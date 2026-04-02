@@ -75,5 +75,6 @@ data class HafasLocation(
 data class HafasProduct(
     @SerializedName("name") val name: String?,
     @SerializedName("line") val line: String?,
+    @SerializedName("number") val number: String?,
     @SerializedName("catOut") val category: String?
 )
