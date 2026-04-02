@@ -1,28 +1,24 @@
 package com.uestra.widgetapp.data
 
 import android.content.Context
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-private val Context.cacheDataStore by preferencesDataStore(name = "departures_cache")
+val Context.cacheDataStore by preferencesDataStore(name = "departures_cache")
 
-/**
- * Ein Cache für die Abfahrtszeiten, der den Glance-Status-Bug umgeht.
- */
+/** Caches departures and widget UI states locally per station. */
 class DeparturesCache(private val context: Context) {
 
     companion object {
-        private val DEPARTURES_JSON = stringPreferencesKey("departures_json")
-        private val LAST_UPDATED = stringPreferencesKey("last_updated")
         private val STATION_ID = stringPreferencesKey("station_id")
-        private val TIME_DISPLAY_MODE = stringPreferencesKey("time_display_mode") // "MIN" | "CLOCK"
+        private val TIME_DISPLAY_MODE = stringPreferencesKey("time_display_mode")
         private val GPS_MODE = booleanPreferencesKey("gps_mode")
+
+        private fun departuresKey(id: String) = stringPreferencesKey("deps_$id")
+        private fun updatedKey(id: String) = stringPreferencesKey("upd_$id")
 
         private fun tabKey(stationId: String) = stringPreferencesKey("tab_state_$stationId")
         private fun directionKey(stationId: String) = stringPreferencesKey("direction_state_$stationId")
@@ -31,19 +27,19 @@ class DeparturesCache(private val context: Context) {
     suspend fun saveDepartures(stationId: String, json: String) {
         context.cacheDataStore.edit { prefs ->
             prefs[STATION_ID] = stationId
-            prefs[DEPARTURES_JSON] = json
-            prefs[LAST_UPDATED] = System.currentTimeMillis().toString()
+            prefs[departuresKey(stationId)] = json
+            prefs[updatedKey(stationId)] = System.currentTimeMillis().toString()
         }
     }
 
-    suspend fun getDeparturesJson(): String = 
-        context.cacheDataStore.data.map { it[DEPARTURES_JSON] ?: "[]" }.first()
-
     suspend fun getStationId(): String = 
-        context.cacheDataStore.data.map { it[STATION_ID] ?: "Unbekannt" }.first()
+        context.cacheDataStore.data.map { it[STATION_ID] ?: "25000031" }.first()
 
-    suspend fun getLastUpdated(): String = 
-        context.cacheDataStore.data.map { it[LAST_UPDATED] ?: "" }.first()
+    suspend fun getDeparturesJson(stationId: String): String = 
+        context.cacheDataStore.data.map { it[departuresKey(stationId)] ?: "[]" }.first()
+
+    suspend fun getLastUpdated(stationId: String): String = 
+        context.cacheDataStore.data.map { it[updatedKey(stationId)] ?: "" }.first()
 
     suspend fun getTabState(stationId: String): String = 
         context.cacheDataStore.data.map { it[tabKey(stationId)] ?: "ALL" }.first()
@@ -57,14 +53,14 @@ class DeparturesCache(private val context: Context) {
     fun getDirectionStateFlow(stationId: String): Flow<String> = 
         context.cacheDataStore.data.map { it[directionKey(stationId)] ?: "ALL" }
 
-    fun getDeparturesJsonFlow(): Flow<String> = 
-        context.cacheDataStore.data.map { it[DEPARTURES_JSON] ?: "[]" }
+    fun getDeparturesJsonFlow(stationId: String): Flow<String> = 
+        context.cacheDataStore.data.map { it[departuresKey(stationId)] ?: "[]" }
         
     fun getStationIdFlow(): Flow<String> = 
-        context.cacheDataStore.data.map { it[STATION_ID] ?: "Unbekannt" }
+        context.cacheDataStore.data.map { it[STATION_ID] ?: "25000031" }
 
-    fun getLastUpdatedFlow(): Flow<String> = 
-        context.cacheDataStore.data.map { it[LAST_UPDATED] ?: "" }
+    fun getLastUpdatedFlow(stationId: String): Flow<String> = 
+        context.cacheDataStore.data.map { it[updatedKey(stationId)] ?: "" }
 
     suspend fun setTabState(stationId: String, state: String) {
         context.cacheDataStore.edit { prefs ->
@@ -78,10 +74,10 @@ class DeparturesCache(private val context: Context) {
         }
     }
 
-    fun getTimeDisplayModeFlow(): Flow<String> =
+    fun getTimeDisplayModeFlow(): Flow<String> = 
         context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] ?: "MIN" }
 
-    suspend fun getTimeDisplayMode(): String =
+    suspend fun getTimeDisplayMode(): String = 
         context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] ?: "MIN" }.first()
 
     suspend fun setTimeDisplayMode(mode: String) {
@@ -90,16 +86,11 @@ class DeparturesCache(private val context: Context) {
         }
     }
 
-    suspend fun toggleTimeDisplayMode() {
-        val current = getTimeDisplayMode()
-        setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
-    }
+    fun getGpsModeFlow(): Flow<Boolean> = 
+        context.cacheDataStore.data.map { it[GPS_MODE] ?: false }
 
     suspend fun isGpsModeActive(): Boolean = 
         context.cacheDataStore.data.map { it[GPS_MODE] ?: false }.first()
-
-    fun getGpsModeFlow(): Flow<Boolean> = 
-        context.cacheDataStore.data.map { it[GPS_MODE] ?: false }
 
     suspend fun setGpsMode(active: Boolean) {
         context.cacheDataStore.edit { prefs ->

@@ -6,23 +6,27 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
-import androidx.glance.text.*
-import androidx.glance.unit.ColorProvider
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
-import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.updateAll
 import com.google.gson.Gson
-import com.uestra.widgetapp.api.DepartureItem
-import com.uestra.widgetapp.api.UestraApi
-import com.uestra.widgetapp.api.StationSearchResult
+import com.uestra.widgetapp.api.*
 import com.uestra.widgetapp.data.DeparturesCache
 import com.uestra.widgetapp.data.FavoritesRepository
 import com.uestra.widgetapp.data.StopsRepository
+import java.time.Instant
+import java.time.Duration
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class RefreshAction : ActionCallback {
+    companion object {
+        val KEY_FORCE = ActionParameters.Key<Boolean>("force")
+    }
+    
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
@@ -31,26 +35,72 @@ class RefreshAction : ActionCallback {
         try {
             val repo = FavoritesRepository(context)
             val cache = DeparturesCache(context)
+            val isForce = parameters[KEY_FORCE] ?: false
             
-            // Wenn GPS-Automatik an ist, erst Standort prüfen
             if (cache.isGpsModeActive()) {
                 findAndSetActiveNearestStation(context)
             }
             
             val stationId = repo.getActiveStationIdNow()
-            val api = UestraApi.create()
-            val response = api.getDepartures(stationId = stationId)
-            val json = Gson().toJson(response.departures ?: emptyList<DepartureItem>())
-
-            // Speichere im Cache (Bypass für Glance-State-Bug)
-            cache.saveDepartures(stationId, json)
+            val lastUpdatedStr = cache.getLastUpdated(stationId)
+            val minutesOld = if (lastUpdatedStr.isNotEmpty()) {
+                val lastTime = Instant.ofEpochMilli(lastUpdatedStr.toLong())
+                Duration.between(lastTime, Instant.now()).toMinutes()
+            } else 999L
             
-            // Widget-Update-Signal
+            if (isForce || minutesOld >= 5) {
+                val api = UestraApi.create()
+                val hafasId = if (stationId.length == 8) "00$stationId" else stationId
+                
+                val request = HafasRequest(
+                    svcReqL = listOf(
+                        SvcReq(
+                            meth = "StationBoard",
+                            req = StationBoardReq(
+                                stbLoc = StbLoc(lid = "A=1@L=$hafasId@"),
+                                maxJny = 25
+                            )
+                        )
+                    )
+                )
+                
+                val response = api.getDepartures(request)
+                val journeys = response.svcResL?.firstOrNull()?.res?.jnyL ?: emptyList()
+                
+                val departures = journeys.map { jny ->
+                    val prod = jny.product?.firstOrNull()
+                    val line = prod?.line ?: prod?.name ?: "???"
+                    val num = prod?.number ?: line.substringAfter(" ")
+                    
+                    val plannedIso = formatHafasToIso(jny.date, jny.time)
+                    val estimatedIso = formatHafasToIso(jny.rtDate ?: jny.date, jny.rtTime ?: jny.time)
+                    
+                    DepartureItem(
+                        line            = line,
+                        lineId          = prod?.name,
+                        destination     = jny.direction ?: "Unbekannt",
+                        number          = num,
+                        events          = listOf(DepartureEvent(plannedIso, estimatedIso))
+                    )
+                }
+                
+                cache.saveDepartures(stationId, Gson().toJson(departures))
+            }
+            
             DeparturesWidget().updateAll(context)
         } catch (e: Exception) {
-            // Im Fehlerfall loggen oder Cache leeren/Status setzen
-            // Hier verzichten wir auf updateAppWidgetState, um Build-Fehler zu vermeiden
+            e.printStackTrace()
         }
+    }
+
+    private fun formatHafasToIso(date: String?, time: String?): String? {
+        if (date == null || time == null) return null
+        return try {
+            // HAFAS: 20260402, 143000 -> 2026-04-02T14:30:00Z
+            val d = date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6, 8)
+            val t = time.substring(0, 2) + ":" + time.substring(2, 4) + ":" + (if (time.length >= 6) time.substring(4, 6) else "00")
+            "${d}T${t}Z"
+        } catch (e: Exception) { null }
     }
 }
 
@@ -68,12 +118,7 @@ class ChangeTabAction : ActionCallback {
         val cache = DeparturesCache(context)
         val stationId = cache.getStationId()
         cache.setTabState(stationId, targetTab)
-        
-        // Wenn GPS-Automatik an ist, sofort neue Haltestelle suchen
-        if (cache.isGpsModeActive()) {
-            findAndSetActiveNearestStation(context)
-        }
-        
+        if (cache.isGpsModeActive()) findAndSetActiveNearestStation(context)
         DeparturesWidget().updateAll(context)
     }
 }
@@ -94,12 +139,9 @@ class ChangeStationAction : ActionCallback {
             val (nextId, nextName) = favorites[nextIndex]
             
             repo.setActiveStation(nextId, nextName)
-            
-            // Manueller Wechsel schaltet GPS-Automatik aus
             DeparturesCache(context).setGpsMode(false)
-            
-            // Load departures for newly selected station
-            RefreshAction().onAction(context, glanceId, parameters)
+            DeparturesWidget().updateAll(context)
+            RefreshAction().onAction(context, glanceId, actionParametersOf())
         }
     }
 }
@@ -130,8 +172,7 @@ class ToggleTimeDisplayAction : ActionCallback {
     ) {
         val cache = DeparturesCache(context)
         val current = cache.getTimeDisplayMode()
-        val next = if (current == "MIN") "CLOCK" else "MIN"
-        cache.setTimeDisplayMode(next)
+        cache.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
         DeparturesWidget().updateAll(context)
     }
 }
@@ -143,87 +184,42 @@ class LocateNearestStationAction : ActionCallback {
         parameters: ActionParameters
     ) {
         val cache = DeparturesCache(context)
-        val current = cache.isGpsModeActive()
-        val next = !current
+        val next = !cache.isGpsModeActive()
         cache.setGpsMode(next)
-        
-        if (next) {
-            findAndSetActiveNearestStation(context)
-        }
-        
+        if (next) findAndSetActiveNearestStation(context)
         DeparturesWidget().updateAll(context)
     }
 }
 
-/**
- * Kern-Logik für die GPS-Suche, ausgelagert zur Wiederverwendung.
- */
 suspend fun findAndSetActiveNearestStation(context: Context) {
-    // 1. Check permissions
-    val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    if (!hasCoarse && !hasFine) return
+    val hasL = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    if (!hasL) return
 
     val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    
-    // Alle aktiven Provider durchprobieren
-    val providers = listOf(
-        LocationManager.GPS_PROVIDER,
-        LocationManager.NETWORK_PROVIDER,
-        LocationManager.PASSIVE_PROVIDER
-    )
-    
-    var bestLoc: android.location.Location? = null
-    for (provider in providers) {
-        val loc = try {
-            if (locationManager.isProviderEnabled(provider))
-                locationManager.getLastKnownLocation(provider)
-            else null
-        } catch (e: SecurityException) { null }
-        
-        if (loc != null && (bestLoc == null || loc.time > bestLoc.time)) {
-            bestLoc = loc
-        }
-    }
+    val lastLoc = try { locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) } catch (e: SecurityException) { null } ?: return
 
-    if (bestLoc == null) return
-
-    // 2. Alle Stationen aus dem lokalen Cache laden
     val stopsRepo = StopsRepository(context)
     val allStops = stopsRepo.getAllStops()
     if (allStops.isEmpty()) return
 
-    // 3. Aktuellen Tab-Filter berücksichtigen
     val cache = DeparturesCache(context)
-    val currentId = cache.getStationId()
-    val tabState = cache.getTabState(currentId)
+    val tabState = cache.getTabState(cache.getStationId())
     
-    val stopsWithCoords = allStops.filter { stop ->
-        if (stop.lat == null || stop.lon == null) return@filter false
-        when (tabState) {
-            "BUS"   -> stop.platforms?.any { it.isBus } == true
-            "TRAIN" -> stop.platforms?.any { it.isTram } == true
-            else    -> true
-        }
-    }
+    val stopsWithCoords = allStops.filter { it.lat != null && it.lon != null }
 
-    // 4. Nächste Station finden
     var nearestStop: StationSearchResult? = null
     var minDistance = Float.MAX_VALUE
     val results = FloatArray(1)
     
     for (stop in stopsWithCoords) {
-        Location.distanceBetween(bestLoc.latitude, bestLoc.longitude, stop.lat!!, stop.lon!!, results)
+        Location.distanceBetween(lastLoc.latitude, lastLoc.longitude, stop.lat!!, stop.lon!!, results)
         if (results[0] < minDistance) {
             minDistance = results[0]
             nearestStop = stop
         }
     }
 
-    // 5. Station als aktiv setzen
     if (nearestStop != null) {
-        // Tab-State auf die neue Station kopieren, damit der Filter erhalten bleibt
-        cache.setTabState(nearestStop.id, tabState)
         FavoritesRepository(context).setActiveStation(nearestStop.id, nearestStop.name)
     }
 }
