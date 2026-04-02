@@ -10,7 +10,6 @@ import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.updateAll
 import com.google.gson.Gson
 import com.uestra.widgetapp.api.*
 import com.uestra.widgetapp.data.DeparturesCache
@@ -49,58 +48,17 @@ class RefreshAction : ActionCallback {
             } else 999L
             
             if (isForce || minutesOld >= 5) {
-                val api = UestraApi.create()
-                val hafasId = if (stationId.length == 8) "00$stationId" else stationId
-                
-                val request = HafasRequest(
-                    svcReqL = listOf(
-                        SvcReq(
-                            meth = "StationBoard",
-                            req = StationBoardReq(
-                                stbLoc = StbLoc(lid = "A=1@L=$hafasId@"),
-                                maxJny = 25
-                            )
-                        )
-                    )
-                )
-                
-                val response = api.getDepartures(request)
-                val journeys = response.svcResL?.firstOrNull()?.res?.jnyL ?: emptyList()
-                
-                val departures = journeys.map { jny ->
-                    val prod = jny.product?.firstOrNull()
-                    val line = prod?.line ?: prod?.name ?: "???"
-                    val num = prod?.number ?: line.substringAfter(" ")
-                    
-                    val plannedIso = formatHafasToIso(jny.date, jny.time)
-                    val estimatedIso = formatHafasToIso(jny.rtDate ?: jny.date, jny.rtTime ?: jny.time)
-                    
-                    DepartureItem(
-                        line            = line,
-                        lineId          = prod?.name,
-                        destination     = jny.direction ?: "Unbekannt",
-                        number          = num,
-                        events          = listOf(DepartureEvent(plannedIso, estimatedIso))
-                    )
-                }
+                val api = UestraApi.createWeb()
+                val response = api.getDepartures(stationId)
+                val departures = response.departures ?: emptyList()
                 
                 cache.saveDepartures(stationId, Gson().toJson(departures))
             }
             
-            DeparturesWidget().updateAll(context)
+            DeparturesWidget().update(context, glanceId)
         } catch (e: Exception) {
             e.printStackTrace()
         }
-    }
-
-    private fun formatHafasToIso(date: String?, time: String?): String? {
-        if (date == null || time == null) return null
-        return try {
-            // HAFAS: 20260402, 143000 -> 2026-04-02T14:30:00Z
-            val d = date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6, 8)
-            val t = time.substring(0, 2) + ":" + time.substring(2, 4) + ":" + (if (time.length >= 6) time.substring(4, 6) else "00")
-            "${d}T${t}Z"
-        } catch (e: Exception) { null }
     }
 }
 
@@ -119,7 +77,7 @@ class ChangeTabAction : ActionCallback {
         val stationId = cache.getStationId()
         cache.setTabState(stationId, targetTab)
         if (cache.isGpsModeActive()) findAndSetActiveNearestStation(context)
-        DeparturesWidget().updateAll(context)
+        DeparturesWidget().update(context, glanceId)
     }
 }
 
@@ -140,7 +98,7 @@ class ChangeStationAction : ActionCallback {
             
             repo.setActiveStation(nextId, nextName)
             DeparturesCache(context).setGpsMode(false)
-            DeparturesWidget().updateAll(context)
+            DeparturesWidget().update(context, glanceId)
             RefreshAction().onAction(context, glanceId, actionParametersOf())
         }
     }
@@ -160,7 +118,7 @@ class ChangeDirectionAction : ActionCallback {
         val cache = DeparturesCache(context)
         val stationId = cache.getStationId()
         cache.setDirectionState(stationId, targetDirection)
-        DeparturesWidget().updateAll(context)
+        DeparturesWidget().update(context, glanceId)
     }
 }
 
@@ -173,7 +131,7 @@ class ToggleTimeDisplayAction : ActionCallback {
         val cache = DeparturesCache(context)
         val current = cache.getTimeDisplayMode()
         cache.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
-        DeparturesWidget().updateAll(context)
+        DeparturesWidget().update(context, glanceId)
     }
 }
 
@@ -187,7 +145,7 @@ class LocateNearestStationAction : ActionCallback {
         val next = !cache.isGpsModeActive()
         cache.setGpsMode(next)
         if (next) findAndSetActiveNearestStation(context)
-        DeparturesWidget().updateAll(context)
+        DeparturesWidget().update(context, glanceId)
     }
 }
 

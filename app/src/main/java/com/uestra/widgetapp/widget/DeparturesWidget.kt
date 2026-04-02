@@ -43,6 +43,9 @@ import java.time.format.DateTimeParseException
 import java.time.Duration
 
 class DeparturesWidget : GlanceAppWidget() {
+    companion object {
+        private val gson = Gson()
+    }
 
     // Wir verzichten komplett auf GlanceStateDefinition, um den 
     // Bug-behafteten updateAppWidgetState-Mechanismus zu umgehen.
@@ -69,7 +72,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val status = "ok"    // In Zukunft via Cache
 
             val departures: List<DepartureItem> = try {
-                Gson().fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
+                gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
             } catch (e: Exception) {
                 emptyList()
             }
