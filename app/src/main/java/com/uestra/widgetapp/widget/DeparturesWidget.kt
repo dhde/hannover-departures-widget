@@ -237,7 +237,7 @@ class DeparturesWidget : GlanceAppWidget() {
             }
             
             val hasDelay = (departure.delayMinutes ?: 0) > 0
-            val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
+            val delayText = if (hasDelay && timeDisplayMode == "CLOCK") " (+${departure.delayMinutes})" else ""
             
             // Wenn ab 2 Min veraltet: Grau und Kursiv. Wenn Verspätung: Orange. Sonst Gruen und Fett
             val timeStyle = when {
