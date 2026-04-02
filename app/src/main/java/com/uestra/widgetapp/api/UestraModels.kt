@@ -42,7 +42,7 @@ data class DepartureItem(
 
 data class DepartureEvent(
     @SerializedName("plannedTime") val plannedTime: String?,
-    @SerializedName("estimatedTime") val estimatedTime: String?
+    @SerializedName("estimated_time") val estimatedTime: String?
 )
 
 /**
