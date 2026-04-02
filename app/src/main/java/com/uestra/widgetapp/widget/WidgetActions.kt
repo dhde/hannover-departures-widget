@@ -92,7 +92,7 @@ class ChangeStationAction : ActionCallback {
         val favorites = repo.getFavoritesNow()
         
         if (favorites.isNotEmpty()) {
-            val currentIndex = favorites.indexOfFirst { it.first == currentId }
+            val currentIndex = favorites.indexOfFirst { it.id == currentId }
             val nextIndex = if (currentIndex == -1 || currentIndex >= favorites.size - 1) 0 else currentIndex + 1
             val (nextId, nextName) = favorites[nextIndex]
             
