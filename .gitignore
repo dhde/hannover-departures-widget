@@ -1,0 +1,28 @@
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# Build artifacts
+.gradle/
+build/
+app/build/
+*/build/
+
+# Signing files
+*.keystore
+*.jks
+*.p12
+
+# Local configuration
+local.properties
+.DS_Store
+
+# Other
+captures/
+.externalNativeBuild
+.cxx/
