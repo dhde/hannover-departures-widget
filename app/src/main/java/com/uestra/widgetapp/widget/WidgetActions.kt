@@ -203,7 +203,6 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     if (allStops.isEmpty()) return
 
     val cache = DeparturesCache(context)
-    val tabState = cache.getTabState(cache.getStationId())
     
     val stopsWithCoords = allStops.filter { it.lat != null && it.lon != null }
 
