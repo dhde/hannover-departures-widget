@@ -72,7 +72,9 @@ class DeparturesWidget : GlanceAppWidget() {
             val status = "ok"    // In Zukunft via Cache
 
             val departures: List<DepartureItem> = try {
-                gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
+                val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
+                // Explizit nach der nächsten Abfahrtszeit (Echtzeit) sortieren
+                list.sortedBy { it.nextDepartureTime ?: "99:99" }
             } catch (e: Exception) {
                 emptyList()
             }
@@ -246,7 +248,7 @@ class DeparturesWidget : GlanceAppWidget() {
             }
             
             val hasDelay = (departure.delayMinutes ?: 0) > 0
-            val delayText = if (hasDelay && timeDisplayMode == "CLOCK") " (+${departure.delayMinutes})" else ""
+            val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
             
             // Wenn ab 2 Min veraltet: Grau und Kursiv. Wenn Verspätung: Orange. Sonst Gruen und Fett
             val timeStyle = when {
