@@ -37,6 +37,27 @@ class FavoritesRepository(private val context: Context) {
     val activeStationName: Flow<String?> = context.dataStore.data
         .map { it[ACTIVE_STATION_NAME] }
 
+    /** Gibt Favoriten als geordnete Liste zurück. Migriert automatisch vom alten Format. */
+    val favoritesFlow: Flow<List<FavoriteStation>> = context.dataStore.data.map { prefs ->
+        val json = prefs[FAVORITES_JSON_KEY]
+        if (json != null) {
+            val type = object : TypeToken<List<FavoriteStation>>() {}.type
+            gson.fromJson(json, type)
+        } else {
+            // Migration vom alten StringSet
+            val oldSet = prefs[OLD_FAVORITES_KEY] ?: emptySet()
+            oldSet.map { entry ->
+                val parts = entry.split("|", limit = 2)
+                FavoriteStation(parts.getOrElse(0) { "" }, parts.getOrElse(1) { entry })
+            }
+        }
+    }
+
+    /** Findet den Alias oder Namen für die aktuell aktive Station. */
+    val effectiveStationName: Flow<String> = combine(activeStationId, activeStationName, favoritesFlow) { id, official, favs ->
+        favs.find { it.id == id }?.alias ?: official ?: "Unbekannt"
+    }
+
     suspend fun setActiveStation(id: String, name: String) {
         context.dataStore.edit { prefs ->
             prefs[ACTIVE_STATION_ID]   = id
@@ -54,22 +75,6 @@ class FavoritesRepository(private val context: Context) {
     }
 
     // ── Favoriten ────────────────────────────────────────────────────────────
-
-    /** Gibt Favoriten als geordnete Liste zurück. Migriert automatisch vom alten Format. */
-    val favoritesFlow: Flow<List<FavoriteStation>> = context.dataStore.data.map { prefs ->
-        val json = prefs[FAVORITES_JSON_KEY]
-        if (json != null) {
-            val type = object : TypeToken<List<FavoriteStation>>() {}.type
-            gson.fromJson(json, type)
-        } else {
-            // Migration vom alten StringSet
-            val oldSet = prefs[OLD_FAVORITES_KEY] ?: emptySet()
-            oldSet.map { entry ->
-                val parts = entry.split("|", limit = 2)
-                FavoriteStation(parts.getOrElse(0) { "" }, parts.getOrElse(1) { entry })
-            }
-        }
-    }
 
     suspend fun getFavoritesNow(): List<FavoriteStation> {
         var list = emptyList<FavoriteStation>()

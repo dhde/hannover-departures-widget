@@ -58,8 +58,8 @@ class DeparturesWidget : GlanceAppWidget() {
             val stationIdState by repo.activeStationId.collectAsState(initial = "25000031")
             val stationId = stationIdState ?: "25000031"
             
-            val stationNameState by repo.activeStationName.collectAsState(initial = "Laden...")
-            val stationName = stationNameState ?: stationId
+            val stationNameState by repo.effectiveStationName.collectAsState(initial = "Laden...")
+            val stationName = stationNameState
 
             val tabState by cache.getTabStateFlow(stationId).collectAsState(initial = "ALL")
             val directionState by cache.getDirectionStateFlow(stationId).collectAsState(initial = "ALL")

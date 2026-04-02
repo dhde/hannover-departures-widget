@@ -105,7 +105,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
 
     val favorites        by repo.favoritesFlow.collectAsState(initial = emptyList())
     val activeStationId  by repo.activeStationId.collectAsState(initial = null)
-    val activeStationName by repo.activeStationName.collectAsState(initial = null)
+    val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
 
     val context = LocalContext.current
     val stopsRepo = remember { com.uestra.widgetapp.data.StopsRepository(context) }
@@ -135,12 +135,20 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "Üstra Widget",
-                        fontWeight = FontWeight.Bold,
-                        fontSize   = 20.sp,
-                        color      = TextMain
-                    )
+                    Column {
+                        Text(
+                            "Üstra Widget",
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 18.sp,
+                            color      = TextMain
+                        )
+                        Text(
+                            "Aktiv: $activeStationName",
+                            fontSize = 12.sp,
+                            color    = Teal,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
             )
@@ -155,43 +163,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ── Aktive Station ────────────────────────────────────────────
-            item {
-                SectionLabel("Aktive Station")
-                Card(
-                    colors  = CardDefaults.cardColors(containerColor = CardBg),
-                    shape   = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Teal),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🚏", fontSize = 18.sp)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                activeStationName ?: "Kröpcke (Standard)",
-                                color      = TextMain,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize   = 15.sp
-                            )
-                            Text(
-                                activeStationId ?: "25000031",
-                                color    = TextSub,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                }
-            }
+            // entfernt, da jetzt in der TopAppBar
 
             // ── Suche ─────────────────────────────────────────────────────
             item {
@@ -345,7 +317,8 @@ private fun SearchResultRow(
                 }
             }
             if (isActive) {
-                Text("✓", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("AKTIV", color = Teal, fontWeight = FontWeight.Bold, fontSize = 10.sp, 
+                    modifier = Modifier.background(Teal.copy(0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
                 Spacer(Modifier.width(8.dp))
             }
             IconButton(onClick = onToggleFav) {
