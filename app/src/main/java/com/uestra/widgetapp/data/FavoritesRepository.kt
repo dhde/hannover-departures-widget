@@ -5,17 +5,25 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.flow.*
 
 val Context.dataStore by preferencesDataStore(name = "favorites_prefs")
 
+data class FavoriteStation(
+    val id: String,
+    val name: String,
+    val alias: String? = null
+)
+
 /** Persistiert Favoriten-Haltestellen und die aktive Widget-Station. */
 class FavoritesRepository(private val context: Context) {
+    private val gson = Gson()
 
     companion object {
-        val FAVORITES_KEY        = stringSetPreferencesKey("saved_favorites")     // Set<"id|name">
+        private val OLD_FAVORITES_KEY = stringSetPreferencesKey("saved_favorites")
+        private val FAVORITES_JSON_KEY = stringPreferencesKey("favorites_json")
         val WIDGET_MODE_KEY      = stringPreferencesKey("widget_mode")            // "gps" | "station"
         val ACTIVE_STATION_ID    = stringPreferencesKey("active_station_id")
         val ACTIVE_STATION_NAME  = stringPreferencesKey("active_station_name")
@@ -37,45 +45,86 @@ class FavoritesRepository(private val context: Context) {
         }
     }
 
-    suspend fun getActiveStationIdNow(): String =
-        context.dataStore.data.first()[ACTIVE_STATION_ID] ?: "25000031" // Fallback: Kröpcke
+    suspend fun getActiveStationIdNow(): String {
+        var id = "25000031"
+        context.dataStore.data.map { prefs -> prefs[ACTIVE_STATION_ID] }.take(1).collect { saved ->
+            if (saved != null) id = saved
+        }
+        return id
+    }
 
     // ── Favoriten ────────────────────────────────────────────────────────────
 
-    /** Gibt Favoriten als Liste von Pair(id, name) zurück. */
-    val favoritesFlow: Flow<List<Pair<String, String>>> =
-        context.dataStore.data.map { prefs ->
-            prefs[FAVORITES_KEY]
-                ?.map { entry ->
-                    val parts = entry.split("|", limit = 2)
-                    Pair(parts.getOrElse(0) { "" }, parts.getOrElse(1) { entry })
-                } ?: emptyList()
+    /** Gibt Favoriten als geordnete Liste zurück. Migriert automatisch vom alten Format. */
+    val favoritesFlow: Flow<List<FavoriteStation>> = context.dataStore.data.map { prefs ->
+        val json = prefs[FAVORITES_JSON_KEY]
+        if (json != null) {
+            val type = object : TypeToken<List<FavoriteStation>>() {}.type
+            gson.fromJson(json, type)
+        } else {
+            // Migration vom alten StringSet
+            val oldSet = prefs[OLD_FAVORITES_KEY] ?: emptySet()
+            oldSet.map { entry ->
+                val parts = entry.split("|", limit = 2)
+                FavoriteStation(parts.getOrElse(0) { "" }, parts.getOrElse(1) { entry })
+            }
         }
+    }
 
-    suspend fun getFavoritesNow(): List<Pair<String, String>> = favoritesFlow.first()
+    suspend fun getFavoritesNow(): List<FavoriteStation> {
+        var list = emptyList<FavoriteStation>()
+        favoritesFlow.take(1).collect { list = it }
+        return list
+    }
 
     suspend fun addFavorite(id: String, name: String) {
-        context.dataStore.edit { prefs ->
-            val current = prefs[FAVORITES_KEY] ?: emptySet()
-            prefs[FAVORITES_KEY] = current + "$id|$name"
+        val current = getFavoritesNow().toMutableList()
+        if (current.none { it.id == id }) {
+            current.add(FavoriteStation(id, name))
+            saveFavorites(current)
         }
     }
 
     suspend fun removeFavorite(id: String) {
+        val updated = getFavoritesNow().filter { it.id != id }
+        saveFavorites(updated)
+    }
+
+    suspend fun moveFavorite(id: String, up: Boolean) {
+        val list = getFavoritesNow().toMutableList()
+        val index = list.indexOfFirst { it.id == id }
+        if (index == -1) return
+        
+        val target = if (up) index - 1 else index + 1
+        if (target in 0 until list.size) {
+            val item = list.removeAt(index)
+            list.add(target, item)
+            saveFavorites(list)
+        }
+    }
+
+    suspend fun setFavoriteAlias(id: String, alias: String?) {
+        val list = getFavoritesNow().map { fav ->
+            if (fav.id == id) fav.copy(alias = alias?.takeIf { it.isNotBlank() }) else fav
+        }
+        saveFavorites(list)
+    }
+
+    private suspend fun saveFavorites(list: List<FavoriteStation>) {
         context.dataStore.edit { prefs ->
-            val current = prefs[FAVORITES_KEY] ?: emptySet()
-            prefs[FAVORITES_KEY] = current.filter { !it.startsWith("$id|") }.toSet()
+            prefs[FAVORITES_JSON_KEY] = gson.toJson(list)
+            // Altes Set löschen, um Migration abzuschließen
+            prefs.remove(OLD_FAVORITES_KEY)
         }
     }
 
     suspend fun isFavorite(id: String): Boolean =
-        context.dataStore.data.first()[FAVORITES_KEY]
-            ?.any { it.startsWith("$id|") } ?: false
+        getFavoritesNow().any { fav -> fav.id == id }
 
     // ── Widget-Modus ─────────────────────────────────────────────────────────
 
     val widgetModeFlow: Flow<String> = context.dataStore.data
-        .map { it[WIDGET_MODE_KEY] ?: "station" }
+        .map { prefs -> prefs[WIDGET_MODE_KEY] ?: "station" }
 
     suspend fun setWidgetMode(mode: String) {
         context.dataStore.edit { prefs ->

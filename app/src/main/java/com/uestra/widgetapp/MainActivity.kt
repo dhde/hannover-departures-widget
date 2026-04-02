@@ -16,6 +16,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
@@ -231,7 +234,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
                     SectionLabel("Ergebnisse")
                 }
                 items(results) { location ->
-                    val isFav   = favorites.any { it.first == location.id }
+                    val isFav   = favorites.any { it.id == location.id }
                     val isActive = location.id == activeStationId
 
                     SearchResultRow(
@@ -269,14 +272,15 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
                     )
                 }
             } else {
-                items(favorites) { (id, name) ->
-                    val isActive = id == activeStationId
+                items(favorites) { fav ->
+                    val isActive = fav.id == activeStationId
                     FavoriteRow(
-                        id       = id,
-                        name     = name,
+                        fav      = fav,
                         isActive = isActive,
-                        onSelect = { scope.launch { repo.setActiveStation(id, name) } },
-                        onDelete = { scope.launch { repo.removeFavorite(id)         } }
+                        onSelect = { scope.launch { repo.setActiveStation(fav.id, fav.name) } },
+                        onDelete = { scope.launch { repo.removeFavorite(fav.id)         } },
+                        onMove   = { up -> scope.launch { repo.moveFavorite(fav.id, up) } },
+                        onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.id, alias) } }
                     )
                 }
             }
@@ -357,12 +361,40 @@ private fun SearchResultRow(
 
 @Composable
 private fun FavoriteRow(
-    id: String,
-    name: String,
+    fav: com.uestra.widgetapp.data.FavoriteStation,
     isActive: Boolean,
     onSelect: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onMove: (Boolean) -> Unit,
+    onAlias: (String?) -> Unit
 ) {
+    var showAliasDialog by remember { mutableStateOf(false) }
+    var aliasText by remember { mutableStateOf(fav.alias ?: "") }
+
+    if (showAliasDialog) {
+        AlertDialog(
+            onDismissRequest = { showAliasDialog = false },
+            title   = { Text("Alias für ${fav.name}") },
+            text    = {
+                OutlinedTextField(
+                    value = aliasText,
+                    onValueChange = { aliasText = it },
+                    placeholder = { Text("z.B. Zuhause, Arbeit...") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAlias(aliasText)
+                    showAliasDialog = false
+                }) { Text("Speichern") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAliasDialog = false }) { Text("Abbrechen") }
+            }
+        )
+    }
+
     Card(
         colors  = CardDefaults.cardColors(
             containerColor = if (isActive) Color(0xFF0F2A2A) else CardBg
@@ -376,24 +408,30 @@ private fun FavoriteRow(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Filled.Star, null, tint = Color(0xFFFFD700), modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = { onMove(true) }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.KeyboardArrowUp, null, tint = TextSub)
+                }
+                IconButton(onClick = { onMove(false) }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.KeyboardArrowDown, null, tint = TextSub)
+                }
+            }
+            Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                val displayName = name.substringAfter(", ").ifBlank { name }
+                val displayName = fav.alias ?: fav.name.substringAfter(", ").ifBlank { fav.name }
                 Text(
                     displayName,
                     color      = if (isActive) Teal else TextMain,
                     fontWeight = FontWeight.SemiBold,
                     fontSize   = 14.sp
                 )
-                Text(name, color = TextSub, fontSize = 11.sp)
+                Text(fav.name, color = TextSub, fontSize = 11.sp)
             }
-            if (isActive) {
-                Text("Aktiv", color = Teal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { showAliasDialog = true }) {
+                Icon(Icons.Default.Edit, null, tint = Teal, modifier = Modifier.size(20.dp))
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, null, tint = Red)
+                Icon(Icons.Default.Delete, null, tint = Red, modifier = Modifier.size(20.dp))
             }
         }
     }
