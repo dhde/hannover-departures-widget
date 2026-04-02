@@ -43,35 +43,42 @@ import java.time.format.DateTimeParseException
 import java.time.Duration
 
 class DeparturesWidget : GlanceAppWidget() {
+    companion object {
+        private val gson = Gson()
+    }
 
     // Wir verzichten komplett auf GlanceStateDefinition, um den 
     // Bug-behafteten updateAppWidgetState-Mechanismus zu umgehen.
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val cache = DeparturesCache(context)
+        val repo = FavoritesRepository(context)
 
         provideContent {
-            val stationId by cache.getStationIdFlow().collectAsState(initial = "")
+            val stationIdState by repo.activeStationId.collectAsState(initial = "25000031")
+            val stationId = stationIdState ?: "25000031"
+            
+            val stationNameState by repo.activeStationName.collectAsState(initial = "Laden...")
+            val stationName = stationNameState ?: stationId
+
             val tabState by cache.getTabStateFlow(stationId).collectAsState(initial = "ALL")
             val directionState by cache.getDirectionStateFlow(stationId).collectAsState(initial = "ALL")
             val gpsModeActive by cache.getGpsModeFlow().collectAsState(initial = false)
             val timeDisplayMode by cache.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
-            val departuresJson by cache.getDeparturesJsonFlow().collectAsState(initial = "[]")
-            val lastUpdated by cache.getLastUpdatedFlow().collectAsState(initial = "")
             
-            val repo = FavoritesRepository(context)
-            val stationName by repo.activeStationName.collectAsState(initial = stationId)
+            val cachedJson by cache.getDeparturesJsonFlow(stationId).collectAsState(initial = "[]")
+            val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
             
             val status = "ok"    // In Zukunft via Cache
 
             val departures: List<DepartureItem> = try {
-                Gson().fromJson(departuresJson, object : TypeToken<List<DepartureItem>>() {}.type)
+                gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
             } catch (e: Exception) {
                 emptyList()
             }
 
             WidgetContent(
-                stationName     = stationName ?: stationId,
+                stationName     = stationName,
                 lastUpdated     = lastUpdated,
                 departures      = departures,
                 tabState        = tabState,
@@ -184,7 +191,9 @@ class DeparturesWidget : GlanceAppWidget() {
             Image(
                 provider = ImageProvider(android.R.drawable.ic_popup_sync),
                 contentDescription = "Refresh",
-                modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>()),
+                modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>(
+                    actionParametersOf(RefreshAction.KEY_FORCE to true)
+                )),
                 colorFilter = ColorFilter.tint(ColorProvider(Color.Gray))
             )
         }
