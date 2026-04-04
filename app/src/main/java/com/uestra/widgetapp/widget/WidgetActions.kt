@@ -82,6 +82,11 @@ class ChangeTabAction : ActionCallback {
 }
 
 class ChangeStationAction : ActionCallback {
+    companion object {
+        val KEY_TARGET_INDEX = ActionParameters.Key<Int>("targetIndex")
+        val KEY_CYCLE_REMAINING = ActionParameters.Key<Boolean>("cycleRemaining")
+    }
+
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
@@ -91,12 +96,32 @@ class ChangeStationAction : ActionCallback {
         val currentId = repo.getActiveStationIdNow()
         val favorites = repo.getFavoritesNow()
         
+        val targetIndex = parameters[KEY_TARGET_INDEX]
+        val cycleRemaining = parameters[KEY_CYCLE_REMAINING] ?: false
+        
         if (favorites.isNotEmpty()) {
-            val currentIndex = favorites.indexOfFirst { it.id == currentId }
-            val nextIndex = if (currentIndex == -1 || currentIndex >= favorites.size - 1) 0 else currentIndex + 1
-            val (nextId, nextName) = favorites[nextIndex]
+            if (targetIndex != null && targetIndex in favorites.indices) {
+                val fav = favorites[targetIndex]
+                repo.setActiveStation(fav.id, fav.name)
+            } else if (cycleRemaining) {
+                if (favorites.size > 3) {
+                    var currentIndex = favorites.indexOfFirst { it.id == currentId }
+                    if (currentIndex < 3) {
+                        currentIndex = 3
+                    } else {
+                        currentIndex++
+                        if (currentIndex >= favorites.size) currentIndex = 3
+                    }
+                    val fav = favorites[currentIndex]
+                    repo.setActiveStation(fav.id, fav.name)
+                }
+            } else {
+                val currentIndex = favorites.indexOfFirst { it.id == currentId }
+                val nextIndex = if (currentIndex == -1 || currentIndex >= favorites.size - 1) 0 else currentIndex + 1
+                val fav = favorites[nextIndex]
+                repo.setActiveStation(fav.id, fav.name)
+            }
             
-            repo.setActiveStation(nextId, nextName)
             DeparturesCache(context).setGpsMode(false)
             DeparturesWidget().update(context, glanceId)
             RefreshAction().onAction(context, glanceId, actionParametersOf())

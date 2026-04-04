@@ -30,6 +30,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.uestra.widgetapp.api.DepartureItem
 import com.uestra.widgetapp.api.UestraApi
+import com.uestra.widgetapp.data.FavoriteStation
 import com.uestra.widgetapp.data.FavoritesRepository
 import com.uestra.widgetapp.data.DeparturesCache
 import com.uestra.widgetapp.widget.RefreshAction
@@ -58,6 +59,8 @@ class DeparturesWidget : GlanceAppWidget() {
             val stationIdState by repo.activeStationId.collectAsState(initial = "25000031")
             val stationId = stationIdState ?: "25000031"
             
+            val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
+            
             val stationNameState by repo.effectiveStationName.collectAsState(initial = "Laden...")
             val stationName = stationNameState
 
@@ -81,8 +84,10 @@ class DeparturesWidget : GlanceAppWidget() {
 
             WidgetContent(
                 stationName     = stationName,
+                stationId       = stationId,
                 lastUpdated     = lastUpdated,
                 departures      = departures,
+                favorites       = favorites,
                 tabState        = tabState,
                 directionState  = directionState,
                 gpsModeActive   = gpsModeActive,
@@ -95,8 +100,10 @@ class DeparturesWidget : GlanceAppWidget() {
     @Composable
     private fun WidgetContent(
         stationName: String,
+        stationId: String,
         lastUpdated: String,
         departures: List<DepartureItem>,
+        favorites: List<FavoriteStation>,
         tabState: String,
         directionState: String,
         gpsModeActive: Boolean,
@@ -110,6 +117,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 .padding(8.dp)
         ) {
             Header(stationName, gpsModeActive)
+            
+            FavoritesRow(favorites, stationId)
             
             FilterSegmentedRow(departures, tabState, directionState)
 
@@ -198,6 +207,68 @@ class DeparturesWidget : GlanceAppWidget() {
                 )),
                 colorFilter = ColorFilter.tint(ColorProvider(Color.Gray))
             )
+        }
+    }
+
+    @Composable
+    private fun FavoritesRow(favorites: List<FavoriteStation>, currentStationId: String) {
+        if (favorites.isEmpty()) return
+        
+        Row(
+            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val buttonsToShow = minOf(3, favorites.size)
+            for (i in 0 until buttonsToShow) {
+                val fav = favorites[i]
+                val cleanName = fav.alias ?: fav.name.replace("Hannover", "", ignoreCase = true)
+                    .replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
+                val shortName = if (cleanName.length > 8) cleanName.take(7) + "." else cleanName
+                
+                val isActive = fav.id == currentStationId
+                val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF333333)
+                
+                Box(
+                    modifier = GlanceModifier
+                        .defaultWeight()
+                        .padding(horizontal = 2.dp)
+                        .cornerRadius(6.dp)
+                        .background(ColorProvider(bgColor))
+                        .clickable(actionRunCallback<ChangeStationAction>(
+                            actionParametersOf(ChangeStationAction.KEY_TARGET_INDEX to i)
+                        )),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = shortName,
+                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                        modifier = GlanceModifier.padding(vertical = 4.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+            
+            if (favorites.size > 3) {
+                val isRemainingActive = favorites.subList(3, favorites.size).any { it.id == currentStationId }
+                val bgColor = if (isRemainingActive) Color(0xFF005A9B) else Color(0xFF333333)
+                Box(
+                    modifier = GlanceModifier
+                        .width(40.dp)
+                        .padding(horizontal = 2.dp)
+                        .cornerRadius(6.dp)
+                        .background(ColorProvider(bgColor))
+                        .clickable(actionRunCallback<ChangeStationAction>(
+                            actionParametersOf(ChangeStationAction.KEY_CYCLE_REMAINING to true)
+                        )),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "▶",
+                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp),
+                        modifier = GlanceModifier.padding(vertical = 4.dp)
+                    )
+                }
+            }
         }
     }
 
