@@ -116,9 +116,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 .background(ColorProvider(Color(0xFF121212)))
                 .padding(8.dp)
         ) {
-            Header(stationName, gpsModeActive)
-            
-            FavoritesRow(favorites, stationId)
+            Header(stationName, gpsModeActive, favorites, stationId)
             
             FilterSegmentedRow(departures, tabState, directionState)
 
@@ -166,9 +164,14 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Header(stationName: String, gpsModeActive: Boolean) {
+    private fun Header(
+        stationName: String, 
+        gpsModeActive: Boolean, 
+        favorites: List<FavoriteStation>, 
+        currentStationId: String
+    ) {
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp),
+            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val cleanName = stationName
@@ -187,15 +190,61 @@ class DeparturesWidget : GlanceAppWidget() {
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 ),
+                maxLines = 1,
                 modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<ChangeStationAction>())
             )
+            
+            if (favorites.isNotEmpty()) {
+                Row(
+                    modifier = GlanceModifier.padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val buttonsToShow = minOf(3, favorites.size)
+                    for (i in 0 until buttonsToShow) {
+                        val isActive = favorites[i].id == currentStationId
+                        val color = if (isActive) Color(0xFF4CAF50) else Color.Gray
+                        
+                        Text(
+                            text = "${i + 1}",
+                            style = TextStyle(
+                                color = ColorProvider(color), 
+                                fontSize = 16.sp, 
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            modifier = GlanceModifier
+                                .padding(horizontal = 6.dp)
+                                .clickable(actionRunCallback<ChangeStationAction>(
+                                    actionParametersOf(ChangeStationAction.KEY_TARGET_INDEX to i)
+                                ))
+                        )
+                    }
+                    
+                    if (favorites.size > 3) {
+                        val isRemainingActive = favorites.subList(3, favorites.size).any { it.id == currentStationId }
+                        val color = if (isRemainingActive) Color(0xFF4CAF50) else Color.Gray
+                        
+                        Text(
+                            text = "▶",
+                            style = TextStyle(
+                                color = ColorProvider(color), 
+                                fontSize = 14.sp
+                            ),
+                            modifier = GlanceModifier
+                                .padding(horizontal = 4.dp)
+                                .clickable(actionRunCallback<ChangeStationAction>(
+                                    actionParametersOf(ChangeStationAction.KEY_CYCLE_REMAINING to true)
+                                ))
+                        )
+                    }
+                }
+            }
             
             val gpsIconColor = if (gpsModeActive) Color(0xFF4285F4) else Color.Gray
 
             Image(
                 provider = ImageProvider(android.R.drawable.ic_menu_mylocation),
                 contentDescription = "GPS Nearest Station",
-                modifier = GlanceModifier.padding(horizontal = 8.dp).clickable(actionRunCallback<LocateNearestStationAction>()),
+                modifier = GlanceModifier.padding(end = 8.dp).clickable(actionRunCallback<LocateNearestStationAction>()),
                 colorFilter = ColorFilter.tint(ColorProvider(gpsIconColor))
             )
 
@@ -210,67 +259,6 @@ class DeparturesWidget : GlanceAppWidget() {
         }
     }
 
-    @Composable
-    private fun FavoritesRow(favorites: List<FavoriteStation>, currentStationId: String) {
-        if (favorites.isEmpty()) return
-        
-        Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val buttonsToShow = minOf(3, favorites.size)
-            for (i in 0 until buttonsToShow) {
-                val fav = favorites[i]
-                val cleanName = fav.alias ?: fav.name.replace("Hannover", "", ignoreCase = true)
-                    .replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
-                val shortName = if (cleanName.length > 8) cleanName.take(7) + "." else cleanName
-                
-                val isActive = fav.id == currentStationId
-                val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF333333)
-                
-                Box(
-                    modifier = GlanceModifier
-                        .defaultWeight()
-                        .padding(horizontal = 2.dp)
-                        .cornerRadius(6.dp)
-                        .background(ColorProvider(bgColor))
-                        .clickable(actionRunCallback<ChangeStationAction>(
-                            actionParametersOf(ChangeStationAction.KEY_TARGET_INDEX to i)
-                        )),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = shortName,
-                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp, fontWeight = FontWeight.Medium),
-                        modifier = GlanceModifier.padding(vertical = 4.dp),
-                        maxLines = 1
-                    )
-                }
-            }
-            
-            if (favorites.size > 3) {
-                val isRemainingActive = favorites.subList(3, favorites.size).any { it.id == currentStationId }
-                val bgColor = if (isRemainingActive) Color(0xFF005A9B) else Color(0xFF333333)
-                Box(
-                    modifier = GlanceModifier
-                        .width(40.dp)
-                        .padding(horizontal = 2.dp)
-                        .cornerRadius(6.dp)
-                        .background(ColorProvider(bgColor))
-                        .clickable(actionRunCallback<ChangeStationAction>(
-                            actionParametersOf(ChangeStationAction.KEY_CYCLE_REMAINING to true)
-                        )),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "▶",
-                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp),
-                        modifier = GlanceModifier.padding(vertical = 4.dp)
-                    )
-                }
-            }
-        }
-    }
 
     @Composable
     private fun FilterToggleButton(tabState: String) {
