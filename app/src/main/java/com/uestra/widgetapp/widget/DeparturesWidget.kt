@@ -30,6 +30,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.uestra.widgetapp.api.DepartureItem
 import com.uestra.widgetapp.api.UestraApi
+import com.uestra.widgetapp.data.FavoriteStation
 import com.uestra.widgetapp.data.FavoritesRepository
 import com.uestra.widgetapp.data.DeparturesCache
 import com.uestra.widgetapp.widget.RefreshAction
@@ -41,6 +42,7 @@ import com.uestra.widgetapp.widget.ToggleTimeDisplayAction
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.time.Duration
+import com.uestra.widgetapp.R
 
 class DeparturesWidget : GlanceAppWidget() {
     companion object {
@@ -58,6 +60,8 @@ class DeparturesWidget : GlanceAppWidget() {
             val stationIdState by repo.activeStationId.collectAsState(initial = "25000031")
             val stationId = stationIdState ?: "25000031"
             
+            val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
+            
             val stationNameState by repo.effectiveStationName.collectAsState(initial = "Laden...")
             val stationName = stationNameState
 
@@ -72,15 +76,19 @@ class DeparturesWidget : GlanceAppWidget() {
             val status = "ok"    // In Zukunft via Cache
 
             val departures: List<DepartureItem> = try {
-                gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
+                val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
+                // Explizit nach der nächsten Abfahrtszeit (Echtzeit) sortieren
+                list.sortedBy { it.nextDepartureTime ?: "99:99" }
             } catch (e: Exception) {
                 emptyList()
             }
 
             WidgetContent(
                 stationName     = stationName,
+                stationId       = stationId,
                 lastUpdated     = lastUpdated,
                 departures      = departures,
+                favorites       = favorites,
                 tabState        = tabState,
                 directionState  = directionState,
                 gpsModeActive   = gpsModeActive,
@@ -93,8 +101,10 @@ class DeparturesWidget : GlanceAppWidget() {
     @Composable
     private fun WidgetContent(
         stationName: String,
+        stationId: String,
         lastUpdated: String,
         departures: List<DepartureItem>,
+        favorites: List<FavoriteStation>,
         tabState: String,
         directionState: String,
         gpsModeActive: Boolean,
@@ -107,7 +117,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 .background(ColorProvider(Color(0xFF121212)))
                 .padding(8.dp)
         ) {
-            Header(stationName, gpsModeActive)
+            Header(stationName, gpsModeActive, favorites, stationId)
             
             FilterSegmentedRow(departures, tabState, directionState)
 
@@ -155,9 +165,14 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Header(stationName: String, gpsModeActive: Boolean) {
+    private fun Header(
+        stationName: String, 
+        gpsModeActive: Boolean, 
+        favorites: List<FavoriteStation>, 
+        currentStationId: String
+    ) {
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp),
+            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val cleanName = stationName
@@ -176,15 +191,61 @@ class DeparturesWidget : GlanceAppWidget() {
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 ),
+                maxLines = 1,
                 modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<ChangeStationAction>())
             )
+            
+            if (favorites.isNotEmpty()) {
+                Row(
+                    modifier = GlanceModifier.padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val buttonsToShow = minOf(3, favorites.size)
+                    for (i in 0 until buttonsToShow) {
+                        val isActive = favorites[i].id == currentStationId
+                        val color = if (isActive) Color(0xFF4CAF50) else Color.Gray
+                        
+                        Text(
+                            text = "${i + 1}",
+                            style = TextStyle(
+                                color = ColorProvider(color), 
+                                fontSize = 16.sp, 
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            modifier = GlanceModifier
+                                .padding(horizontal = 6.dp)
+                                .clickable(actionRunCallback<ChangeStationAction>(
+                                    actionParametersOf(ChangeStationAction.KEY_TARGET_INDEX to i)
+                                ))
+                        )
+                    }
+                    
+                    if (favorites.size > 3) {
+                        val isRemainingActive = favorites.subList(3, favorites.size).any { it.id == currentStationId }
+                        val color = if (isRemainingActive) Color(0xFF4CAF50) else Color.Gray
+                        
+                        Text(
+                            text = "▶",
+                            style = TextStyle(
+                                color = ColorProvider(color), 
+                                fontSize = 14.sp
+                            ),
+                            modifier = GlanceModifier
+                                .padding(horizontal = 4.dp)
+                                .clickable(actionRunCallback<ChangeStationAction>(
+                                    actionParametersOf(ChangeStationAction.KEY_CYCLE_REMAINING to true)
+                                ))
+                        )
+                    }
+                }
+            }
             
             val gpsIconColor = if (gpsModeActive) Color(0xFF4285F4) else Color.Gray
 
             Image(
                 provider = ImageProvider(android.R.drawable.ic_menu_mylocation),
                 contentDescription = "GPS Nearest Station",
-                modifier = GlanceModifier.padding(horizontal = 8.dp).clickable(actionRunCallback<LocateNearestStationAction>()),
+                modifier = GlanceModifier.padding(end = 8.dp).clickable(actionRunCallback<LocateNearestStationAction>()),
                 colorFilter = ColorFilter.tint(ColorProvider(gpsIconColor))
             )
 
@@ -198,6 +259,7 @@ class DeparturesWidget : GlanceAppWidget() {
             )
         }
     }
+
 
     @Composable
     private fun FilterToggleButton(tabState: String) {
@@ -314,15 +376,15 @@ class DeparturesWidget : GlanceAppWidget() {
         ) {
             // --- Gruppe VEHICLE (Links-bündig) ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SegmentButton("🚌", null, tabState == "BUS", Color(0xFFE94560)) { 
+                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "BUS", Color(0xFFE94560)) { 
                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "BUS")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton("🚋", null, tabState == "TRAIN", Color(0xFF005A9B)) { 
+                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "TRAIN", Color(0xFF005A9B)) { 
                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "TRAIN")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(null, "ALLE", tabState == "ALL", Color(0xFF555555)) { 
+                SegmentButton(R.drawable.ic_widget_all, null, tabState == "ALL", Color(0xFF555555)) { 
                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "ALL")) 
                 }
             }
@@ -334,19 +396,19 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showDirectionGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasH) {
-                        SegmentButton("🏙️", null, directionState == "H", Color(0xFF0F7173)) { 
+                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "H", Color(0xFF0F7173)) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "H")) 
                         }
                         Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (hasR) {
-                        SegmentButton("🏡", null, directionState == "R", Color(0xFFE94560)) { 
+                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "R", Color(0xFFE94560)) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "R")) 
                         }
                         Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (showAllToggle) {
-                        SegmentButton("↔", null, directionState == "ALL", Color(0xFF555555)) { 
+                        SegmentButton(R.drawable.ic_widget_swap, null, directionState == "ALL", Color(0xFF555555)) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "ALL")) 
                         }
                     }
@@ -357,7 +419,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun SegmentButton(
-        icon: String?, 
+        iconRes: Int?, 
         text: String?, 
         isActive: Boolean, 
         activeColor: Color,
@@ -370,20 +432,22 @@ class DeparturesWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .cornerRadius(6.dp)
                 .background(ColorProvider(bgColor))
-                .clickable(onClick()),
+                .clickable(onClick())
+                .padding(horizontal = 6.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (icon != null) {
-                Text(
-                    text = icon,
-                    style = TextStyle(fontSize = 14.sp),
-                    modifier = GlanceModifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            if (iconRes != null) {
+                Image(
+                    provider = ImageProvider(iconRes),
+                    contentDescription = text ?: "",
+                    modifier = GlanceModifier.size(20.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(contentColor))
                 )
             } else if (text != null) {
                 Text(
                     text = text,
                     style = TextStyle(color = ColorProvider(contentColor), fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                    modifier = GlanceModifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                    modifier = GlanceModifier.padding(horizontal = 4.dp, vertical = 2.dp)
                 )
             }
         }
