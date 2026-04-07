@@ -78,6 +78,7 @@ class ChangeTabAction : ActionCallback {
         cache.setTabState(stationId, targetTab)
         if (cache.isGpsModeActive()) findAndSetActiveNearestStation(context)
         DeparturesWidget().update(context, glanceId)
+        RefreshAction().onAction(context, glanceId, actionParametersOf(RefreshAction.KEY_FORCE to true))
     }
 }
 
@@ -124,7 +125,7 @@ class ChangeStationAction : ActionCallback {
             
             DeparturesCache(context).setGpsMode(false)
             DeparturesWidget().update(context, glanceId)
-            RefreshAction().onAction(context, glanceId, actionParametersOf())
+            RefreshAction().onAction(context, glanceId, actionParametersOf(RefreshAction.KEY_FORCE to true))
         }
     }
 }
@@ -144,6 +145,7 @@ class ChangeDirectionAction : ActionCallback {
         val stationId = cache.getStationId()
         cache.setDirectionState(stationId, targetDirection)
         DeparturesWidget().update(context, glanceId)
+        RefreshAction().onAction(context, glanceId, actionParametersOf(RefreshAction.KEY_FORCE to true))
     }
 }
 
@@ -157,6 +159,7 @@ class ToggleTimeDisplayAction : ActionCallback {
         val current = cache.getTimeDisplayMode()
         cache.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
         DeparturesWidget().update(context, glanceId)
+        RefreshAction().onAction(context, glanceId, actionParametersOf(RefreshAction.KEY_FORCE to true))
     }
 }
 
@@ -171,6 +174,7 @@ class LocateNearestStationAction : ActionCallback {
         cache.setGpsMode(next)
         if (next) findAndSetActiveNearestStation(context)
         DeparturesWidget().update(context, glanceId)
+        RefreshAction().onAction(context, glanceId, actionParametersOf(RefreshAction.KEY_FORCE to true))
     }
 }
 
@@ -184,8 +188,6 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     val stopsRepo = StopsRepository(context)
     val allStops = stopsRepo.getAllStops()
     if (allStops.isEmpty()) return
-
-    val cache = DeparturesCache(context)
     
     val stopsWithCoords = allStops.filter { it.lat != null && it.lon != null }
 
