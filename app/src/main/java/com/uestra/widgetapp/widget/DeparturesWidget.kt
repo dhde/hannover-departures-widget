@@ -433,14 +433,14 @@ class DeparturesWidget : GlanceAppWidget() {
                 .cornerRadius(6.dp)
                 .background(ColorProvider(bgColor))
                 .clickable(onClick())
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 6.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
             if (iconRes != null) {
                 Image(
                     provider = ImageProvider(iconRes),
                     contentDescription = text ?: "",
-                    modifier = GlanceModifier.size(24.dp),
+                    modifier = GlanceModifier.size(20.dp),
                     colorFilter = ColorFilter.tint(ColorProvider(contentColor))
                 )
             } else if (text != null) {
