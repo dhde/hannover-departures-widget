@@ -42,6 +42,7 @@ import com.uestra.widgetapp.widget.ToggleTimeDisplayAction
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.time.Duration
+import com.uestra.widgetapp.R
 
 class DeparturesWidget : GlanceAppWidget() {
     companion object {
@@ -375,15 +376,15 @@ class DeparturesWidget : GlanceAppWidget() {
         ) {
             // --- Gruppe VEHICLE (Links-bündig) ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SegmentButton("🚌", null, tabState == "BUS", Color(0xFFE94560)) { 
+                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "BUS", Color(0xFFE94560)) { 
                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "BUS")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton("🚋", null, tabState == "TRAIN", Color(0xFF005A9B)) { 
+                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "TRAIN", Color(0xFF005A9B)) { 
                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "TRAIN")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(null, "ALLE", tabState == "ALL", Color(0xFF555555)) { 
+                SegmentButton(R.drawable.ic_widget_all, null, tabState == "ALL", Color(0xFF555555)) { 
                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "ALL")) 
                 }
             }
@@ -395,19 +396,19 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showDirectionGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasH) {
-                        SegmentButton("🏙️", null, directionState == "H", Color(0xFF0F7173)) { 
+                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "H", Color(0xFF0F7173)) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "H")) 
                         }
                         Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (hasR) {
-                        SegmentButton("🏡", null, directionState == "R", Color(0xFFE94560)) { 
+                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "R", Color(0xFFE94560)) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "R")) 
                         }
                         Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (showAllToggle) {
-                        SegmentButton("↔", null, directionState == "ALL", Color(0xFF555555)) { 
+                        SegmentButton(R.drawable.ic_widget_swap, null, directionState == "ALL", Color(0xFF555555)) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "ALL")) 
                         }
                     }
@@ -418,7 +419,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun SegmentButton(
-        icon: String?, 
+        iconRes: Int?, 
         text: String?, 
         isActive: Boolean, 
         activeColor: Color,
@@ -431,20 +432,22 @@ class DeparturesWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .cornerRadius(6.dp)
                 .background(ColorProvider(bgColor))
-                .clickable(onClick()),
+                .clickable(onClick())
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (icon != null) {
-                Text(
-                    text = icon,
-                    style = TextStyle(fontSize = 14.sp),
-                    modifier = GlanceModifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            if (iconRes != null) {
+                Image(
+                    provider = ImageProvider(iconRes),
+                    contentDescription = text ?: "",
+                    modifier = GlanceModifier.size(24.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(contentColor))
                 )
             } else if (text != null) {
                 Text(
                     text = text,
                     style = TextStyle(color = ColorProvider(contentColor), fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                    modifier = GlanceModifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                    modifier = GlanceModifier.padding(horizontal = 4.dp, vertical = 2.dp)
                 )
             }
         }
