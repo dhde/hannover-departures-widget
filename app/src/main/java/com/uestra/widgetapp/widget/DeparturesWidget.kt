@@ -216,7 +216,7 @@ class DeparturesWidget : GlanceAppWidget() {
         if (favorites.isEmpty()) return
 
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val buttonsToShow = minOf(3, favorites.size)
@@ -252,7 +252,7 @@ class DeparturesWidget : GlanceAppWidget() {
                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                         ),
                         maxLines = 1,
-                        modifier = GlanceModifier.padding(vertical = 5.dp)
+                        modifier = GlanceModifier.padding(vertical = 3.dp)
                     )
                 }
             }
@@ -275,7 +275,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     Text(
                         text = "▶",
                         style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp),
-                        modifier = GlanceModifier.padding(vertical = 5.dp)
+                        modifier = GlanceModifier.padding(vertical = 3.dp)
                     )
                 }
             }
