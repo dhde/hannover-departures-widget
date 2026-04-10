@@ -1,21 +1,14 @@
 package com.uestra.widgetapp.api
 
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Body
+import java.util.concurrent.TimeUnit
 import retrofit2.http.GET
-import retrofit2.http.POST
 import retrofit2.http.Query
 
-/** API for GVH Hannover. Hybrid: HAFAS for departures, Web-Proxy for stops. */
+/** API for GVH Hannover via ÜSTRA Web Proxy. */
 interface UestraApi {
-
-    /** Fetch departures via HAFAS mgate.exe (Legacy) */
-    @POST("bin/mgate.exe")
-    suspend fun getDeparturesHafas(
-        @Body request: HafasRequest
-    ): HafasResponse
-
     /** 
      * Fetch departures via ÜSTRA Web Proxy (Original EFA).
      * Uses the exact parameter set from the ÜSTRA website to ensure successful rapidJSON output.
@@ -30,22 +23,17 @@ interface UestraApi {
     suspend fun getAllStops(): List<StationSearchResult>
 
     companion object {
-        private const val BASE_URL = "https://gvh.hafas.de/"
         private const val WEB_BASE_URL = "https://abfahrten.uestra.de/"
 
         fun create(): UestraApi {
-            // By default, we use the HAFAS base URL
-            val retrofit = Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .addConverterFactory(GsonConverterFactory.create())
+            val client = OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
                 .build()
-            return retrofit.create(UestraApi::class.java)
-        }
-        
-        fun createWeb(): UestraApi {
-            // For the /stops endpoint on the web server
+
             val retrofit = Retrofit.Builder()
                 .baseUrl(WEB_BASE_URL)
+                .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
             return retrofit.create(UestraApi::class.java)

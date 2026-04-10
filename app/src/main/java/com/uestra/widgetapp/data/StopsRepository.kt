@@ -31,7 +31,7 @@ class StopsRepository(context: Context) {
 
         // Von der API abrufen
         try {
-            val api = UestraApi.createWeb()
+            val api = UestraApi.create()
             val stops = api.getAllStops()
             if (stops.isNotEmpty()) {
                 val json = Gson().toJson(stops)
