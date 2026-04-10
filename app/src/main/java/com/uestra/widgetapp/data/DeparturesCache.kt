@@ -14,6 +14,7 @@ class DeparturesCache(private val context: Context) {
         private val STATION_ID = stringPreferencesKey("station_id")
         private val TIME_DISPLAY_MODE = stringPreferencesKey("time_display_mode")
         private val GPS_MODE = booleanPreferencesKey("gps_mode")
+        private val IS_REFRESHING = booleanPreferencesKey("is_refreshing")
 
         private fun departuresKey(id: String) = stringPreferencesKey("deps_$id")
         private fun updatedKey(id: String) = stringPreferencesKey("upd_$id")
@@ -26,6 +27,12 @@ class DeparturesCache(private val context: Context) {
         context.cacheDataStore.edit { prefs ->
             prefs[STATION_ID] = stationId
             prefs[departuresKey(stationId)] = json
+            prefs[updatedKey(stationId)] = System.currentTimeMillis().toString()
+        }
+    }
+
+    suspend fun updateRefreshTime(stationId: String) {
+        context.cacheDataStore.edit { prefs ->
             prefs[updatedKey(stationId)] = System.currentTimeMillis().toString()
         }
     }
@@ -128,6 +135,15 @@ class DeparturesCache(private val context: Context) {
     suspend fun setGpsMode(active: Boolean) {
         context.cacheDataStore.edit { prefs ->
             prefs[GPS_MODE] = active
+        }
+    }
+
+    fun isRefreshingFlow(): Flow<Boolean> = 
+        context.cacheDataStore.data.map { it[IS_REFRESHING] ?: false }
+
+    suspend fun setRefreshing(refreshing: Boolean) {
+        context.cacheDataStore.edit { prefs ->
+            prefs[IS_REFRESHING] = refreshing
         }
     }
 }

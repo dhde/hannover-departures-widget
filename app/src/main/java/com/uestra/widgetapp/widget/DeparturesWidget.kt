@@ -26,6 +26,7 @@ import androidx.glance.text.*
 import androidx.glance.unit.ColorProvider
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.action.ActionParameters
+import androidx.glance.appwidget.appWidgetBackground
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.uestra.widgetapp.api.DepartureItem
@@ -83,6 +84,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 emptyList()
             }
 
+            val isRefreshing by cache.isRefreshingFlow().collectAsState(initial = false)
+
             WidgetContent(
                 stationName     = stationName,
                 stationId       = stationId,
@@ -93,7 +96,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 directionState  = directionState,
                 gpsModeActive   = gpsModeActive,
                 timeDisplayMode = timeDisplayMode,
-                status          = status
+                status          = status,
+                isRefreshing    = isRefreshing
             )
         }
     }
@@ -109,15 +113,24 @@ class DeparturesWidget : GlanceAppWidget() {
         directionState: String,
         gpsModeActive: Boolean,
         timeDisplayMode: String,
-        status: String
+        status: String,
+        isRefreshing: Boolean
     ) {
-        Column(
+        Box(
             modifier = GlanceModifier
                 .fillMaxSize()
+                .appWidgetBackground()
                 .background(ColorProvider(Color(0xFF121212)))
-                .padding(8.dp)
         ) {
-            Header(stationName, gpsModeActive)
+            // --- Hintergrund-Icon (Subtil) ---
+            BackgroundIcon(tabState)
+
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            ) {
+            Header(stationName, gpsModeActive, isRefreshing)
             
             FilterSegmentedRow(departures, tabState, directionState)
 
@@ -164,9 +177,33 @@ class DeparturesWidget : GlanceAppWidget() {
             Footer(lastUpdated, isStale)
         }
     }
+}
 
     @Composable
-    private fun Header(stationName: String, gpsModeActive: Boolean) {
+    private fun BackgroundIcon(tabState: String) {
+        if (tabState == "ALL") return // Nur bei spezifischer Wahl anzeigen
+
+        val iconRes = when (tabState) {
+            "BUS" -> R.drawable.ic_widget_bus
+            "TRAIN" -> R.drawable.ic_widget_tram
+            else -> return
+        }
+
+        Box(
+            modifier = GlanceModifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                provider = ImageProvider(iconRes),
+                contentDescription = null,
+                modifier = GlanceModifier.size(130.dp), 
+                colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF141F14))) // Ganz dezentes Dunkelgrün
+            )
+        }
+    }
+
+    @Composable
+    private fun Header(stationName: String, gpsModeActive: Boolean, isRefreshing: Boolean) {
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -200,13 +237,15 @@ class DeparturesWidget : GlanceAppWidget() {
                 colorFilter = ColorFilter.tint(ColorProvider(gpsIconColor))
             )
 
+            val refreshIconColor = if (isRefreshing) Color(0xFF4285F4) else Color.Gray
+
             Image(
                 provider = ImageProvider(android.R.drawable.ic_popup_sync),
                 contentDescription = "Refresh",
                 modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>(
                     actionParametersOf(RefreshAction.KEY_FORCE to true)
                 )),
-                colorFilter = ColorFilter.tint(ColorProvider(Color.Gray))
+                colorFilter = ColorFilter.tint(ColorProvider(refreshIconColor))
             )
         }
     }
