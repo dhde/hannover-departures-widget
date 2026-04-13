@@ -351,8 +351,19 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun DepartureRow(departure: DepartureItem, timeDisplayMode: String, isWarning: Boolean) {
+        val rowBgColor = when {
+            departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x1A0F7173)
+            departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x1AE94560)
+            else -> Color.Transparent
+        }
+
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp)
+                .cornerRadius(6.dp)
+                .background(ColorProvider(rowBgColor))
+                .padding(vertical = 4.dp, horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             LineBadge(departure.lineShort, departure.isBus)
