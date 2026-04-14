@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.collect
 import androidx.glance.appwidget.updateAll
+import kotlinx.coroutines.launch
 
 class RefreshAction : ActionCallback {
     companion object {
@@ -50,45 +51,44 @@ class RefreshAction : ActionCallback {
             
             // 2. Nur wenn nicht bereits ein Fetch läuft, starten wir einen neuen
             if (!alreadyRefreshing) {
-                try {
-                    cache.setRefreshing(true)
-                    DeparturesWidget().updateAll(context)
+                // Widget auf "lädt" setzen und sofort onAction() zurückgeben lassen!
+                cache.setRefreshing(true)
+                DeparturesWidget().updateAll(context)
 
-                    val stationId = repo.getActiveStationIdNow()
-                    val lastUpdatedStr = cache.getLastUpdated(stationId)
-                    val secondsOld = if (lastUpdatedStr.isNotEmpty()) {
-                        val lastTime = Instant.ofEpochMilli(lastUpdatedStr.toLong())
-                        Duration.between(lastTime, Instant.now()).getSeconds()
-                    } else 999L
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob()).launch {
+                    try {
+                        val stationId = repo.getActiveStationIdNow()
+                        val lastUpdatedStr = cache.getLastUpdated(stationId)
+                        val secondsOld = if (lastUpdatedStr.isNotEmpty()) {
+                            val lastTime = Instant.ofEpochMilli(lastUpdatedStr.toLong())
+                            Duration.between(lastTime, Instant.now()).getSeconds()
+                        } else 999L
 
-                    // Drosselung: Maximal alle 30 Sekunden eine Anfrage pro Haltestelle,
-                    // es sei denn, es ist ein wirklich erzwungener Refresh vom User.
-                    if (isForce || secondsOld >= 30) {
-                        cache.updateRefreshTime(stationId)
-                        var departures: List<DepartureItem>? = null
-                        var errorOccurred = false
-                        
-                        // --- ÜSTRA Web Proxy (Original-Quelle) ---
-                        try {
-                            val api = UestraApi.create()
-                            val response = api.getDepartures(stationId)
-                            departures = response.departures
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            errorOccurred = true
+                        // Drosselung: Maximal alle 30 Sekunden eine Anfrage pro Haltestelle,
+                        // es sei denn, es ist ein wirklich erzwungener Refresh vom User.
+                        if (isForce || secondsOld >= 30) {
+                            cache.updateRefreshTime(stationId)
+                            var departures: List<DepartureItem>? = null
+                            var errorOccurred = false
+                            
+                            // --- ÜSTRA Web Proxy (Original-Quelle) ---
+                            try {
+                                val api = UestraApi.create()
+                                val response = api.getDepartures(stationId)
+                                departures = response.departures
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                errorOccurred = true
+                            }
+                            
+                            if (departures != null) {
+                                cache.saveDepartures(stationId, Gson().toJson(departures))
+                            }
                         }
-                        
-                        if (departures != null) {
-                            cache.saveDepartures(stationId, Gson().toJson(departures))
-                            // Status zurücksetzen falls es geklappt hat
-                            // (Hier könnte man noch ein Status-Feld im Cache setzen)
-                        } else if (errorOccurred) {
-                            // Optional: Fehlerstatus im Cache hinterlegen, damit das UI "Server-Fehler" anzeigen kann
-                        }
+                    } finally {
+                        cache.setRefreshing(false)
+                        DeparturesWidget().updateAll(context)
                     }
-                } finally {
-                    cache.setRefreshing(false)
-                    DeparturesWidget().updateAll(context)
                 }
             } else {
                 DeparturesWidget().updateAll(context)
