@@ -352,8 +352,10 @@ class DeparturesWidget : GlanceAppWidget() {
     @Composable
     private fun DepartureRow(departure: DepartureItem, timeDisplayMode: String, isWarning: Boolean) {
         val rowBgColor = when {
-            departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x1A0F7173)
-            departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x1AE94560)
+            // "City" (H) aufhellen: Sehr sanftes, transluzentes Weiß (ca. 8% Deckkraft)
+            departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF) 
+            // "Home" (R) abdunkeln: Zartes, dunkles Schwarz (ca. 30% Deckkraft macht das Dunkelgrau zu Tiefschwarz)
+            departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000) 
             else -> Color.Transparent
         }
 
