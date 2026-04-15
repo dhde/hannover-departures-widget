@@ -417,21 +417,59 @@ private fun HelpCard() {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            HelpItem("🎯", "GPS-Suche", "Tippe im Widget auf das Zielkreuz, um die nächste Haltestelle in deiner Nähe (Bus/Bahn-Filter beachten!) zu finden.")
+            HelpItem(
+                icon = { 
+                    Text("1", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
+                },
+                title = "Favoriten-Schnellwahl",
+                description = "Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten."
+            )
             HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
-            HelpItem("🚏", "Station wechseln", "Ein Klick auf den Haltestellennamen im Widget wechselt zyklisch durch deine Favoriten.")
+            HelpItem(
+                icon = { 
+                    Row {
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = Teal, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = Red, modifier = Modifier.size(18.dp))
+                    }
+                },
+                title = "Richtungen & Filter",
+                description = "Nutze die Symbole für City oder Home, um die Richtung zu filtern. Die Zeilen im Widget färben sich automatisch passend (hell/dunkel)."
+            )
             HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
-            HelpItem("🕒", "Zeit-Modus", "Tippe auf die Abfahrtszeit (z.B. '5 Min'), um zwischen Minuten-Countdown und echter Uhrzeit umzuschalten.")
+            HelpItem(
+                icon = { 
+                    Text("5", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
+                },
+                title = "Zeit-Ansicht",
+                description = "Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten."
+            )
             HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
-            HelpItem("🔄", "Aktualisierung", "Der Countdown zählt alle 15 Min. automatisch runter. Für Live-Daten tippe auf den Refresh-Button.")
+            HelpItem(
+                icon = { 
+                    Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_popup_sync), null, tint = Teal, modifier = Modifier.size(20.dp))
+                },
+                title = "Aktualisierung",
+                description = "Das Widget frischt sich ca. alle 15 Minuten selbst auf. Für sofortige Echtzeitdaten tippe auf den kleinen Refresh-Pfeil oben rechts."
+            )
+            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HelpItem(
+                icon = { 
+                    Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_mylocation), null, tint = Teal, modifier = Modifier.size(20.dp))
+                },
+                title = "GPS-Suche",
+                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
+            )
         }
     }
 }
 
 @Composable
-private fun HelpItem(icon: String, title: String, description: String) {
+private fun HelpItem(icon: @Composable () -> Unit, title: String, description: String) {
     Row(verticalAlignment = Alignment.Top) {
-        Text(icon, fontSize = 18.sp, modifier = Modifier.padding(top = 2.dp))
+        Box(modifier = Modifier.padding(top = 2.dp).size(24.dp), contentAlignment = Alignment.Center) {
+            icon()
+        }
         Spacer(Modifier.width(12.dp))
         Column {
             Text(title, color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
