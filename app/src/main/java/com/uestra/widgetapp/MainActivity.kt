@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -94,9 +95,73 @@ private val TextSub    = Color(0xFF9090AA)
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
+enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    SEARCH("Suchen", Icons.Default.Search),
+    FAVORITES("Favoriten", Icons.Default.Star),
+    HELP("Hilfe", Icons.Default.Info)
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun ConfigurationScreen(repo: FavoritesRepository) {
+    var currentScreen by remember { mutableStateOf(AppScreen.SEARCH) }
+    val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
+
+    Scaffold(
+        containerColor = DarkBg,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            "Üstra Widget",
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 18.sp,
+                            color      = TextMain
+                        )
+                        Text(
+                            "Aktiv: $activeStationName",
+                            fontSize = 12.sp,
+                            color    = Teal,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
+            )
+        },
+        bottomBar = {
+            NavigationBar(containerColor = CardBg) {
+                AppScreen.values().forEach { screen ->
+                    NavigationBarItem(
+                        icon = { Icon(screen.icon, contentDescription = screen.label) },
+                        label = { Text(screen.label) },
+                        selected = currentScreen == screen,
+                        onClick = { currentScreen = screen },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Teal,
+                            selectedTextColor = Teal,
+                            unselectedIconColor = TextSub,
+                            unselectedTextColor = TextSub,
+                            indicatorColor = Teal.copy(alpha = 0.2f)
+                        )
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            when (currentScreen) {
+                AppScreen.SEARCH -> SearchScreen(repo)
+                AppScreen.FAVORITES -> FavoritesScreen(repo)
+                AppScreen.HELP -> HelpScreen()
+            }
+        }
+    }
+}
+
+@Composable
+fun SearchScreen(repo: FavoritesRepository) {
     val scope      = rememberCoroutineScope()
     var query      by remember { mutableStateOf("") }
     var results    by remember { mutableStateOf<List<StationSearchResult>>(emptyList()) }
@@ -105,7 +170,6 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
 
     val favorites        by repo.favoritesFlow.collectAsState(initial = emptyList())
     val activeStationId  by repo.activeStationId.collectAsState(initial = null)
-    val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
 
     val context = LocalContext.current
     val stopsRepo = remember { com.uestra.widgetapp.data.StopsRepository(context) }
@@ -130,141 +194,111 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
         }
     }
 
-    Scaffold(
-        containerColor = DarkBg,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Üstra Widget",
-                            fontWeight = FontWeight.Bold,
-                            fontSize   = 18.sp,
-                            color      = TextMain
-                        )
-                        Text(
-                            "Aktiv: $activeStationName",
-                            fontSize = 12.sp,
-                            color    = Teal,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(DarkBg),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionLabel("Haltestelle suchen")
+            OutlinedTextField(
+                value         = query,
+                onValueChange = { query = it },
+                placeholder   = { Text("z.B. Kröpcke, Roderbruch…", color = TextSub) },
+                leadingIcon   = {
+                    if (isSearching)
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Teal, strokeWidth = 2.dp)
+                    else
+                        Icon(Icons.Default.Search, null, tint = TextSub)
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
+                singleLine  = true,
+                colors      = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = Teal,
+                    unfocusedBorderColor = Color(0xFF3A3A5A),
+                    focusedTextColor     = TextMain,
+                    unfocusedTextColor   = TextMain,
+                    cursorColor          = Teal
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(12.dp)
             )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .background(DarkBg),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // ── Aktive Station ────────────────────────────────────────────
-            // entfernt, da jetzt in der TopAppBar
 
-            // ── Suche ─────────────────────────────────────────────────────
-            item {
-                SectionLabel("Haltestelle suchen")
-                OutlinedTextField(
-                    value         = query,
-                    onValueChange = { query = it },
-                    placeholder   = { Text("z.B. Kröpcke, Roderbruch…", color = TextSub) },
-                    leadingIcon   = {
-                        if (isSearching)
-                            CircularProgressIndicator(
-                                modifier  = Modifier.size(18.dp),
-                                color     = Teal,
-                                strokeWidth = 2.dp
-                            )
-                        else
-                            Icon(Icons.Default.Search, null, tint = TextSub)
-                    },
-                    singleLine  = true,
-                    colors      = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = Teal,
-                        unfocusedBorderColor = Color(0xFF3A3A5A),
-                        focusedTextColor     = TextMain,
-                        unfocusedTextColor   = TextMain,
-                        cursorColor          = Teal
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape    = RoundedCornerShape(12.dp)
-                )
-
-                searchError?.let {
-                    Text(it, color = Red, fontSize = 11.sp,
-                        modifier = Modifier.padding(top = 4.dp))
-                }
+            searchError?.let {
+                Text(it, color = Red, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
+        }
 
-            // ── Suchergebnisse ────────────────────────────────────────────
-            if (results.isNotEmpty()) {
-                item {
-                    SectionLabel("Ergebnisse")
-                }
-                items(results) { location ->
-                    val isFav   = favorites.any { it.id == location.id }
-                    val isActive = location.id == activeStationId
+        if (results.isNotEmpty()) {
+            item { SectionLabel("Ergebnisse") }
+            items(results) { location ->
+                val isFav   = favorites.any { it.id == location.id }
+                val isActive = location.id == activeStationId
 
-                    SearchResultRow(
-                        location = location,
-                        isFav    = isFav,
-                        isActive = isActive,
-                        onSelect = {
-                            scope.launch {
-                                repo.setActiveStation(location.id, location.name)
-                                query   = ""
-                                results = emptyList()
-                            }
-                        },
-                        onToggleFav = {
-                            scope.launch {
-                                if (isFav) repo.removeFavorite(location.id)
-                                else       repo.addFavorite(location.id, location.name)
-                            }
+                SearchResultRow(
+                    location = location,
+                    isFav    = isFav,
+                    isActive = isActive,
+                    onSelect = {
+                        scope.launch {
+                            repo.setActiveStation(location.id, location.name)
+                            query   = ""
+                            results = emptyList()
                         }
-                    )
-                }
+                    },
+                    onToggleFav = {
+                        scope.launch {
+                            if (isFav) repo.removeFavorite(location.id)
+                            else       repo.addFavorite(location.id, location.name)
+                        }
+                    }
+                )
             }
-
-            // ── Favoriten ─────────────────────────────────────────────────
-            item {
-                SectionLabel("Meine Favoriten")
-            }
-
-            if (favorites.isEmpty()) {
-                item {
-                    Text(
-                        "Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.",
-                        color    = TextSub,
-                        fontSize = 13.sp
-                    )
-                }
-            } else {
-                items(favorites) { fav ->
-                    val isActive = fav.id == activeStationId
-                    FavoriteRow(
-                        fav      = fav,
-                        isActive = isActive,
-                        onSelect = { scope.launch { repo.setActiveStation(fav.id, fav.name) } },
-                        onDelete = { scope.launch { repo.removeFavorite(fav.id)         } },
-                        onMove   = { up -> scope.launch { repo.moveFavorite(fav.id, up) } },
-                        onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.id, alias) } }
-                    )
-                }
-            }
-
-            // ── Hilfe & Tipps ─────────────────────────────────────────────
-            item {
-                SectionLabel("Hilfe & Tipps")
-                HelpCard()
-            }
-
-            item { Spacer(Modifier.height(32.dp)) }
         }
+    }
+}
+
+@Composable
+fun FavoritesScreen(repo: FavoritesRepository) {
+    val scope = rememberCoroutineScope()
+    val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
+    val activeStationId by repo.activeStationId.collectAsState(initial = null)
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(DarkBg),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { SectionLabel("Meine Favoriten") }
+
+        if (favorites.isEmpty()) {
+            item {
+                Text("Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.", color = TextSub, fontSize = 13.sp)
+            }
+        } else {
+            items(favorites) { fav ->
+                val isActive = fav.id == activeStationId
+                FavoriteRow(
+                    fav      = fav,
+                    isActive = isActive,
+                    onSelect = { scope.launch { repo.setActiveStation(fav.id, fav.name) } },
+                    onDelete = { scope.launch { repo.removeFavorite(fav.id)         } },
+                    onMove   = { up -> scope.launch { repo.moveFavorite(fav.id, up) } },
+                    onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.id, alias) } }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun HelpScreen() {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(DarkBg),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { SectionLabel("Hilfe & Tipps") }
+        item { HelpCard() }
     }
 }
 
