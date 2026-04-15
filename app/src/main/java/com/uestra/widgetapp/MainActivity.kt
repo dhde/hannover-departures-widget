@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -481,7 +483,7 @@ private fun HelpCard() {
             HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_popup_sync), null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(androidx.compose.material.icons.Icons.Default.Refresh, null, tint = Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "Aktualisierung",
                 description = "Das Widget frischt sich ca. alle 15 Minuten selbst auf. Für sofortige Echtzeitdaten tippe auf den kleinen Refresh-Pfeil oben rechts."
@@ -489,7 +491,7 @@ private fun HelpCard() {
             HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_mylocation), null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(androidx.compose.material.icons.Icons.Default.LocationOn, null, tint = Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "GPS-Suche",
                 description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
