@@ -23,11 +23,61 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.collect
 import androidx.glance.appwidget.updateAll
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 class RefreshAction : ActionCallback {
     companion object {
         val KEY_FORCE = ActionParameters.Key<Boolean>("force")
+        
+        /** Zentraler Auslöser für Updates, um Kaskaden zu vermeiden */
+        suspend fun triggerUpdate(context: Context, isForce: Boolean = false) {
+            val repo = FavoritesRepository(context)
+            val cache = DeparturesCache(context)
+            
+            // Falls bereits ein Refresh läuft, brechen wir hier ab, 
+            // um den DataStore nicht zu überlasten.
+            if (cache.isRefreshing()) return
+            
+            if (cache.isGpsModeActive()) {
+                findAndSetActiveNearestStation(context)
+            }
+            
+            val stationId = repo.getActiveStationIdNow()
+            val lastUpdatedStr = cache.getLastUpdated(stationId)
+            val secondsOld = if (lastUpdatedStr.isNotEmpty()) {
+                val lastTime = java.time.Instant.ofEpochMilli(lastUpdatedStr.toLong())
+                java.time.Duration.between(lastTime, java.time.Instant.now()).seconds
+            } else 999L
+
+            // Drosselung: Nur alle 30s anfragen, außer bei manuellem Force
+            if (isForce || secondsOld >= 30) {
+                cache.setRefreshing(true)
+                DeparturesWidget().updateAll(context)
+                
+                try {
+                    // Wir führen den Netzwerk-Check in einem begrenzten Zeitfenster aus
+                    kotlinx.coroutines.withTimeoutOrNull(10000) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val api = UestraApi.create()
+                            val response = api.getDepartures(stationId)
+                            val departures = response.departures
+                            if (departures != null) {
+                                cache.saveDepartures(stationId, Gson().toJson(departures))
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    cache.setRefreshing(false)
+                    DeparturesWidget().updateAll(context)
+                }
+            } else {
+                // Nur UI aktualisieren (z.B. für Countdown)
+                DeparturesWidget().updateAll(context)
+            }
+        }
     }
     
     override suspend fun onAction(
@@ -35,67 +85,8 @@ class RefreshAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        try {
-            val repo = FavoritesRepository(context)
-            val cache = DeparturesCache(context)
-            val isForce = parameters[KEY_FORCE] ?: false
-
-            // Momentanen Status prüfen
-            var alreadyRefreshing = false
-            cache.isRefreshingFlow().take(1).collect { alreadyRefreshing = it }
-
-            // 1. UI-Dinge tun, die immer gehen (z.B. GPS-Suche oder UI-Refresh)
-            if (cache.isGpsModeActive()) {
-                findAndSetActiveNearestStation(context)
-            }
-            
-            // 2. Nur wenn nicht bereits ein Fetch läuft, starten wir einen neuen
-            if (!alreadyRefreshing) {
-                // Widget auf "lädt" setzen und sofort onAction() zurückgeben lassen!
-                cache.setRefreshing(true)
-                DeparturesWidget().updateAll(context)
-
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob()).launch {
-                    try {
-                        val stationId = repo.getActiveStationIdNow()
-                        val lastUpdatedStr = cache.getLastUpdated(stationId)
-                        val secondsOld = if (lastUpdatedStr.isNotEmpty()) {
-                            val lastTime = Instant.ofEpochMilli(lastUpdatedStr.toLong())
-                            Duration.between(lastTime, Instant.now()).getSeconds()
-                        } else 999L
-
-                        // Drosselung: Maximal alle 30 Sekunden eine Anfrage pro Haltestelle,
-                        // es sei denn, es ist ein wirklich erzwungener Refresh vom User.
-                        if (isForce || secondsOld >= 30) {
-                            cache.updateRefreshTime(stationId)
-                            var departures: List<DepartureItem>? = null
-                            var errorOccurred = false
-                            
-                            // --- ÜSTRA Web Proxy (Original-Quelle) ---
-                            try {
-                                val api = UestraApi.create()
-                                val response = api.getDepartures(stationId)
-                                departures = response.departures
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                                errorOccurred = true
-                            }
-                            
-                            if (departures != null) {
-                                cache.saveDepartures(stationId, Gson().toJson(departures))
-                            }
-                        }
-                    } finally {
-                        cache.setRefreshing(false)
-                        DeparturesWidget().updateAll(context)
-                    }
-                }
-            } else {
-                DeparturesWidget().updateAll(context)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        val isForce = parameters[KEY_FORCE] ?: false
+        triggerUpdate(context, isForce)
     }
 }
 
@@ -117,7 +108,7 @@ class ChangeTabAction : ActionCallback {
         
         // WICHTIG: Beim Tab-Wechsel KEIN Force-Refresh, nur normales onAction.
         // Das sorgt dafür, dass nur neue Daten geholt werden, wenn die 30s/5min abgelaufen sind.
-        RefreshAction().onAction(context, glanceId, actionParametersOf())
+        RefreshAction.triggerUpdate(context)
     }
 }
 
@@ -163,8 +154,7 @@ class ChangeStationAction : ActionCallback {
             }
             
             DeparturesCache(context).setGpsMode(false)
-            DeparturesWidget().updateAll(context)
-            RefreshAction().onAction(context, glanceId, actionParametersOf())
+            RefreshAction.triggerUpdate(context)
         }
     }
 }
@@ -183,8 +173,7 @@ class ChangeDirectionAction : ActionCallback {
         val cache = DeparturesCache(context)
         val stationId = cache.getStationId()
         cache.setDirectionState(stationId, targetDirection)
-        DeparturesWidget().updateAll(context)
-        RefreshAction().onAction(context, glanceId, actionParametersOf())
+        RefreshAction.triggerUpdate(context)
     }
 }
 
@@ -197,8 +186,7 @@ class ToggleTimeDisplayAction : ActionCallback {
         val cache = DeparturesCache(context)
         val current = cache.getTimeDisplayMode()
         cache.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
-        DeparturesWidget().updateAll(context)
-        RefreshAction().onAction(context, glanceId, actionParametersOf())
+        RefreshAction.triggerUpdate(context)
     }
 }
 
@@ -212,8 +200,7 @@ class LocateNearestStationAction : ActionCallback {
         val next = !cache.isGpsModeActive()
         cache.setGpsMode(next)
         if (next) findAndSetActiveNearestStation(context)
-        DeparturesWidget().updateAll(context)
-        RefreshAction().onAction(context, glanceId, actionParametersOf())
+        RefreshAction.triggerUpdate(context)
     }
 }
 
