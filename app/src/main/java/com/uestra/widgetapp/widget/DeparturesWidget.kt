@@ -74,7 +74,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val cachedJson by cache.getDeparturesJsonFlow(stationId).collectAsState(initial = "[]")
             val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
             
-            val status = "ok"    // In Zukunft via Cache
+            val errorState by cache.getErrorStateFlow().collectAsState(initial = "")
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
@@ -96,7 +96,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 directionState  = directionState,
                 gpsModeActive   = gpsModeActive,
                 timeDisplayMode = timeDisplayMode,
-                status          = status,
+                status          = if (errorState.isNotEmpty()) "error" else "ok",
+                errorMsg        = errorState,
                 isRefreshing    = isRefreshing
             )
         }
@@ -114,6 +115,7 @@ class DeparturesWidget : GlanceAppWidget() {
         gpsModeActive: Boolean,
         timeDisplayMode: String,
         status: String,
+        errorMsg: String,
         isRefreshing: Boolean
     ) {
         Box(
@@ -134,8 +136,8 @@ class DeparturesWidget : GlanceAppWidget() {
             
             FilterSegmentedRow(departures, tabState, directionState)
 
-            if (status.startsWith("error")) {
-                Text("Fehler: $status", style = TextStyle(color = ColorProvider(Color.Red), fontSize = 12.sp))
+            if (status == "error" && errorMsg.isNotEmpty()) {
+                Text("⚠️ $errorMsg", style = TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 12.sp, fontWeight = FontWeight.Medium), modifier = GlanceModifier.padding(vertical = 4.dp))
             }
 
             val minutesSinceUpdate = if (lastUpdated.isNotEmpty()) {

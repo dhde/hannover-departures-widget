@@ -35,6 +35,11 @@ class RefreshAction : ActionCallback {
             val repo = FavoritesRepository(context)
             val cache = DeparturesCache(context)
             
+            // 1. WICHTIG: UI sofort updaten (z.B. für Tab-Wechsel)
+            // Auch wenn wir danach den Netzwerkabruf überspringen, 
+            // ist die Klick-Aktion (wie Tab-Wechsel) dann schon sichtbar.
+            DeparturesWidget().updateAll(context)
+            
             // Falls bereits ein Refresh läuft, brechen wir hier ab, 
             // um den DataStore nicht zu überlasten.
             if (cache.isRefreshing()) return
@@ -57,25 +62,29 @@ class RefreshAction : ActionCallback {
                 
                 try {
                     // Wir führen den Netzwerk-Check in einem begrenzten Zeitfenster aus
-                    kotlinx.coroutines.withTimeoutOrNull(10000) {
+                    val success = kotlinx.coroutines.withTimeoutOrNull(10000) {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             val api = UestraApi.create()
                             val response = api.getDepartures(stationId)
                             val departures = response.departures
                             if (departures != null) {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
+                                true // Signal success
+                            } else {
+                                false
                             }
                         }
                     }
+                    if (success == null) {
+                        cache.setErrorState("Zeitüberschreitung") // Timeout
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    cache.setErrorState("Verbindung fehlgeschlagen")
                 } finally {
                     cache.setRefreshing(false)
                     DeparturesWidget().updateAll(context)
                 }
-            } else {
-                // Nur UI aktualisieren (z.B. für Countdown)
-                DeparturesWidget().updateAll(context)
             }
         }
     }
