@@ -55,8 +55,8 @@ class RefreshAction : ActionCallback {
                 java.time.Duration.between(lastTime, java.time.Instant.now()).seconds
             } else 999L
 
-            // Drosselung: Nur alle 30s anfragen, außer bei manuellem Force
-            if (isForce || secondsOld >= 30) {
+            // Drosselung: Nur alle 6s anfragen, außer bei manuellem Force
+            if (isForce || secondsOld >= 6) {
                 cache.setRefreshing(true)
                 DeparturesWidget().updateAll(context)
                 
