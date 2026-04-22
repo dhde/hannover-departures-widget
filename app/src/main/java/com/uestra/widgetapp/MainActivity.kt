@@ -166,7 +166,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
 fun SearchScreen(repo: FavoritesRepository) {
     val scope      = rememberCoroutineScope()
     var query      by remember { mutableStateOf("") }
-    var results    by remember { mutableStateOf<List<StationSearchResult>>(emptyList()) }
+    var results    by remember { mutableStateOf<List<Pair<StationSearchResult, Float?>>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
 
@@ -176,19 +176,46 @@ fun SearchScreen(repo: FavoritesRepository) {
     val context = LocalContext.current
     val stopsRepo = remember { com.uestra.widgetapp.data.StopsRepository(context) }
 
+    val lastLocation = remember {
+        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+            try {
+                locationManager.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER)
+                    ?: locationManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+            } catch (e: SecurityException) { null }
+        } else null
+    }
+
     // Debounced search
     LaunchedEffect(query) {
-        if (query.length < 2) {
-            results     = emptyList()
-            searchError = null
-            return@LaunchedEffect
-        }
         delay(400)
         isSearching = true
         searchError = null
         try {
             val allStops = stopsRepo.getAllStops()
-            results = allStops.filter { it.name.contains(query, ignoreCase = true) }.take(15)
+            
+            val filteredStops = if (query.isBlank()) {
+                allStops
+            } else {
+                allStops.filter { it.name.contains(query, ignoreCase = true) }
+            }
+
+            val stopsWithDistances = filteredStops.map { stop ->
+                var dist: Float? = null
+                if (lastLocation != null && stop.lat != null && stop.lon != null) {
+                    val resultsArr = FloatArray(1)
+                    android.location.Location.distanceBetween(
+                        lastLocation.latitude, lastLocation.longitude,
+                        stop.lat, stop.lon,
+                        resultsArr
+                    )
+                    dist = resultsArr[0]
+                }
+                stop to dist
+            }
+
+            results = stopsWithDistances.sortedWith(compareBy({ it.second ?: Float.MAX_VALUE }, { it.first.name })).take(5)
         } catch (e: Exception) {
             searchError = "Suche fehlgeschlagen: ${e.message?.take(40)}"
         } finally {
@@ -232,19 +259,29 @@ fun SearchScreen(repo: FavoritesRepository) {
 
         if (results.isNotEmpty()) {
             item { SectionLabel("Ergebnisse") }
-            items(results) { location ->
+            items(results) { item ->
+                val location = item.first
+                val dist = item.second
                 val isFav   = favorites.any { it.id == location.id }
                 val isActive = location.id == activeStationId
 
+                val distText = dist?.let {
+                    if (it >= 1000) {
+                        String.format(java.util.Locale.getDefault(), "%.1f km", it / 1000f)
+                    } else {
+                        "${it.toInt()} m"
+                    }
+                }
+
                 SearchResultRow(
                     location = location,
+                    distanceText = distText,
                     isFav    = isFav,
                     isActive = isActive,
                     onSelect = {
                         scope.launch {
                             repo.setActiveStation(location.id, location.name)
                             query   = ""
-                            results = emptyList()
                         }
                     },
                     onToggleFav = {
@@ -321,6 +358,7 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun SearchResultRow(
     location: StationSearchResult,
+    distanceText: String?,
     isFav: Boolean,
     isActive: Boolean,
     onSelect: () -> Unit,
@@ -348,8 +386,16 @@ private fun SearchResultRow(
                     fontWeight = FontWeight.SemiBold,
                     fontSize   = 14.sp
                 )
-                if (displayName != location.name) {
-                    Text(location.name, color = TextSub, fontSize = 11.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (displayName != location.name) {
+                        Text(location.name, color = TextSub, fontSize = 11.sp)
+                    }
+                    if (distanceText != null) {
+                        if (displayName != location.name) {
+                            Text(" • ", color = TextSub, fontSize = 11.sp)
+                        }
+                        Text(distanceText, color = TextSub, fontSize = 11.sp)
+                    }
                 }
             }
             if (isActive) {
