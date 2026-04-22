@@ -21,7 +21,7 @@ data class DepartureItem(
 ) {
     // Hilfsabfragen für das UI-Filtering
     val isBus: Boolean get() = line?.contains("Bus", ignoreCase = true) == true
-    val isTram: Boolean get() = line?.contains("Stadtbahn", ignoreCase = true) == true
+    val isTram: Boolean get() = line?.contains("Stadtbahn", ignoreCase = true) == true || (lineShort.toIntOrNull() != null && lineShort.length <= 2)
     
     // Die nächste verfügbare Abfahrtszeit (Echtzeit bevorzugt)
     val nextDepartureTime: String? 
@@ -61,6 +61,7 @@ data class StationSearchResult(
 data class Platform(
     @SerializedName("productClasses") val productClasses: List<Int>? = null
 ) {
-    val isBus: Boolean get() = productClasses?.contains(6) == true
-    val isTram: Boolean get() = productClasses?.contains(0) == true
+    // GVH Produktklassen: 0=Zug, 1=S-Bahn, 2=U-Bahn, 3=Stadtbahn, 4=Straßenbahn, 5/6=Bus
+    val isBus: Boolean get() = productClasses?.any { it in 5..11 } == true
+    val isTram: Boolean get() = productClasses?.any { it in 2..4 } == true
 }

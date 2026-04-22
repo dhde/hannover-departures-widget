@@ -163,7 +163,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 typeMatch && dirMatch
             }
 
-            Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+            Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.CenterEnd) {
                 if (filtered.isEmpty()) {
                     Text("Keine Abfahrten", style = TextStyle(color = ColorProvider(Color.Gray)))
                 } else {
@@ -172,6 +172,15 @@ class DeparturesWidget : GlanceAppWidget() {
                             DepartureRow(departure, timeDisplayMode, isWarning)
                         }
                     }
+                    
+                    // Unsichtbare Box (ca. 1/4 der Breite) über den Abfahrtszeiten, 
+                    // fängt alle Klicks ab und ändert das Zeit-Format
+                    Box(
+                        modifier = GlanceModifier
+                            .fillMaxHeight()
+                            .width(80.dp)
+                            .clickable(actionRunCallback<ToggleTimeDisplayAction>())
+                    ) {}
                 }
             }
 
@@ -395,8 +404,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
             Text(
                 text = timeText + delayText,
-                style = timeStyle,
-                modifier = GlanceModifier.clickable(actionRunCallback<ToggleTimeDisplayAction>())
+                style = timeStyle
             )
         }
     }

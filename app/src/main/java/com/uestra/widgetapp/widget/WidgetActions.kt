@@ -55,9 +55,10 @@ class RefreshAction : ActionCallback {
                 java.time.Duration.between(lastTime, java.time.Instant.now()).seconds
             } else 999L
 
-            // Drosselung: Nur alle 6s anfragen, außer bei manuellem Force
-            if (isForce || secondsOld >= 6) {
+            // Drosselung: Nur alle 60s anfragen, außer bei manuellem Force
+            if (isForce || secondsOld >= 60) {
                 cache.setRefreshing(true)
+                cache.updateRefreshTime(stationId)
                 DeparturesWidget().updateAll(context)
                 
                 try {
@@ -111,12 +112,13 @@ class ChangeTabAction : ActionCallback {
     ) {
         val targetTab = parameters[KEY_TAB] ?: "ALL"
         val cache = DeparturesCache(context)
-        val stationId = cache.getStationId()
+        val stationId = FavoritesRepository(context).getActiveStationIdNow()
         cache.setTabState(stationId, targetTab)
-        if (cache.isGpsModeActive()) findAndSetActiveNearestStation(context)
         
-        // WICHTIG: Beim Tab-Wechsel KEIN Force-Refresh, nur normales onAction.
-        // Das sorgt dafür, dass nur neue Daten geholt werden, wenn die 30s/5min abgelaufen sind.
+        // Sofortiges UI-Feedback für den Tab-Wechsel
+        DeparturesWidget().updateAll(context)
+        
+        if (cache.isGpsModeActive()) findAndSetActiveNearestStation(context)
         RefreshAction.triggerUpdate(context)
     }
 }
@@ -180,8 +182,12 @@ class ChangeDirectionAction : ActionCallback {
     ) {
         val targetDirection = parameters[KEY_DIRECTION] ?: "ALL"
         val cache = DeparturesCache(context)
-        val stationId = cache.getStationId()
+        val stationId = FavoritesRepository(context).getActiveStationIdNow()
         cache.setDirectionState(stationId, targetDirection)
+        
+        // Sofortiges UI-Feedback für Richtungswechsel
+        DeparturesWidget().updateAll(context)
+        
         RefreshAction.triggerUpdate(context)
     }
 }
@@ -224,7 +230,20 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     val allStops = stopsRepo.getAllStops()
     if (allStops.isEmpty()) return
     
-    val stopsWithCoords = allStops.filter { it.lat != null && it.lon != null }
+    val repo = FavoritesRepository(context)
+    val currentStationId = repo.getActiveStationIdNow()
+    val cache = DeparturesCache(context)
+    val currentTabState = cache.getTabState(currentStationId)
+
+    val stopsWithCoords = allStops.filter { stop ->
+        if (stop.lat == null || stop.lon == null) return@filter false
+        val platforms = stop.platforms
+        when (currentTabState) {
+            "BUS" -> platforms.isNullOrEmpty() || platforms.any { it.isBus }
+            "TRAIN" -> platforms.isNullOrEmpty() || platforms.any { it.isTram }
+            else -> true
+        }
+    }
 
     var nearestStop: StationSearchResult? = null
     var minDistance = Float.MAX_VALUE
@@ -239,6 +258,8 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     }
 
     if (nearestStop != null) {
-        FavoritesRepository(context).setActiveStation(nearestStop.id, nearestStop.name)
+        repo.setActiveStation(nearestStop.id, nearestStop.name)
+        // Den Filter (Bus/Bahn) für die neue Haltestelle übernehmen, damit das Erlebnis konsistent bleibt
+        cache.setTabState(nearestStop.id, currentTabState)
     }
 }
