@@ -44,6 +44,39 @@ import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.time.Duration
 import com.uestra.widgetapp.R
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Intent
+import androidx.compose.runtime.SideEffect
+import androidx.glance.LocalContext
+import androidx.glance.appwidget.CircularProgressIndicator
+
+object WidgetTicker {
+    fun scheduleNextTick(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
+            action = "com.uestra.widgetapp.TICK"
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, 0, intent, 
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val now = System.currentTimeMillis()
+        val nextMinute = now + (60000L - (now % 60000L))
+        alarmManager.setWindow(AlarmManager.RTC, nextMinute, 1000L, pendingIntent)
+    }
+    fun cancelTick(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
+            action = "com.uestra.widgetapp.TICK"
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, 0, intent, 
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (pendingIntent != null) alarmManager.cancel(pendingIntent)
+    }
+}
 
 class DeparturesWidget : GlanceAppWidget() {
     companion object {
@@ -60,6 +93,10 @@ class DeparturesWidget : GlanceAppWidget() {
         provideContent {
             val stationIdState by repo.activeStationId.collectAsState(initial = "25000031")
             val stationId = stationIdState ?: "25000031"
+            
+            val maxFavorites by repo.maxFavoritesFlow.collectAsState(initial = 3)
+            val maxFavRows by repo.maxFavRowsFlow.collectAsState(initial = 1)
+            val maxRows by repo.maxRowsFlow.collectAsState(initial = 10)
             
             val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
             
@@ -84,6 +121,21 @@ class DeparturesWidget : GlanceAppWidget() {
                 emptyList()
             }
 
+            val hasFutureDepartures = departures.any {
+                it.nextDepartureTime != null && try {
+                    Instant.parse(it.nextDepartureTime).isAfter(Instant.now().minusSeconds(60))
+                } catch(e: Exception) { true }
+            }
+
+            val context = LocalContext.current
+            SideEffect {
+                if (hasFutureDepartures) {
+                    WidgetTicker.scheduleNextTick(context)
+                } else {
+                    WidgetTicker.cancelTick(context)
+                }
+            }
+
             val isRefreshing by cache.isRefreshingFlow().collectAsState(initial = false)
 
             WidgetContent(
@@ -98,7 +150,10 @@ class DeparturesWidget : GlanceAppWidget() {
                 timeDisplayMode = timeDisplayMode,
                 status          = if (errorState.isNotEmpty()) "error" else "ok",
                 errorMsg        = errorState,
-                isRefreshing    = isRefreshing
+                isRefreshing    = isRefreshing,
+                maxFavorites    = maxFavorites,
+                maxFavRows      = maxFavRows,
+                maxRows         = maxRows
             )
         }
     }
@@ -116,7 +171,10 @@ class DeparturesWidget : GlanceAppWidget() {
         timeDisplayMode: String,
         status: String,
         errorMsg: String,
-        isRefreshing: Boolean
+        isRefreshing: Boolean,
+        maxFavorites: Int,
+        maxFavRows: Int,
+        maxRows: Int
     ) {
         Box(
             modifier = GlanceModifier
@@ -146,10 +204,14 @@ class DeparturesWidget : GlanceAppWidget() {
             } else 0L
 
             val isStale = minutesSinceUpdate >= 5
-            val isWarning = minutesSinceUpdate >= 2
+            val isWarning = minutesSinceUpdate >= 10
 
 
             val filtered = departures.filter { 
+                val isNotExpired = it.nextDepartureTime != null && try {
+                    Instant.parse(it.nextDepartureTime).isAfter(Instant.now().minusSeconds(60))
+                } catch(e: Exception) { true }
+                
                 val typeMatch = when (tabState) {
                     "BUS" -> it.isBus
                     "TRAIN" -> it.isTram
@@ -160,15 +222,16 @@ class DeparturesWidget : GlanceAppWidget() {
                     "R" -> it.lineId?.endsWith("R", ignoreCase = true) == true
                     else -> true
                 }
-                typeMatch && dirMatch
+                isNotExpired && typeMatch && dirMatch
             }
 
             Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.CenterEnd) {
-                if (filtered.isEmpty()) {
+                val limitedFiltered = if (maxRows >= 15) filtered else filtered.take(maxRows)
+                if (limitedFiltered.isEmpty()) {
                     Text("Keine Abfahrten", style = TextStyle(color = ColorProvider(Color.Gray)))
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                        items(filtered) { departure ->
+                        items(limitedFiltered) { departure ->
                             DepartureRow(departure, timeDisplayMode, isWarning)
                         }
                     }
@@ -184,7 +247,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
             }
 
-            FavoritesRow(favorites, stationId)
+            FavoritesRow(favorites, stationId, maxFavorites, maxFavRows)
             Footer(lastUpdated, isStale)
         }
     }
@@ -248,85 +311,107 @@ class DeparturesWidget : GlanceAppWidget() {
                 colorFilter = ColorFilter.tint(ColorProvider(gpsIconColor))
             )
 
-            val refreshIconColor = if (isRefreshing) Color(0xFF4285F4) else Color.Gray
-
-            Image(
-                provider = ImageProvider(android.R.drawable.ic_popup_sync),
-                contentDescription = "Refresh",
-                modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>(
-                    actionParametersOf(RefreshAction.KEY_FORCE to true)
-                )),
-                colorFilter = ColorFilter.tint(ColorProvider(refreshIconColor))
-            )
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    color = ColorProvider(Color(0xFF4285F4)),
+                    modifier = GlanceModifier.size(24.dp)
+                )
+            } else {
+                Image(
+                    provider = ImageProvider(android.R.drawable.ic_popup_sync),
+                    contentDescription = "Refresh",
+                    modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>(
+                        actionParametersOf(RefreshAction.KEY_FORCE to true)
+                    )),
+                    colorFilter = ColorFilter.tint(ColorProvider(Color.Gray))
+                )
+            }
         }
     }
 
     @Composable
-    private fun FavoritesRow(favorites: List<FavoriteStation>, currentStationId: String) {
-        if (favorites.isEmpty()) return
+    private fun FavoritesRow(favorites: List<FavoriteStation>, currentStationId: String, maxFavorites: Int, maxFavRows: Int) {
+        if (favorites.isEmpty() || maxFavorites <= 0 || maxFavRows <= 0) return
 
-        Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val buttonsToShow = minOf(3, favorites.size)
-            for (i in 0 until buttonsToShow) {
-                val fav = favorites[i]
-                val label = fav.alias
-                    ?: fav.name
-                        .replace("Hannover", "", ignoreCase = true)
-                        .replace(Regex("[,/()]+"), " ")
-                        .trim()
-                        .split(" ")
-                        .firstOrNull() ?: fav.name
-                val shortLabel = if (label.length > 8) label.take(7) + "." else label
-                val isActive = fav.id == currentStationId
-                val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
+        Column(modifier = GlanceModifier.fillMaxWidth()) {
+            val maxVisible = maxFavorites * maxFavRows
+            val needsCycle = favorites.size > maxVisible
+            val totalNormalButtons = if (needsCycle) maxVisible else favorites.size
 
-                Box(
-                    modifier = GlanceModifier
-                        .defaultWeight()
-                        .padding(horizontal = 2.dp)
-                        .cornerRadius(6.dp)
-                        .background(ColorProvider(bgColor))
-                        .clickable(actionRunCallback<ChangeStationAction>(
-                            actionParametersOf(ChangeStationAction.KEY_TARGET_INDEX to i)
-                        )),
-                    contentAlignment = Alignment.Center
+            for (rowIndex in 0 until maxFavRows) {
+                val startIndex = rowIndex * maxFavorites
+                if (startIndex >= totalNormalButtons) break
+
+                val endIndex = minOf(startIndex + maxFavorites, totalNormalButtons)
+
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = shortLabel,
-                        style = TextStyle(
-                            color = ColorProvider(Color.White),
-                            fontSize = 11.sp,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                        ),
-                        maxLines = 1,
-                        modifier = GlanceModifier.padding(vertical = 3.dp)
-                    )
-                }
-            }
+                    for (i in startIndex until endIndex) {
+                        val fav = favorites[i]
+                        val label = fav.alias
+                            ?: fav.name
+                                .replace("Hannover", "", ignoreCase = true)
+                                .replace(Regex("[,/()]+"), " ")
+                                .trim()
+                                .split(" ")
+                                .firstOrNull() ?: fav.name
+                        val shortLabel = if (label.length > 8) label.take(7) + "." else label
+                        val isActive = fav.id == currentStationId
+                        val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
 
-            // Cycle-Button für Favoriten ab Position 4
-            if (favorites.size > 3) {
-                val isRemainingActive = favorites.drop(3).any { it.id == currentStationId }
-                val bgColor = if (isRemainingActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
-                Box(
-                    modifier = GlanceModifier
-                        .defaultWeight()
-                        .padding(horizontal = 2.dp)
-                        .cornerRadius(6.dp)
-                        .background(ColorProvider(bgColor))
-                        .clickable(actionRunCallback<ChangeStationAction>(
-                            actionParametersOf(ChangeStationAction.KEY_CYCLE_REMAINING to true)
-                        )),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "▶",
-                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp),
-                        modifier = GlanceModifier.padding(vertical = 3.dp)
-                    )
+                        Box(
+                            modifier = GlanceModifier
+                                .defaultWeight()
+                                .padding(horizontal = 2.dp)
+                                .cornerRadius(6.dp)
+                                .background(ColorProvider(bgColor))
+                                .clickable(actionRunCallback<ChangeStationAction>(
+                                    actionParametersOf(ChangeStationAction.KEY_TARGET_INDEX to i)
+                                )),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = shortLabel,
+                                style = TextStyle(
+                                    color = ColorProvider(Color.White),
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                                ),
+                                maxLines = 1,
+                                modifier = GlanceModifier.padding(vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    val isLastRow = rowIndex == maxFavRows - 1
+                    if (isLastRow && needsCycle) {
+                        val isRemainingActive = favorites.drop(maxVisible).any { it.id == currentStationId }
+                        val bgColor = if (isRemainingActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
+                        Box(
+                            modifier = GlanceModifier
+                                .defaultWeight()
+                                .padding(horizontal = 2.dp)
+                                .cornerRadius(6.dp)
+                                .background(ColorProvider(bgColor))
+                                .clickable(actionRunCallback<ChangeStationAction>(
+                                    actionParametersOf(ChangeStationAction.KEY_CYCLE_REMAINING to true)
+                                )),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "▶",
+                                style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp),
+                                modifier = GlanceModifier.padding(vertical = 3.dp)
+                            )
+                        }
+                    } else if (endIndex - startIndex < maxFavorites) {
+                        val missing = maxFavorites - (endIndex - startIndex)
+                        for (m in 0 until missing) {
+                            Box(modifier = GlanceModifier.defaultWeight().padding(horizontal = 2.dp)) {}
+                        }
+                    }
                 }
             }
         }
@@ -373,10 +458,10 @@ class DeparturesWidget : GlanceAppWidget() {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .padding(vertical = 2.dp)
+                .padding(vertical = 1.dp)
                 .cornerRadius(6.dp)
                 .background(ColorProvider(rowBgColor))
-                .padding(vertical = 4.dp, horizontal = 6.dp),
+                .padding(vertical = 2.dp, horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             LineBadge(departure.lineShort, departure.isBus)

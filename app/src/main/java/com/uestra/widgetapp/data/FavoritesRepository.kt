@@ -2,6 +2,7 @@ package com.uestra.widgetapp.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -27,6 +28,9 @@ class FavoritesRepository(private val context: Context) {
         val WIDGET_MODE_KEY      = stringPreferencesKey("widget_mode")            // "gps" | "station"
         val ACTIVE_STATION_ID    = stringPreferencesKey("active_station_id")
         val ACTIVE_STATION_NAME  = stringPreferencesKey("active_station_name")
+        val MAX_FAV_KEY          = intPreferencesKey("max_favorites_widget")
+        val MAX_FAV_ROWS_KEY     = intPreferencesKey("max_fav_rows_widget")
+        val MAX_ROWS_KEY         = intPreferencesKey("max_rows_widget")
     }
 
     // ── Aktive Station ───────────────────────────────────────────────────────
@@ -135,5 +139,28 @@ class FavoritesRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[WIDGET_MODE_KEY] = mode
         }
+    }
+
+    // ── UI Einstellungen ─────────────────────────────────────────────────────
+
+    val maxFavoritesFlow: Flow<Int> = context.dataStore.data
+        .map { prefs -> prefs[MAX_FAV_KEY] ?: 3 }
+
+    val maxFavRowsFlow: Flow<Int> = context.dataStore.data
+        .map { prefs -> prefs[MAX_FAV_ROWS_KEY] ?: 1 }
+
+    val maxRowsFlow: Flow<Int> = context.dataStore.data
+        .map { prefs -> prefs[MAX_ROWS_KEY] ?: 10 }
+
+    suspend fun setMaxFavorites(max: Int) {
+        context.dataStore.edit { prefs -> prefs[MAX_FAV_KEY] = max }
+    }
+
+    suspend fun setMaxFavRows(max: Int) {
+        context.dataStore.edit { prefs -> prefs[MAX_FAV_ROWS_KEY] = max }
+    }
+
+    suspend fun setMaxRows(max: Int) {
+        context.dataStore.edit { prefs -> prefs[MAX_ROWS_KEY] = max }
     }
 }

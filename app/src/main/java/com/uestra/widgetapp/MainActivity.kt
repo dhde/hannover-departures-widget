@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
@@ -42,6 +43,8 @@ import com.uestra.widgetapp.data.FavoritesRepository
 import com.uestra.widgetapp.widget.WidgetTickerWorker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.glance.appwidget.updateAll
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
 
@@ -99,6 +102,7 @@ private val TextSub    = Color(0xFF9090AA)
 
 enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     SEARCH("Suchen", Icons.Default.Search),
+    OPTIONS("Optionen", Icons.Default.Settings),
     FAVORITES("Favoriten", Icons.Default.Star),
     HELP("Hilfe", Icons.Default.Info)
 }
@@ -155,6 +159,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (currentScreen) {
                 AppScreen.SEARCH -> SearchScreen(repo)
+                AppScreen.OPTIONS -> OptionsScreen(repo)
                 AppScreen.FAVORITES -> FavoritesScreen(repo)
                 AppScreen.HELP -> HelpScreen()
             }
@@ -552,10 +557,96 @@ private fun HelpItem(icon: @Composable () -> Unit, title: String, description: S
         Box(modifier = Modifier.padding(top = 2.dp).size(24.dp), contentAlignment = Alignment.Center) {
             icon()
         }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(title, color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text(description, color = TextSub, fontSize = 12.sp, lineHeight = 16.sp)
+    }
+}
+
+@Composable
+fun OptionsScreen(repo: com.uestra.widgetapp.data.FavoritesRepository) {
+    val scope = rememberCoroutineScope()
+    val maxFavsFlow by repo.maxFavoritesFlow.collectAsState(initial = 3)
+    val maxFavRowsFlow by repo.maxFavRowsFlow.collectAsState(initial = 1)
+    val maxRowsFlow by repo.maxRowsFlow.collectAsState(initial = 10)
+    
+    var localMaxFavs by remember(maxFavsFlow) { mutableStateOf(maxFavsFlow.toFloat()) }
+    var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
+    var localMaxRows by remember(maxRowsFlow) { mutableStateOf(maxRowsFlow.toFloat()) }
+    
+    val context = LocalContext.current
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(DarkBg),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { SectionLabel("Widget Einstellungen") }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Favoriten pro Zeile", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Anzahl der Schnellwahl-Tasten pro Zeile (0 bis 5)", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Slider(
+                        value = localMaxFavs,
+                        onValueChange = { localMaxFavs = it },
+                        onValueChangeFinished = { scope.launch { repo.setMaxFavorites(localMaxFavs.roundToInt()) } },
+                        valueRange = 0f..5f,
+                        steps = 4,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Teal,
+                            activeTrackColor = Teal,
+                            inactiveTrackColor = Color(0xFF333344)
+                        )
+                    )
+                    Text("${localMaxFavs.roundToInt()} Knöpfe pro Zeile", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+
+                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                    Text("Zeilen für Favoriten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Anzahl der Zeilen für Schnellwahl-Tasten (1 bis 3)", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Slider(
+                        value = localMaxFavRows,
+                        onValueChange = { localMaxFavRows = it },
+                        onValueChangeFinished = { scope.launch { repo.setMaxFavRows(localMaxFavRows.roundToInt()) } },
+                        valueRange = 1f..3f,
+                        steps = 1,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Teal,
+                            activeTrackColor = Teal,
+                            inactiveTrackColor = Color(0xFF333344)
+                        )
+                    )
+                    Text("${localMaxFavRows.roundToInt()} Zeilen", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+
+                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                    Text("Maximale Abfahrten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Zeilen im Widget (1 bis 15, 15 = unbegrenzt)", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Slider(
+                        value = localMaxRows,
+                        onValueChange = { localMaxRows = it },
+                        onValueChangeFinished = { scope.launch { repo.setMaxRows(localMaxRows.roundToInt()) } },
+                        valueRange = 1f..15f,
+                        steps = 13,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Teal,
+                            activeTrackColor = Teal,
+                            inactiveTrackColor = Color(0xFF333344)
+                        )
+                    )
+                    val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
+                    Text(rowLabel, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                }
+            }
         }
+    }
+    
+    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow) {
+        com.uestra.widgetapp.widget.DeparturesWidget().updateAll(context)
     }
 }
