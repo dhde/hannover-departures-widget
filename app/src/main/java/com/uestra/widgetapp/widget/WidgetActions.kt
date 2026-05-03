@@ -146,13 +146,16 @@ class ChangeStationAction : ActionCallback {
                 val fav = favorites[targetIndex]
                 repo.setActiveStation(fav.id, fav.name)
             } else if (cycleRemaining) {
-                if (favorites.size > 3) {
+                val maxFavorites = repo.maxFavoritesFlow.first()
+                val maxFavRows = repo.maxFavRowsFlow.first()
+                val maxVisible = maxFavorites * maxFavRows
+                if (favorites.size > maxVisible) {
                     var currentIndex = favorites.indexOfFirst { it.id == currentId }
-                    if (currentIndex < 3) {
-                        currentIndex = 3
+                    if (currentIndex < maxVisible) {
+                        currentIndex = maxVisible
                     } else {
                         currentIndex++
-                        if (currentIndex >= favorites.size) currentIndex = 3
+                        if (currentIndex >= favorites.size) currentIndex = maxVisible
                     }
                     val fav = favorites[currentIndex]
                     repo.setActiveStation(fav.id, fav.name)
