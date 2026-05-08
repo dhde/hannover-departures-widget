@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -357,7 +356,7 @@ fun HelpScreen() {
                     
                     val context = LocalContext.current
                     val intentHandler = { url: String ->
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.util.Log.d("URL", url).let { android.net.Uri.parse(url) })
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
                         context.startActivity(intent)
                     }
 
@@ -380,7 +379,7 @@ fun HelpScreen() {
                         shape = RoundedCornerShape(8.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, TextSub)
                     ) {
-                        Icon(Icons.Default.Code, contentDescription = null, tint = TextMain)
+                        Icon(Icons.Default.Search, contentDescription = null, tint = TextMain)
                         Spacer(Modifier.width(8.dp))
                         Text("Quellcode auf GitHub", color = TextMain)
                     }
