@@ -54,4 +54,4 @@ Die App bietet eine vollständige Verwaltung deiner Lieblingshaltestellen:
 
 Gefällt dir das Widget? Wenn du die Weiterentwicklung unterstützen möchtest, freue ich mich über einen virtuellen Kaffee! ☕
 
-[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/dhde)
+<a href="https://www.buymeacoffee.com/dhde"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="35"></a>
