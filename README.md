@@ -18,7 +18,7 @@ Ein modernes, natives Android-Widget für Live-Abfahrtszeiten des GVH (Großraum
 
 ## Screenshots
 
-| Widget (Hauptbahnhof) | Widget (Klingerstraße) | App-Konfiguration |
+| Widget & App | Favoriten | Suche |
 | --- | --- | --- |
 | ![Widget & App](docs/images/screenshot_1.png) | ![Favoriten](docs/images/screenshot_2.png) | ![Suche](docs/images/screenshot_3.png) |
 
