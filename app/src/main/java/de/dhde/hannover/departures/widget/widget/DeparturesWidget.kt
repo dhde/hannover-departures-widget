@@ -1,4 +1,4 @@
-package com.uestra.widgetapp.widget
+package de.dhde.hannover.departures.widget.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
@@ -29,21 +29,23 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.appWidgetBackground
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.uestra.widgetapp.api.DepartureItem
-import com.uestra.widgetapp.api.UestraApi
-import com.uestra.widgetapp.data.FavoriteStation
-import com.uestra.widgetapp.data.FavoritesRepository
-import com.uestra.widgetapp.data.DeparturesCache
-import com.uestra.widgetapp.widget.RefreshAction
-import com.uestra.widgetapp.widget.ChangeTabAction
-import com.uestra.widgetapp.widget.ChangeStationAction
-import com.uestra.widgetapp.widget.ChangeDirectionAction
-import com.uestra.widgetapp.widget.LocateNearestStationAction
-import com.uestra.widgetapp.widget.ToggleTimeDisplayAction
+import de.dhde.hannover.departures.widget.api.DepartureItem
+import de.dhde.hannover.departures.widget.api.FlatDeparture
+import de.dhde.hannover.departures.widget.api.toFlatRows
+import de.dhde.hannover.departures.widget.api.UestraApi
+import de.dhde.hannover.departures.widget.data.FavoriteStation
+import de.dhde.hannover.departures.widget.data.FavoritesRepository
+import de.dhde.hannover.departures.widget.data.DeparturesCache
+import de.dhde.hannover.departures.widget.widget.RefreshAction
+import de.dhde.hannover.departures.widget.widget.ChangeTabAction
+import de.dhde.hannover.departures.widget.widget.ChangeStationAction
+import de.dhde.hannover.departures.widget.widget.ChangeDirectionAction
+import de.dhde.hannover.departures.widget.widget.LocateNearestStationAction
+import de.dhde.hannover.departures.widget.widget.ToggleTimeDisplayAction
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.time.Duration
-import com.uestra.widgetapp.R
+import de.dhde.hannover.departures.widget.R
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
@@ -55,7 +57,7 @@ object WidgetTicker {
     fun scheduleNextTick(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
-            action = "com.uestra.widgetapp.TICK"
+            action = "de.dhde.hannover.departures.widget.TICK"
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context, 0, intent, 
@@ -68,7 +70,7 @@ object WidgetTicker {
     fun cancelTick(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
-            action = "com.uestra.widgetapp.TICK"
+            action = "de.dhde.hannover.departures.widget.TICK"
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context, 0, intent, 
@@ -115,17 +117,17 @@ class DeparturesWidget : GlanceAppWidget() {
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
-                // Explizit nach der nächsten Abfahrtszeit (Echtzeit) sortieren
-                list.sortedBy { it.nextDepartureTime ?: "99:99" }
+                list
             } catch (e: Exception) {
                 emptyList()
             }
 
-            val hasFutureDepartures = departures.any {
-                it.nextDepartureTime != null && try {
-                    Instant.parse(it.nextDepartureTime).isAfter(Instant.now().minusSeconds(60))
-                } catch(e: Exception) { true }
-            }
+            // Alle Events aller Linien zu einzelnen Abfahrtszeilen aufkläppen und nach Echtzeit sortieren
+            val flatDepartures: List<FlatDeparture> = departures
+                .flatMap { it.toFlatRows() }
+                .sortedBy { it.departureTime }
+
+            val hasFutureDepartures = flatDepartures.isNotEmpty()
 
             val context = LocalContext.current
             SideEffect {
@@ -143,6 +145,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 stationId       = stationId,
                 lastUpdated     = lastUpdated,
                 departures      = departures,
+                flatDepartures  = flatDepartures,
                 favorites       = favorites,
                 tabState        = tabState,
                 directionState  = directionState,
@@ -164,6 +167,7 @@ class DeparturesWidget : GlanceAppWidget() {
         stationId: String,
         lastUpdated: String,
         departures: List<DepartureItem>,
+        flatDepartures: List<FlatDeparture>,
         favorites: List<FavoriteStation>,
         tabState: String,
         directionState: String,
@@ -207,11 +211,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val isWarning = minutesSinceUpdate >= 10
 
 
-            val filtered = departures.filter { 
-                val isNotExpired = it.nextDepartureTime != null && try {
-                    Instant.parse(it.nextDepartureTime).isAfter(Instant.now().minusSeconds(60))
-                } catch(e: Exception) { true }
-                
+            val filtered = flatDepartures.filter {
                 val typeMatch = when (tabState) {
                     "BUS" -> it.isBus
                     "TRAIN" -> it.isTram
@@ -222,7 +222,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     "R" -> it.lineId?.endsWith("R", ignoreCase = true) == true
                     else -> true
                 }
-                isNotExpired && typeMatch && dirMatch
+                typeMatch && dirMatch
             }
 
             Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.CenterEnd) {
@@ -232,7 +232,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                         items(limitedFiltered) { departure ->
-                            DepartureRow(departure, timeDisplayMode, isWarning)
+                            FlatDepartureRow(departure, timeDisplayMode, isWarning)
                         }
                     }
                     
@@ -446,6 +446,52 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
+    private fun FlatDepartureRow(departure: FlatDeparture, timeDisplayMode: String, isWarning: Boolean) {
+        val rowBgColor = when {
+            departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
+            departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
+            else -> Color.Transparent
+        }
+
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .padding(vertical = 1.dp)
+                .cornerRadius(6.dp)
+                .background(ColorProvider(rowBgColor))
+                .padding(vertical = 2.dp, horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LineBadge(departure.lineShort, departure.isBus)
+            Spacer(modifier = GlanceModifier.width(8.dp))
+            Text(
+                text = departure.destination ?: "Unbekannt",
+                style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp),
+                modifier = GlanceModifier.defaultWeight()
+            )
+            val timeText = if (timeDisplayMode == "CLOCK") {
+                clockTime(departure.departureTime)
+            } else {
+                minutesUntil(departure.departureTime, isWarning)
+            }
+
+            val hasDelay = (departure.delayMinutes ?: 0) > 0
+            val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
+
+            val timeStyle = when {
+                isWarning -> TextStyle(color = ColorProvider(Color.Gray), fontSize = 14.sp, fontStyle = FontStyle.Italic)
+                hasDelay -> TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                else -> TextStyle(color = ColorProvider(Color(0xFF4CAF50)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Text(
+                text = timeText + delayText,
+                style = timeStyle
+            )
+        }
+    }
+
+    @Composable
     private fun DepartureRow(departure: DepartureItem, timeDisplayMode: String, isWarning: Boolean) {
         val rowBgColor = when {
             // "City" (H) aufhellen: Sehr sanftes, transluzentes Weiß (ca. 8% Deckkraft)
@@ -478,7 +524,7 @@ class DeparturesWidget : GlanceAppWidget() {
             }
             
             val hasDelay = (departure.delayMinutes ?: 0) > 0
-            val delayText = if (hasDelay && timeDisplayMode == "CLOCK") " (+${departure.delayMinutes})" else ""
+            val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
             
             // Wenn ab 2 Min veraltet: Grau und Kursiv. Wenn Verspätung: Orange. Sonst Gruen und Fett
             val timeStyle = when {
@@ -643,8 +689,8 @@ class DeparturesWidget : GlanceAppWidget() {
             )
             
             Text(
-                text = "Inoffizielles Widget",
-                style = TextStyle(color = ColorProvider(Color.Gray.copy(alpha = 0.5f)), fontSize = 8.sp),
+                text = "Inoffiziell",
+                style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 10.sp),
                 modifier = GlanceModifier.padding(start = 4.dp)
             )
         }

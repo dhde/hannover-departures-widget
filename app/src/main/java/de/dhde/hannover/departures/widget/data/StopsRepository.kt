@@ -1,10 +1,10 @@
-package com.uestra.widgetapp.data
+package de.dhde.hannover.departures.widget.data
 
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.uestra.widgetapp.api.StationSearchResult
-import com.uestra.widgetapp.api.UestraApi
+import de.dhde.hannover.departures.widget.api.StationSearchResult
+import de.dhde.hannover.departures.widget.api.UestraApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File

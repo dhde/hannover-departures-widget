@@ -1,4 +1,4 @@
-package com.uestra.widgetapp
+package de.dhde.hannover.departures.widget
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -37,10 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.uestra.widgetapp.api.StationSearchResult
-import com.uestra.widgetapp.api.UestraApi
-import com.uestra.widgetapp.data.FavoritesRepository
-import com.uestra.widgetapp.widget.WidgetTickerWorker
+import de.dhde.hannover.departures.widget.api.StationSearchResult
+import de.dhde.hannover.departures.widget.api.UestraApi
+import de.dhde.hannover.departures.widget.data.FavoritesRepository
+import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
@@ -120,7 +120,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
                 title = {
                     Column {
                         Text(
-                            "Üstra Widget",
+                            "Hannover Abfahrten Stadtbahnen",
                             fontWeight = FontWeight.Bold,
                             fontSize   = 18.sp,
                             color      = TextMain
@@ -179,7 +179,7 @@ fun SearchScreen(repo: FavoritesRepository) {
     val activeStationId  by repo.activeStationId.collectAsState(initial = null)
 
     val context = LocalContext.current
-    val stopsRepo = remember { com.uestra.widgetapp.data.StopsRepository(context) }
+    val stopsRepo = remember { de.dhde.hannover.departures.widget.data.StopsRepository(context) }
 
     val lastLocation = remember {
         val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -343,6 +343,29 @@ fun HelpScreen() {
     ) {
         item { SectionLabel("Hilfe & Tipps") }
         item { HelpCard() }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "Rechtlicher Hinweis",
+                        color = Red,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Dies ist eine inoffizielle App. Sie steht in keiner Verbindung zur ÜSTRA Hannoversche Verkehrsbetriebe AG oder dem GVH. Alle Daten werden über öffentliche Schnittstellen bezogen. Nutzung auf eigene Gefahr.",
+                        color = TextSub,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -421,7 +444,7 @@ private fun SearchResultRow(
 
 @Composable
 private fun FavoriteRow(
-    fav: com.uestra.widgetapp.data.FavoriteStation,
+    fav: de.dhde.hannover.departures.widget.data.FavoriteStation,
     isActive: Boolean,
     onSelect: () -> Unit,
     onDelete: () -> Unit,
@@ -557,11 +580,17 @@ private fun HelpItem(icon: @Composable () -> Unit, title: String, description: S
         Box(modifier = Modifier.padding(top = 2.dp).size(24.dp), contentAlignment = Alignment.Center) {
             icon()
         }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = TextMain, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(description, color = TextSub, fontSize = 12.sp)
+        }
     }
 }
 
 @Composable
-fun OptionsScreen(repo: com.uestra.widgetapp.data.FavoritesRepository) {
+fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesRepository) {
     val scope = rememberCoroutineScope()
     val maxFavsFlow by repo.maxFavoritesFlow.collectAsState(initial = 3)
     val maxFavRowsFlow by repo.maxFavRowsFlow.collectAsState(initial = 1)
@@ -647,6 +676,6 @@ fun OptionsScreen(repo: com.uestra.widgetapp.data.FavoritesRepository) {
     }
     
     LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow) {
-        com.uestra.widgetapp.widget.DeparturesWidget().updateAll(context)
+        de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }

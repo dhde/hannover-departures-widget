@@ -1,4 +1,4 @@
-package com.uestra.widgetapp.data
+package de.dhde.hannover.departures.widget.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.*

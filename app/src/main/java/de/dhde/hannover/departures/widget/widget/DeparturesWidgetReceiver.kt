@@ -1,4 +1,4 @@
-package com.uestra.widgetapp.widget
+package de.dhde.hannover.departures.widget.widget
 
 import android.content.Context
 import android.content.Intent
@@ -13,7 +13,7 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == "com.uestra.widgetapp.TICK") {
+        if (intent.action == "de.dhde.hannover.departures.widget.TICK") {
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {
                 DeparturesWidget().updateAll(context)

@@ -1,4 +1,4 @@
-package com.uestra.widgetapp
+package de.dhde.hannover.departures.widget
 
 import android.app.Application
 
