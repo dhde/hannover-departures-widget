@@ -2,7 +2,7 @@
 
 Ein modernes, natives Android-Widget für Live-Abfahrtszeiten des GVH (Großraum-Verkehr Hannover). Behalte Busse und Bahnen direkt auf deinem Homescreen im Blick.
 
-![Üstra Widget](docs/images/widget_hbf.png)
+![Üstra Widget](docs/images/feature_graphic.png)
 
 ## Features
 
@@ -20,7 +20,7 @@ Ein modernes, natives Android-Widget für Live-Abfahrtszeiten des GVH (Großraum
 
 | Widget (Hauptbahnhof) | Widget (Klingerstraße) | App-Konfiguration |
 | --- | --- | --- |
-| ![Widget HBF](docs/images/widget_hbf.png) | ![Widget Klinger](docs/images/widget.png) | ![App Configuration](docs/images/app.png) |
+| ![Widget & App](docs/images/screenshot_1.png) | ![Favoriten](docs/images/screenshot_2.png) | ![Suche](docs/images/screenshot_3.png) |
 
 ## Bedienung & Tipps
 
@@ -54,4 +54,4 @@ Die App bietet eine vollständige Verwaltung deiner Lieblingshaltestellen:
 
 Gefällt dir das Widget? Wenn du die Weiterentwicklung unterstützen möchtest, freue ich mich über einen virtuellen Kaffee! ☕
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_platforms/yellow_img.png)](https://www.buymeacoffee.com/dhde)
+<a href="https://www.buymeacoffee.com/dhde"><img src="https://img.buymeacoffee.com/button-api/?text=Kaffee spenden&emoji=☕&slug=dhde&button_colour=FFDD00&font_colour=000000&font_family=Inter&outline_colour=000000&coffee_colour=ffffff" /></a>
