@@ -49,3 +49,9 @@ Die App bietet eine vollständige Verwaltung deiner Lieblingshaltestellen:
 
 ---
 *Hinweis: Dies ist ein inoffizielles Widget und steht in keiner direkten Verbindung zur ÜSTRA oder dem GVH.*
+
+## Support & Spenden
+
+Gefällt dir das Widget? Wenn du die Weiterentwicklung unterstützen möchtest, freue ich mich über einen virtuellen Kaffee! ☕
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_platforms/yellow_img.png)](https://www.buymeacoffee.com/dhde)
