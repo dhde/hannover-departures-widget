@@ -366,7 +366,7 @@ fun HelpScreen() {
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Black)
+                        Text("☕", fontSize = 18.sp)
                         Spacer(Modifier.width(8.dp))
                         Text("Kaffee spenden", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
