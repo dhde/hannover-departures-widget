@@ -1,4 +1,4 @@
-package com.uestra.widgetapp.api
+package de.dhde.hannover.departures.widget.api
 
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit

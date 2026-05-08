@@ -1,4 +1,4 @@
-package com.uestra.widgetapp.widget
+package de.dhde.hannover.departures.widget.widget
 
 import android.content.Context
 import android.Manifest
@@ -11,10 +11,10 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.action.ActionCallback
 import com.google.gson.Gson
-import com.uestra.widgetapp.api.*
-import com.uestra.widgetapp.data.DeparturesCache
-import com.uestra.widgetapp.data.FavoritesRepository
-import com.uestra.widgetapp.data.StopsRepository
+import de.dhde.hannover.departures.widget.api.*
+import de.dhde.hannover.departures.widget.data.DeparturesCache
+import de.dhde.hannover.departures.widget.data.FavoritesRepository
+import de.dhde.hannover.departures.widget.data.StopsRepository
 import java.time.Instant
 import java.time.Duration
 import java.time.OffsetDateTime

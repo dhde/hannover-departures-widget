@@ -1,4 +1,4 @@
-package com.uestra.widgetapp.widget
+package de.dhde.hannover.departures.widget.widget
 
 import android.content.Context
 import androidx.glance.appwidget.updateAll

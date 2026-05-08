@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.uestra.widgetapp"
+    namespace = "de.dhde.hannover.departures.widget"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.uestra.widgetapp"
+        applicationId = "de.dhde.hannover.departures.widget"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
