@@ -362,7 +362,7 @@ fun HelpScreen() {
                     }
 
                     Button(
-                        onClick = { intentHandler("https://www.buymeacoffee.com/DEIN_NAME") },
+                        onClick = { intentHandler("https://www.buymeacoffee.com/dhde") },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDD00)),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
