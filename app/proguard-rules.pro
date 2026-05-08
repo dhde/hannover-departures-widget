@@ -5,6 +5,8 @@
 
 # Gson rules
 -keep class com.google.gson.** { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+-keep public class * implements java.lang.reflect.Type
 -keepattributes Signature
 -keepattributes *Annotation*
 -dontwarn sun.misc.Unsafe

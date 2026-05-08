@@ -25,6 +25,7 @@ class StopsRepository(context: Context) {
                     return@withContext stops
                 }
             } catch (e: Exception) {
+                android.util.Log.e("StopsRepo", "Failed to read stops from cache", e)
                 // Bei Fehler im Cache (z.B. defekte Datei) weiter zum Network-Fallback
             }
         }
@@ -39,6 +40,7 @@ class StopsRepository(context: Context) {
             }
             stops
         } catch (e: Exception) {
+            android.util.Log.e("StopsRepo", "Failed to fetch stops", e)
             emptyList()
         }
     }
