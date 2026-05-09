@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import de.dhde.hannover.departures.widget.api.StationSearchResult
 import de.dhde.hannover.departures.widget.api.UestraApi
+import de.dhde.hannover.departures.widget.api.FlatDeparture
+import de.dhde.hannover.departures.widget.api.toFlatRows
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
 import kotlinx.coroutines.delay
@@ -95,23 +97,25 @@ private val TextSub    = Color(0xFF9090AA)
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    DASHBOARD("Abfahrten", Icons.Default.Dashboard),
     SEARCH("Suchen", Icons.Default.Search),
-    OPTIONS("Optionen", Icons.Default.Settings),
     FAVORITES("Favoriten", Icons.Default.Star),
+    OPTIONS("Optionen", Icons.Default.Settings),
     HELP("Hilfe", Icons.Default.Info)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun ConfigurationScreen(repo: FavoritesRepository) {
-    var currentScreen by remember { mutableStateOf(AppScreen.SEARCH) }
+    var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
     val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
 
     Scaffold(
         containerColor = DarkBg,
         topBar = {
-            TopAppBar(
-                title = {
+            if (currentScreen != AppScreen.DASHBOARD) {
+                TopAppBar(
+                    title = {
                     Column {
                         Text(
                             "Hannover Abfahrten Stadtbahnen",
@@ -128,7 +132,8 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
-            )
+                )
+            }
         },
         bottomBar = {
             NavigationBar(containerColor = CardBg) {
@@ -152,10 +157,411 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (currentScreen) {
+                AppScreen.DASHBOARD -> DashboardScreen(repo)
                 AppScreen.SEARCH -> SearchScreen(repo)
                 AppScreen.OPTIONS -> OptionsScreen(repo)
                 AppScreen.FAVORITES -> FavoritesScreen(repo)
                 AppScreen.HELP -> HelpScreen()
+            }
+        }
+    }
+}
+
+@Composable
+fun DashboardScreen(repo: FavoritesRepository) {
+    val scope = rememberCoroutineScope()
+    
+    val activeStationId by repo.activeStationId.collectAsState(initial = null)
+    val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
+    val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
+    
+    val maxFavorites by repo.maxFavoritesFlow.collectAsState(initial = 3)
+    val maxFavRows by repo.maxFavRowsFlow.collectAsState(initial = 1)
+    val maxRows by repo.maxRowsFlow.collectAsState(initial = 10)
+    
+    var departures by remember { mutableStateOf<List<FlatDeparture>>(emptyList()) }
+    var rawDepartures by remember { mutableStateOf<List<de.dhde.hannover.departures.widget.api.DepartureItem>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var lastUpdate by remember { mutableStateOf<java.time.Instant?>(null) }
+    
+    // States matching the widget
+    var tabState by remember { mutableStateOf("ALL") }
+    var directionState by remember { mutableStateOf("ALL") }
+    var timeDisplayMode by remember { mutableStateOf("MIN") }
+
+    fun loadData(stationId: String) {
+        if (isLoading) return
+        scope.launch {
+            isLoading = true
+            try {
+                val apiResponse = UestraApi.create().getDepartures(stationId)
+                rawDepartures = apiResponse.departures ?: emptyList()
+                departures = rawDepartures.flatMap { it.toFlatRows() }.sortedBy { it.departureTime }
+                lastUpdate = java.time.Instant.now()
+            } catch (e: Exception) {
+                // Ignore for now, keep old data
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(activeStationId) {
+        activeStationId?.let { loadData(it) }
+    }
+
+    LaunchedEffect(activeStationId, lastUpdate) {
+        if (activeStationId != null && !isLoading) {
+            delay(30000)
+            loadData(activeStationId!!)
+        }
+    }
+
+    // Filter logic
+    val filtered = departures.filter {
+        val typeMatch = when (tabState) {
+            "BUS" -> it.isBus
+            "TRAIN" -> it.isTram
+            else -> true
+        }
+        val dirMatch = when (directionState) {
+            "H" -> it.lineId?.endsWith("H", ignoreCase = true) == true
+            "R" -> it.lineId?.endsWith("R", ignoreCase = true) == true
+            else -> true
+        }
+        typeMatch && dirMatch
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().background(DarkBg)
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .background(Color(0xFF121212)) // Widget Bg
+                .padding(12.dp)
+        ) {
+            // Background Icon
+            if (tabState != "ALL") {
+                val iconRes = if (tabState == "BUS") R.drawable.ic_widget_bus else R.drawable.ic_widget_tram
+                Icon(
+                    androidx.compose.ui.res.painterResource(iconRes),
+                    contentDescription = null,
+                    tint = Color(0xFF141F14), // Subtle dark green
+                    modifier = Modifier.fillMaxSize().padding(32.dp)
+                )
+            }
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header
+            WidgetHeader(
+                stationName = activeStationName,
+                isRefreshing = isLoading,
+                onRefresh = { activeStationId?.let { loadData(it) } }
+            )
+            
+            // Filter Segmented Row
+            WidgetFilterRow(
+                departures = rawDepartures,
+                tabState = tabState,
+                directionState = directionState,
+                onTabChange = { tabState = it },
+                onDirChange = { directionState = it }
+            )
+
+            // List
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(filtered.take(maxRows)) { dep ->
+                        WidgetFlatDepartureRow(dep, timeDisplayMode)
+                    }
+                }
+                // Invisible box to toggle time display mode
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(80.dp)
+                        .align(Alignment.CenterEnd)
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            timeDisplayMode = if (timeDisplayMode == "MIN") "CLOCK" else "MIN"
+                        }
+                )
+            }
+
+            // Favorites Row
+            WidgetFavoritesRow(
+                favorites = favorites,
+                currentStationId = activeStationId,
+                maxFavorites = maxFavorites,
+                maxFavRows = maxFavRows,
+                onSelect = { scope.launch { repo.setActiveStation(it.id, it.name) } }
+            )
+
+            // Footer
+            if (lastUpdate != null) {
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss").withZone(java.time.ZoneId.systemDefault())
+                Text(
+                    text = "Letztes Update: ${formatter.format(lastUpdate)}",
+                    color = Color.Gray,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 4.dp).align(Alignment.End)
+                )
+            }
+        }
+    }
+}
+}
+
+// ---------------- UI COMPONENTS ----------------
+
+@Composable
+fun WidgetHeader(stationName: String, isRefreshing: Boolean, onRefresh: () -> Unit) {
+    val cleanName = stationName
+        .replace("Hannover", "", ignoreCase = true)
+        .replace("Landeshauptstadt", "", ignoreCase = true)
+        .replace(Regex("[,/()]+"), " ")
+        .trim()
+        .replace(Regex("\\s+"), " ")
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = cleanName,
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Default.LocationOn,
+            contentDescription = null,
+            tint = Color.Gray,
+            modifier = Modifier.padding(end = 8.dp).size(20.dp)
+        )
+        if (isRefreshing) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color(0xFF4285F4), strokeWidth = 2.dp)
+        } else {
+            Icon(
+                Icons.Default.Refresh,
+                contentDescription = "Refresh",
+                tint = Color.Gray,
+                modifier = Modifier.size(20.dp).clickable { onRefresh() }
+            )
+        }
+    }
+}
+
+@Composable
+fun WidgetFilterRow(
+    departures: List<de.dhde.hannover.departures.widget.api.DepartureItem>, 
+    tabState: String, 
+    directionState: String,
+    onTabChange: (String) -> Unit,
+    onDirChange: (String) -> Unit
+) {
+    val hasH = departures.any { it.lineId?.endsWith("H") == true }
+    val hasR = departures.any { it.lineId?.endsWith("R") == true }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Vehicle Type Filters
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "BUS", Color(0xFFE94560)) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
+            Spacer(modifier = Modifier.width(4.dp))
+            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "TRAIN", Color(0xFF005A9B)) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Direction Filters
+        if (hasH || hasR) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (hasH) {
+                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "H", Color(0xFF0F7173)) { onDirChange(if (directionState == "H") "ALL" else "H") }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                if (hasH && hasR) {
+                    WidgetSegmentButton(R.drawable.ic_widget_all, directionState == "ALL", Color.Gray) { onDirChange("ALL") }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                if (hasR) {
+                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "R", Color(0xFFE94560)) { onDirChange(if (directionState == "R") "ALL" else "R") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, onClick: () -> Unit) {
+    val bgColor = if (isActive) activeColor else Color(0xFF2A2A2A)
+    Box(
+        modifier = Modifier
+            .size(32.dp, 24.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(bgColor)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            androidx.compose.ui.res.painterResource(iconRes),
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+@Composable
+fun WidgetFlatDepartureRow(dep: FlatDeparture, timeDisplayMode: String) {
+    val rowBgColor = when {
+        dep.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
+        dep.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
+        else -> Color.Transparent
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(rowBgColor)
+            .padding(vertical = 4.dp, horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        WidgetLineBadge(dep.lineShort, dep.isBus)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = dep.destination ?: "Unbekannt",
+            color = Color.White,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+
+        val minutes = try {
+            val depTime = java.time.Instant.parse(dep.departureTime)
+            java.time.Duration.between(java.time.Instant.now(), depTime).toMinutes()
+        } catch (e: Exception) { -1L }
+
+        val timeText = if (timeDisplayMode == "CLOCK") {
+            try {
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                    .withZone(java.time.ZoneId.systemDefault())
+                    .format(java.time.Instant.parse(dep.departureTime))
+            } catch (e: Exception) { "--:--" }
+        } else {
+            if (minutes in 0..60) "$minutes min" else "-- min"
+        }
+
+        val hasDelay = (dep.delayMinutes ?: 0) > 0
+        val delayText = if (hasDelay) " (+${dep.delayMinutes})" else ""
+
+        val timeColor = when {
+            minutes < 5 -> Color.Gray // Warning state
+            hasDelay -> Color(0xFFFF9800)
+            else -> Color(0xFF4CAF50)
+        }
+
+        Text(
+            text = timeText + delayText,
+            color = timeColor,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontStyle = if (minutes < 5) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+        )
+    }
+}
+
+@Composable
+fun WidgetLineBadge(line: String, isBus: Boolean) {
+    val (bgColor, textColor) = if (isBus) {
+        val isSprintH = line.length == 3 && line[0] in '3'..'9' && line.substring(1) == "00"
+        if (isSprintH) Color(0xFFB42082) to Color.White
+        else Color(0xFFE3001B) to Color.White
+    } else {
+        when (line) {
+            "1", "2", "8" -> Color(0xFFE3001B) to Color.White
+            "3", "7", "9", "13" -> Color(0xFF005A9B) to Color.White
+            "4", "5", "6", "11" -> Color(0xFFFFCC00) to Color.Black
+            "10", "17" -> Color(0xFF009A44) to Color.White
+            else -> Color.Gray to Color.White
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(34.dp, 24.dp)
+            .background(bgColor, RoundedCornerShape(2.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = line,
+            color = textColor,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+fun WidgetFavoritesRow(
+    favorites: List<de.dhde.hannover.departures.widget.data.FavoriteStation>, 
+    currentStationId: String?, 
+    maxFavorites: Int,
+    maxFavRows: Int,
+    onSelect: (de.dhde.hannover.departures.widget.data.FavoriteStation) -> Unit
+) {
+    if (favorites.isEmpty() || maxFavorites <= 0 || maxFavRows <= 0) return
+    
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        val visibleFavs = favorites.take(maxFavorites * maxFavRows)
+        visibleFavs.chunked(maxFavorites).forEach { chunk ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                chunk.forEach { fav ->
+                    val label = fav.alias ?: fav.name.replace("Hannover", "", ignoreCase = true).replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
+                    val shortLabel = if (label.length > 8) label.take(7) + "." else label
+                    val isActive = fav.id == currentStationId
+                    val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(bgColor)
+                            .clickable { onSelect(fav) }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = shortLabel,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1
+                        )
+                    }
+                }
+                
+                // Fill remaining space if chunk is smaller than maxFavorites
+                val missing = maxFavorites - chunk.size
+                repeat(missing) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
     }
@@ -676,6 +1082,25 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            val appWidgetManager = android.appwidget.AppWidgetManager.getInstance(context)
+            if (appWidgetManager.isRequestPinAppWidgetSupported) {
+                Button(
+                    onClick = {
+                        val myProvider = android.content.ComponentName(context, de.dhde.hannover.departures.widget.widget.DeparturesWidgetReceiver::class.java)
+                        appWidgetManager.requestPinAppWidget(myProvider, null, null)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Widget zum Startbildschirm hinzufügen", fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    
         item { SectionLabel("Widget Einstellungen") }
         item {
             Card(
