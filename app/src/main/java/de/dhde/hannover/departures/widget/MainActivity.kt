@@ -9,30 +9,23 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -284,12 +277,6 @@ fun SearchScreen(repo: FavoritesRepository) {
                     distanceText = distText,
                     isFav    = isFav,
                     isActive = isActive,
-                    onSelect = {
-                        scope.launch {
-                            repo.setActiveStation(location.id, location.name)
-                            query   = ""
-                        }
-                    },
                     onToggleFav = {
                         scope.launch {
                             if (isFav) repo.removeFavorite(location.id)
@@ -305,8 +292,11 @@ fun SearchScreen(repo: FavoritesRepository) {
 @Composable
 fun FavoritesScreen(repo: FavoritesRepository) {
     val scope = rememberCoroutineScope()
-    val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
+    val favoritesFromRepo by repo.favoritesFlow.collectAsState(initial = emptyList())
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
+
+    // Lokaler State für die Reihenfolge
+    var listState by remember(favoritesFromRepo) { mutableStateOf(favoritesFromRepo) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(DarkBg),
@@ -315,20 +305,30 @@ fun FavoritesScreen(repo: FavoritesRepository) {
     ) {
         item { SectionLabel("Meine Favoriten") }
 
-        if (favorites.isEmpty()) {
+        if (listState.isEmpty()) {
             item {
                 Text("Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.", color = TextSub, fontSize = 13.sp)
             }
         } else {
-            items(favorites) { fav ->
+            itemsIndexed(listState, key = { _, it -> it.id }) { index, fav ->
                 val isActive = fav.id == activeStationId
                 FavoriteRow(
                     fav      = fav,
                     isActive = isActive,
                     onSelect = { scope.launch { repo.setActiveStation(fav.id, fav.name) } },
                     onDelete = { scope.launch { repo.removeFavorite(fav.id)         } },
-                    onMove   = { up -> scope.launch { repo.moveFavorite(fav.id, up) } },
-                    onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.id, alias) } }
+                    onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.id, alias) } },
+                    onMove   = { from, to ->
+                        if (from != to && from in listState.indices && to in listState.indices) {
+                            val newList = listState.toMutableList()
+                            val item = newList.removeAt(from)
+                            newList.add(to, item)
+                            listState = newList
+                            scope.launch { repo.updateFavoritesOrder(newList) }
+                        }
+                    },
+                    index = index,
+                    totalCount = listState.size
                 )
             }
         }
@@ -432,7 +432,6 @@ private fun SearchResultRow(
     distanceText: String?,
     isFav: Boolean,
     isActive: Boolean,
-    onSelect: () -> Unit,
     onToggleFav: () -> Unit
 ) {
     Card(
@@ -442,14 +441,13 @@ private fun SearchResultRow(
         shape   = RoundedCornerShape(10.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onSelect() }
+            .clickable { onToggleFav() }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                // Anzeige-Name: Ortsteil/Halt bevorzugen, falls Komma vorhanden
                 val displayName = location.name.substringAfter(", ").ifBlank { location.name }
                 Text(
                     displayName,
@@ -491,8 +489,10 @@ private fun FavoriteRow(
     isActive: Boolean,
     onSelect: () -> Unit,
     onDelete: () -> Unit,
-    onMove: (Boolean) -> Unit,
-    onAlias: (String?) -> Unit
+    onAlias: (String?) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    index: Int,
+    totalCount: Int
 ) {
     var showAliasDialog by remember { mutableStateOf(false) }
     var aliasText by remember { mutableStateOf(fav.alias ?: "") }
@@ -521,6 +521,8 @@ private fun FavoriteRow(
         )
     }
 
+    var dragOffset by remember { mutableStateOf(0f) }
+
     Card(
         colors  = CardDefaults.cardColors(
             containerColor = if (isActive) Color(0xFF0F2A2A) else CardBg
@@ -528,21 +530,43 @@ private fun FavoriteRow(
         shape   = RoundedCornerShape(10.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .offset(y = dragOffset.dp)
             .clickable { onSelect() }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = { onMove(true) }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.KeyboardArrowUp, null, tint = TextSub)
-                }
-                IconButton(onClick = { onMove(false) }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = TextSub)
-                }
-            }
-            Spacer(Modifier.width(8.dp))
+            // Real Drag Handle
+            Icon(
+                Icons.Default.DragHandle,
+                contentDescription = "Verschieben",
+                tint = if (dragOffset != 0f) Teal else TextSub,
+                modifier = Modifier
+                    .size(32.dp)
+                    .padding(end = 8.dp)
+                    .pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { /* optional feedback */ },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragOffset += dragAmount.y / 3f // Sensitivität anpassen
+                                
+                                // Threshold für Tausch (ca. Zeilenhöhe)
+                                if (dragOffset > 50f && index < totalCount - 1) {
+                                    onMove(index, index + 1)
+                                    dragOffset -= 60f
+                                } else if (dragOffset < -50f && index > 0) {
+                                    onMove(index, index - 1)
+                                    dragOffset += 60f
+                                }
+                            },
+                            onDragEnd = { dragOffset = 0f },
+                            onDragCancel = { dragOffset = 0f }
+                        )
+                    }
+            )
+            
             Column(Modifier.weight(1f)) {
                 val displayName = fav.alias ?: fav.name.substringAfter(", ").ifBlank { fav.name }
                 Text(
@@ -553,6 +577,7 @@ private fun FavoriteRow(
                 )
                 Text(fav.name, color = TextSub, fontSize = 11.sp)
             }
+
             IconButton(onClick = { showAliasDialog = true }) {
                 Icon(Icons.Default.Edit, null, tint = Teal, modifier = Modifier.size(20.dp))
             }
@@ -562,6 +587,7 @@ private fun FavoriteRow(
         }
     }
 }
+
 @Composable
 private fun HelpCard() {
     Card(
@@ -600,7 +626,7 @@ private fun HelpCard() {
             HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Icon(androidx.compose.material.icons.Icons.Default.Refresh, null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Refresh, null, tint = Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "Aktualisierung",
                 description = "Das Widget frischt sich ca. alle 15 Minuten selbst auf. Für sofortige Echtzeitdaten tippe auf den kleinen Refresh-Pfeil oben rechts."
@@ -608,7 +634,7 @@ private fun HelpCard() {
             HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Icon(androidx.compose.material.icons.Icons.Default.LocationOn, null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.LocationOn, null, tint = Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "GPS-Suche",
                 description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
