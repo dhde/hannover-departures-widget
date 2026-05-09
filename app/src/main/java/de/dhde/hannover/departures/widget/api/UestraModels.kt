@@ -20,8 +20,18 @@ data class DepartureItem(
     @SerializedName("events") val events: List<DepartureEvent>? = null
 ) {
     // Hilfsabfragen für das UI-Filtering
-    val isBus: Boolean get() = line?.contains("Bus", ignoreCase = true) == true
-    val isTram: Boolean get() = line?.contains("Stadtbahn", ignoreCase = true) == true || (lineShort.toIntOrNull() != null && lineShort.length <= 2)
+    val isBus: Boolean get() {
+        val s = lineShort.uppercase()
+        return line?.contains("Bus", ignoreCase = true) == true || 
+               (s.toIntOrNull() != null && s.toInt() >= 100) ||
+               s.startsWith("N")
+    }
+    val isTram: Boolean get() {
+        val s = lineShort.uppercase()
+        return line?.contains("Stadtbahn", ignoreCase = true) == true || 
+               (s.toIntOrNull() != null && s.toInt() <= 17) ||
+               s == "E"
+    }
     
     // Die nächste verfügbare Abfahrtszeit (Echtzeit bevorzugt, abgelaufene Events überspringen)
     val nextDepartureTime: String?
