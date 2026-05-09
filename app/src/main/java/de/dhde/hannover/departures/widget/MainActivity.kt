@@ -284,12 +284,6 @@ fun SearchScreen(repo: FavoritesRepository) {
                     distanceText = distText,
                     isFav    = isFav,
                     isActive = isActive,
-                    onSelect = {
-                        scope.launch {
-                            repo.setActiveStation(location.id, location.name)
-                            query   = ""
-                        }
-                    },
                     onToggleFav = {
                         scope.launch {
                             if (isFav) repo.removeFavorite(location.id)
@@ -432,7 +426,6 @@ private fun SearchResultRow(
     distanceText: String?,
     isFav: Boolean,
     isActive: Boolean,
-    onSelect: () -> Unit,
     onToggleFav: () -> Unit
 ) {
     Card(
@@ -442,7 +435,7 @@ private fun SearchResultRow(
         shape   = RoundedCornerShape(10.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onSelect() }
+            .clickable { onToggleFav() }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
