@@ -215,7 +215,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 val typeMatch = when (tabState) {
                     "BUS" -> it.isBus
                     "TRAIN" -> it.isTram
-                    else -> it.isBus || it.isTram
+                    else -> true
                 }
                 val dirMatch = when (directionState) {
                     "H" -> it.lineId?.endsWith("H", ignoreCase = true) == true
