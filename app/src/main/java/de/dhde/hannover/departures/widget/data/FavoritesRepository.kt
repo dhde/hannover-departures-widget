@@ -119,6 +119,10 @@ class FavoritesRepository(private val context: Context) {
         saveFavorites(list)
     }
 
+    suspend fun updateFavoritesOrder(list: List<FavoriteStation>) {
+        saveFavorites(list)
+    }
+
     private suspend fun saveFavorites(list: List<FavoriteStation>) {
         context.dataStore.edit { prefs ->
             prefs[FAVORITES_JSON_KEY] = gson.toJson(list)
