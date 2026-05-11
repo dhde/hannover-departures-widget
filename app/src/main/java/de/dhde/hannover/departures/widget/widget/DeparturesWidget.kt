@@ -224,6 +224,11 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
                 if (!globalTypeMatch) return@filter false
 
+                // Stations-spezifischer Linien-Filter
+                val currentFav = favorites.find { fav -> fav.id == stationId }
+                val linesFilter = currentFav?.filteredLines
+                if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
+
                 val typeMatch = when (tabState) {
                     "BUS" -> it.isBus
                     "TRAIN" -> it.isTram
@@ -684,8 +689,8 @@ class DeparturesWidget : GlanceAppWidget() {
     private fun Footer(lastUpdated: String, isStale: Boolean) {
         val timeStr = if (lastUpdated.isNotEmpty()) {
             val instant = Instant.ofEpochMilli(lastUpdated.toLong())
-            java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault()).format(instant)
-        } else "--:--"
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss").withZone(java.time.ZoneId.systemDefault()).format(instant)
+        } else "--:--:--"
 
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp),

@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -230,6 +232,11 @@ fun DashboardScreen(repo: FavoritesRepository) {
         }
         if (!globalTypeMatch) return@filter false
 
+        // Stations-spezifischer Linien-Filter
+        val currentFav = favorites.find { fav -> fav.id == activeStationId }
+        val linesFilter = currentFav?.filteredLines
+        if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
+
         val typeMatch = when (tabState) {
             "BUS" -> it.isBus
             "TRAIN" -> it.isTram
@@ -246,6 +253,23 @@ fun DashboardScreen(repo: FavoritesRepository) {
     Column(
         modifier = Modifier.fillMaxSize().background(DarkBg)
     ) {
+        // "Widget Vorschau" label
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF1A1A2E))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Widget Vorschau",
+                color = TextSub,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp
+            )
+        }
+
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -714,12 +738,32 @@ fun FavoritesScreen(repo: FavoritesRepository) {
 
     // Lokaler State für die Reihenfolge
     var listState by remember { mutableStateOf(favoritesFromRepo) }
+    val itemHeights = remember { mutableStateMapOf<String, Float>() }
+    var filterDialogFav by remember { mutableStateOf<de.dhde.hannover.departures.widget.data.FavoriteStation?>(null) }
     
-    // Sync mit Repository nur bei Änderungen der Anzahl (Neu/Löschen) 
-    // oder wenn sich die Liste fundamental unterscheidet.
+    if (filterDialogFav != null) {
+        LineFilterDialog(
+            fav = filterDialogFav!!,
+            repo = repo,
+            onDismiss = { filterDialogFav = null }
+        )
+    }
+    
+    // Sync mit Repository
     LaunchedEffect(favoritesFromRepo) {
-        if (favoritesFromRepo.size != listState.size || favoritesFromRepo.map { it.id } != listState.map { it.id }) {
+        val currentIds = listState.map { it.id }.toSet()
+        val repoIds = favoritesFromRepo.map { it.id }.toSet()
+        
+        if (currentIds != repoIds) {
+            // Elemente wurden hinzugefügt oder entfernt -> kompletter Reset
             listState = favoritesFromRepo
+        } else {
+            // Die Elemente sind gleich. Wir updaten die Eigenschaften (Alias, Filter), 
+            // behalten aber die lokale Reihenfolge von listState, um Drag&Drop nicht zu stören.
+            val repoMap = favoritesFromRepo.associateBy { it.id }
+            listState = listState.mapNotNull { localFav ->
+                repoMap[localFav.id]
+            }
         }
     }
 
@@ -743,6 +787,7 @@ fun FavoritesScreen(repo: FavoritesRepository) {
                     onSelect = { scope.launch { repo.setActiveStation(fav.id, fav.name) } },
                     onDelete = { scope.launch { repo.removeFavorite(fav.id)         } },
                     onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.id, alias) } },
+                    onFilter = { filterDialogFav = fav },
                     onMove   = { from, to ->
                         if (from != to && from in listState.indices && to in listState.indices) {
                             val newList = listState.toMutableList()
@@ -751,6 +796,14 @@ fun FavoritesScreen(repo: FavoritesRepository) {
                             listState = newList
                             scope.launch { repo.updateFavoritesOrder(newList) }
                         }
+                    },
+                    getHeight = { targetIndex ->
+                        if (targetIndex in listState.indices) {
+                            itemHeights[listState[targetIndex].id] ?: 0f
+                        } else 0f
+                    },
+                    onHeightMeasured = { height ->
+                        itemHeights[fav.id] = height
                     },
                     index = index,
                     totalCount = listState.size
@@ -768,49 +821,38 @@ fun HelpScreen() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { SectionLabel("Hilfe & Tipps") }
-        item { HelpCard() }
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Teal.copy(alpha = 0.15f)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Support & Open Source", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Spacer(Modifier.height(8.dp))
-                    
-                    val context = LocalContext.current
-                    val intentHandler = { url: String ->
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                        context.startActivity(intent)
-                    }
-
-                    Button(
-                        onClick = { intentHandler("https://www.buymeacoffee.com/dhde") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDD00)),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Black)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Kaffee spenden", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                    
-                    Spacer(Modifier.height(8.dp))
-                    
-                    OutlinedButton(
-                        onClick = { intentHandler("https://github.com/dhde/hannover-departures-widget") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, TextSub)
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = TextMain)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Quellcode auf GitHub", color = TextMain)
-                    }
+            val context = LocalContext.current
+            val intentHandler = { url: String ->
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                context.startActivity(intent)
+            }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { intentHandler("https://www.buymeacoffee.com/dhde") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDD00)),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Black)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Kaffee spenden", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { intentHandler("https://github.com/dhde/hannover-departures-widget") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, TextSub)
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = TextMain)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Quellcode auf GitHub", color = TextMain)
                 }
             }
+
         }
+        item { HelpCard() }
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBg.copy(alpha = 0.5f)),
@@ -915,10 +957,14 @@ private fun FavoriteRow(
     onSelect: () -> Unit,
     onDelete: () -> Unit,
     onAlias: (String?) -> Unit,
+    onFilter: () -> Unit,
     onMove: (Int, Int) -> Unit,
+    getHeight: (Int) -> Float,
+    onHeightMeasured: (Float) -> Unit,
     index: Int,
     totalCount: Int
 ) {
+    val currentIndex by rememberUpdatedState(index)
     var showAliasDialog by remember { mutableStateOf(false) }
     var aliasText by remember { mutableStateOf(fav.alias ?: "") }
 
@@ -948,6 +994,7 @@ private fun FavoriteRow(
 
     val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(0f) }
+    var rowHeightPx by remember { mutableStateOf(0) }
 
     Card(
         colors  = CardDefaults.cardColors(
@@ -957,6 +1004,14 @@ private fun FavoriteRow(
         modifier = Modifier
             .fillMaxWidth()
             .offset(y = dragOffset.dp)
+            .zIndex(if (dragOffset != 0f) 1f else 0f)
+            .onGloballyPositioned { 
+                val h = it.size.height.toFloat() / density.density
+                if (rowHeightPx != it.size.height) {
+                    rowHeightPx = it.size.height
+                    onHeightMeasured(h)
+                }
+            }
             .clickable { onSelect() }
     ) {
         Row(
@@ -976,17 +1031,29 @@ private fun FavoriteRow(
                             onDragStart = { /* optional feedback */ },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                // Pixel in DP umrechnen für konsistente Thresholds
                                 val deltaDp = with(density) { dragAmount.y.toDp() }.value
                                 dragOffset += deltaDp
                                 
-                                val threshold = 50f // Ungefähre Zeilenhöhe in DP
-                                if (dragOffset > threshold && index < totalCount - 1) {
-                                    onMove(index, index + 1)
-                                    dragOffset -= 62f // Threshold + Spacing
-                                } else if (dragOffset < -threshold && index > 0) {
-                                    onMove(index, index - 1)
-                                    dragOffset += 62f
+                                val myHeight = if (rowHeightPx > 0) rowHeightPx / density.density else 50f
+                                
+                                if (dragOffset > 0 && currentIndex < totalCount - 1) {
+                                    val targetHeight = getHeight(currentIndex + 1).takeIf { it > 0 } ?: 50f
+                                    val distanceBetweenCenters = (myHeight / 2f) + 12f + (targetHeight / 2f)
+                                    val threshold = distanceBetweenCenters / 2f
+                                    
+                                    if (dragOffset > threshold) {
+                                        onMove(currentIndex, currentIndex + 1)
+                                        dragOffset -= (targetHeight + 12f)
+                                    }
+                                } else if (dragOffset < 0 && currentIndex > 0) {
+                                    val targetHeight = getHeight(currentIndex - 1).takeIf { it > 0 } ?: 50f
+                                    val distanceBetweenCenters = (myHeight / 2f) + 12f + (targetHeight / 2f)
+                                    val threshold = distanceBetweenCenters / 2f
+                                    
+                                    if (dragOffset < -threshold) {
+                                        onMove(currentIndex, currentIndex - 1)
+                                        dragOffset += (targetHeight + 12f)
+                                    }
                                 }
                             },
                             onDragEnd = { dragOffset = 0f },
@@ -996,18 +1063,36 @@ private fun FavoriteRow(
             )
             
             Column(Modifier.weight(1f)) {
-                val displayName = fav.alias ?: fav.name.substringAfter(", ").ifBlank { fav.name }
+                // Remove "Hannover " prefix if there is no alias, to save space
+                val cleanName = fav.name.removePrefix("Hannover ").trim()
+                val displayName = fav.alias ?: cleanName.substringAfter(", ").ifBlank { cleanName }
+                
                 Text(
-                    displayName,
+                    text       = displayName,
                     color      = if (isActive) Teal else TextMain,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize   = 14.sp
+                    fontSize   = 14.sp,
+                    maxLines   = 1,
+                    overflow   = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
-                Text(fav.name, color = TextSub, fontSize = 11.sp)
+                
+                // Only show the official name as subtitle if an alias is actively used
+                if (!fav.alias.isNullOrBlank()) {
+                    Text(
+                        text     = fav.name, 
+                        color    = TextSub, 
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
             }
 
             IconButton(onClick = { showAliasDialog = true }) {
                 Icon(Icons.Default.Edit, null, tint = Teal, modifier = Modifier.size(20.dp))
+            }
+            IconButton(onClick = onFilter) {
+                Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) Color(0xFFFFD700) else Teal, modifier = Modifier.size(20.dp))
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, null, tint = Red, modifier = Modifier.size(20.dp))
@@ -1123,6 +1208,40 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
+
+        item { SectionLabel("Verkehrsmittel") }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Wähle aus, welche Verkehrsmittel angezeigt werden sollen", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val allTypes = listOf("Stadtbahn", "Bus", "S-Bahn")
+                    allTypes.forEach { type ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                val newSet = if (type in transportTypes) transportTypes - type else transportTypes + type
+                                if (newSet.isNotEmpty()) {
+                                    scope.launch { repo.setTransportTypes(newSet) }
+                                }
+                            }.padding(vertical = 4.dp)
+                        ) {
+                            Checkbox(
+                                checked = type in transportTypes,
+                                onCheckedChange = null,
+                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(type, color = TextMain, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
     
         item { SectionLabel("Widget Einstellungen") }
         item {
@@ -1187,33 +1306,6 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                     )
                     val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
                     Text(rowLabel, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
-
-                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
-
-                    Text("Verkehrsmittel", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Wähle aus, welche Verkehrsmittel angezeigt werden sollen", color = TextSub, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    val allTypes = listOf("Stadtbahn", "Bus", "S-Bahn")
-                    allTypes.forEach { type ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                val newSet = if (type in transportTypes) transportTypes - type else transportTypes + type
-                                if (newSet.isNotEmpty()) {
-                                    scope.launch { repo.setTransportTypes(newSet) }
-                                }
-                            }.padding(vertical = 4.dp)
-                        ) {
-                            Checkbox(
-                                checked = type in transportTypes,
-                                onCheckedChange = null,
-                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(type, color = TextMain, fontSize = 14.sp)
-                        }
-                    }
                 }
             }
         }
@@ -1223,3 +1315,96 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }
+
+@Composable
+fun LineFilterDialog(
+    fav: de.dhde.hannover.departures.widget.data.FavoriteStation,
+    repo: FavoritesRepository,
+    onDismiss: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(true) }
+    var availableLines by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedLines by remember { mutableStateOf<Set<String>>(fav.filteredLines ?: emptySet()) }
+    var hasLoaded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(fav.id) {
+        isLoading = true
+        try {
+            val response = de.dhde.hannover.departures.widget.api.UestraApi.create().getDepartures(fav.id)
+            val lines = response.departures?.mapNotNull { it.lineShort }?.distinct()?.sorted() ?: emptyList()
+            if (fav.filteredLines == null) {
+                availableLines = lines
+                selectedLines = lines.toSet()
+            } else {
+                availableLines = (lines + fav.filteredLines).distinct().sorted()
+                selectedLines = fav.filteredLines!!
+            }
+        } catch (e: Exception) {
+            // Ignoriere Fehler, zeige leere Liste
+        } finally {
+            isLoading = false
+            hasLoaded = true
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            val titleName = fav.alias ?: fav.name.substringBefore(",")
+            Text("Linien filtern: $titleName", color = Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold) 
+        },
+        text = {
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Teal)
+                }
+            } else if (availableLines.isEmpty()) {
+                Text("Konnte aktuell keine Linien für diese Station finden.", color = TextSub)
+            } else {
+                LazyColumn {
+                    items(availableLines) { line ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedLines = if (line in selectedLines) {
+                                    selectedLines - line
+                                } else {
+                                    selectedLines + line
+                                }
+                            }.padding(vertical = 8.dp)
+                        ) {
+                            Checkbox(
+                                checked = line in selectedLines,
+                                onCheckedChange = null,
+                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text("Linie $line", color = TextMain, fontSize = 16.sp)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    scope.launch {
+                        // Speichere null, falls alle verfügbaren Linien markiert sind (kein Filter)
+                        val filterToSave = if (selectedLines.containsAll(availableLines)) null else selectedLines
+                        repo.setFavoriteLineFilter(fav.id, filterToSave)
+                        onDismiss()
+                    }
+                },
+                enabled = hasLoaded
+            ) { Text("Speichern", color = Teal) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSub) }
+        },
+        containerColor = CardBg,
+        titleContentColor = Teal,
+        textContentColor = TextMain
+    )
+}
+

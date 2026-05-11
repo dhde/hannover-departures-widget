@@ -15,7 +15,8 @@ val Context.dataStore by preferencesDataStore(name = "favorites_prefs")
 data class FavoriteStation(
     val id: String,
     val name: String,
-    val alias: String? = null
+    val alias: String? = null,
+    val filteredLines: Set<String>? = null
 )
 
 /** Persistiert Favoriten-Haltestellen und die aktive Widget-Station. */
@@ -116,6 +117,13 @@ class FavoritesRepository(private val context: Context) {
     suspend fun setFavoriteAlias(id: String, alias: String?) {
         val list = getFavoritesNow().map { fav ->
             if (fav.id == id) fav.copy(alias = alias?.takeIf { it.isNotBlank() }) else fav
+        }
+        saveFavorites(list)
+    }
+
+    suspend fun setFavoriteLineFilter(id: String, lines: Set<String>?) {
+        val list = getFavoritesNow().map { fav ->
+            if (fav.id == id) fav.copy(filteredLines = lines) else fav
         }
         saveFavorites(list)
     }
