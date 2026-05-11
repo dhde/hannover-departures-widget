@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -178,6 +179,7 @@ fun DashboardScreen(repo: FavoritesRepository) {
     val maxFavorites by repo.maxFavoritesFlow.collectAsState(initial = 3)
     val maxFavRows by repo.maxFavRowsFlow.collectAsState(initial = 1)
     val maxRows by repo.maxRowsFlow.collectAsState(initial = 10)
+    val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
     
     var departures by remember { mutableStateOf<List<FlatDeparture>>(emptyList()) }
     var rawDepartures by remember { mutableStateOf<List<de.dhde.hannover.departures.widget.api.DepartureItem>>(emptyList()) }
@@ -219,6 +221,15 @@ fun DashboardScreen(repo: FavoritesRepository) {
 
     // Filter logic
     val filtered = departures.filter {
+        // Globaler Transport-Filter aus den Optionen
+        val globalTypeMatch = when {
+            it.isBus -> "Bus" in transportFilters
+            it.isTram -> "Stadtbahn" in transportFilters
+            it.isTrain -> "S-Bahn" in transportFilters
+            else -> true
+        }
+        if (!globalTypeMatch) return@filter false
+
         val typeMatch = when (tabState) {
             "BUS" -> it.isBus
             "TRAIN" -> it.isTram
@@ -702,7 +713,15 @@ fun FavoritesScreen(repo: FavoritesRepository) {
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
 
     // Lokaler State für die Reihenfolge
-    var listState by remember(favoritesFromRepo) { mutableStateOf(favoritesFromRepo) }
+    var listState by remember { mutableStateOf(favoritesFromRepo) }
+    
+    // Sync mit Repository nur bei Änderungen der Anzahl (Neu/Löschen) 
+    // oder wenn sich die Liste fundamental unterscheidet.
+    LaunchedEffect(favoritesFromRepo) {
+        if (favoritesFromRepo.size != listState.size || favoritesFromRepo.map { it.id } != listState.map { it.id }) {
+            listState = favoritesFromRepo
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(DarkBg),
@@ -927,6 +946,7 @@ private fun FavoriteRow(
         )
     }
 
+    val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(0f) }
 
     Card(
@@ -951,20 +971,22 @@ private fun FavoriteRow(
                 modifier = Modifier
                     .size(32.dp)
                     .padding(end = 8.dp)
-                    .pointerInput(Unit) {
+                    .pointerInput(fav.id) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { /* optional feedback */ },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                dragOffset += dragAmount.y / 3f // Sensitivität anpassen
+                                // Pixel in DP umrechnen für konsistente Thresholds
+                                val deltaDp = with(density) { dragAmount.y.toDp() }.value
+                                dragOffset += deltaDp
                                 
-                                // Threshold für Tausch (ca. Zeilenhöhe)
-                                if (dragOffset > 50f && index < totalCount - 1) {
+                                val threshold = 50f // Ungefähre Zeilenhöhe in DP
+                                if (dragOffset > threshold && index < totalCount - 1) {
                                     onMove(index, index + 1)
-                                    dragOffset -= 60f
-                                } else if (dragOffset < -50f && index > 0) {
+                                    dragOffset -= 62f // Threshold + Spacing
+                                } else if (dragOffset < -threshold && index > 0) {
                                     onMove(index, index - 1)
-                                    dragOffset += 60f
+                                    dragOffset += 62f
                                 }
                             },
                             onDragEnd = { dragOffset = 0f },
@@ -1070,6 +1092,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val maxFavsFlow by repo.maxFavoritesFlow.collectAsState(initial = 3)
     val maxFavRowsFlow by repo.maxFavRowsFlow.collectAsState(initial = 1)
     val maxRowsFlow by repo.maxRowsFlow.collectAsState(initial = 10)
+    val transportTypes by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
     
     var localMaxFavs by remember(maxFavsFlow) { mutableStateOf(maxFavsFlow.toFloat()) }
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
@@ -1164,12 +1187,39 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                     )
                     val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
                     Text(rowLabel, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+
+                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                    Text("Verkehrsmittel", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Wähle aus, welche Verkehrsmittel angezeigt werden sollen", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    val allTypes = listOf("Stadtbahn", "Bus", "S-Bahn")
+                    allTypes.forEach { type ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                val newSet = if (type in transportTypes) transportTypes - type else transportTypes + type
+                                if (newSet.isNotEmpty()) {
+                                    scope.launch { repo.setTransportTypes(newSet) }
+                                }
+                            }.padding(vertical = 4.dp)
+                        ) {
+                            Checkbox(
+                                checked = type in transportTypes,
+                                onCheckedChange = null,
+                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(type, color = TextMain, fontSize = 14.sp)
+                        }
+                    }
                 }
             }
         }
     }
     
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow) {
+    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes) {
         de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }

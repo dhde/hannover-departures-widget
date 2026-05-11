@@ -22,15 +22,25 @@ data class DepartureItem(
     // Hilfsabfragen für das UI-Filtering
     val isBus: Boolean get() {
         val s = lineShort.uppercase()
+        // Busse haben oft Nummern >= 100 oder fangen mit N an, oder enthalten explizit "Bus"
         return line?.contains("Bus", ignoreCase = true) == true || 
                (s.toIntOrNull() != null && s.toInt() >= 100) ||
                s.startsWith("N")
     }
     val isTram: Boolean get() {
         val s = lineShort.uppercase()
+        // Stadtbahnen in Hannover sind 1-17 oder E (Express/Einsatzwagen)
         return line?.contains("Stadtbahn", ignoreCase = true) == true || 
-               (s.toIntOrNull() != null && s.toInt() <= 17) ||
+               (s.toIntOrNull() != null && s.toInt() in 1..17) ||
                s == "E"
+    }
+    val isTrain: Boolean get() {
+        val s = lineShort.uppercase()
+        // S-Bahn, Regionalexpress, Regionalbahn
+        return line?.contains("S-Bahn", ignoreCase = true) == true ||
+               line?.contains("Regionalbahn", ignoreCase = true) == true ||
+               line?.contains("Express", ignoreCase = true) == true ||
+               s.startsWith("S") || s.startsWith("RE") || s.startsWith("RB")
     }
     
     // Die nächste verfügbare Abfahrtszeit (Echtzeit bevorzugt, abgelaufene Events überspringen)
@@ -74,6 +84,7 @@ data class FlatDeparture(
     val number: String?,
     val isBus: Boolean,
     val isTram: Boolean,
+    val isTrain: Boolean,
     val departureTime: String,   // Echtzeit, falls vorhanden, sonst Planzeit
     val plannedTime: String?,
     val estimatedTime: String?,
@@ -97,7 +108,7 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
             } else null
             FlatDeparture(
                 line = line, lineId = lineId, destination = destination, number = number,
-                isBus = isBus, isTram = isTram,
+                isBus = isBus, isTram = isTram, isTrain = isTrain,
                 departureTime = dept,
                 plannedTime = event.plannedTime,
                 estimatedTime = event.estimatedTime,

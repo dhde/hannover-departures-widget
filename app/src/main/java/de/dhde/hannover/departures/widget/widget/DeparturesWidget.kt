@@ -114,6 +114,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
             
             val errorState by cache.getErrorStateFlow().collectAsState(initial = "")
+            val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
@@ -156,7 +157,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 isRefreshing    = isRefreshing,
                 maxFavorites    = maxFavorites,
                 maxFavRows      = maxFavRows,
-                maxRows         = maxRows
+                maxRows         = maxRows,
+                transportFilters = transportFilters
             )
         }
     }
@@ -178,7 +180,8 @@ class DeparturesWidget : GlanceAppWidget() {
         isRefreshing: Boolean,
         maxFavorites: Int,
         maxFavRows: Int,
-        maxRows: Int
+        maxRows: Int,
+        transportFilters: Set<String>
     ) {
         Box(
             modifier = GlanceModifier
@@ -212,6 +215,15 @@ class DeparturesWidget : GlanceAppWidget() {
 
 
             val filtered = flatDepartures.filter {
+                // Globaler Transport-Filter
+                val globalTypeMatch = when {
+                    it.isBus -> "Bus" in transportFilters
+                    it.isTram -> "Stadtbahn" in transportFilters
+                    it.isTrain -> "S-Bahn" in transportFilters
+                    else -> true
+                }
+                if (!globalTypeMatch) return@filter false
+
                 val typeMatch = when (tabState) {
                     "BUS" -> it.isBus
                     "TRAIN" -> it.isTram

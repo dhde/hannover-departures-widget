@@ -31,6 +31,7 @@ class FavoritesRepository(private val context: Context) {
         val MAX_FAV_KEY          = intPreferencesKey("max_favorites_widget")
         val MAX_FAV_ROWS_KEY     = intPreferencesKey("max_fav_rows_widget")
         val MAX_ROWS_KEY         = intPreferencesKey("max_rows_widget")
+        val TRANSPORT_TYPES_KEY  = stringSetPreferencesKey("transport_types_filter")
     }
 
     // ── Aktive Station ───────────────────────────────────────────────────────
@@ -166,5 +167,14 @@ class FavoritesRepository(private val context: Context) {
 
     suspend fun setMaxRows(max: Int) {
         context.dataStore.edit { prefs -> prefs[MAX_ROWS_KEY] = max }
+    }
+
+    // ── Verkehrsmittel Filter ────────────────────────────────────────────────
+
+    val transportTypesFlow: Flow<Set<String>> = context.dataStore.data
+        .map { prefs -> prefs[TRANSPORT_TYPES_KEY] ?: setOf("Stadtbahn", "Bus", "S-Bahn") }
+
+    suspend fun setTransportTypes(types: Set<String>) {
+        context.dataStore.edit { prefs -> prefs[TRANSPORT_TYPES_KEY] = types }
     }
 }
