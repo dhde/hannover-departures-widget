@@ -356,8 +356,7 @@ fun DashboardScreen(repo: FavoritesRepository) {
 @Composable
 fun WidgetHeader(stationName: String, isRefreshing: Boolean, onRefresh: () -> Unit) {
     val cleanName = stationName
-        .replace("Hannover", "", ignoreCase = true)
-        .replace("Landeshauptstadt", "", ignoreCase = true)
+        .replace(Regex("\\b(Hannover|Landeshauptstadt)\\b", RegexOption.IGNORE_CASE), "")
         .replace(Regex("[,/()]+"), " ")
         .trim()
         .replace(Regex("\\s+"), " ")
@@ -568,7 +567,7 @@ fun WidgetFavoritesRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 chunk.forEach { fav ->
-                    val label = fav.alias ?: fav.name.replace("Hannover", "", ignoreCase = true).replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
+                    val label = fav.alias ?: fav.name.replace(Regex("\\bHannover\\b", RegexOption.IGNORE_CASE), "").replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
                     val shortLabel = if (label.length > 8) label.take(7) + "." else label
                     val isActive = fav.id == currentStationId
                     val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)

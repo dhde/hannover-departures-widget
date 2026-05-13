@@ -300,8 +300,7 @@ class DeparturesWidget : GlanceAppWidget() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             val cleanName = stationName
-                .replace("Hannover", "", ignoreCase = true)
-                .replace("Landeshauptstadt", "", ignoreCase = true)
+                .replace(Regex("\\b(Hannover|Landeshauptstadt)\\b", RegexOption.IGNORE_CASE), "")
                 .replace(Regex("[,/()]+"), " ")
                 .trim()
                 .replace(Regex("\\s+"), " ")
@@ -369,7 +368,7 @@ class DeparturesWidget : GlanceAppWidget() {
                         val fav = favorites[i]
                         val label = fav.alias
                             ?: fav.name
-                                .replace("Hannover", "", ignoreCase = true)
+                                .replace(Regex("\\bHannover\\b", RegexOption.IGNORE_CASE), "")
                                 .replace(Regex("[,/()]+"), " ")
                                 .trim()
                                 .split(" ")
