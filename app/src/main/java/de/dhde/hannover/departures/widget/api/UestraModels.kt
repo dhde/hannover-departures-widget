@@ -17,7 +17,10 @@ data class DepartureItem(
     @SerializedName("lineId") val lineId: String?,
     @SerializedName("destination") val destination: String?,
     @SerializedName("number") val number: String?,
-    @SerializedName("events") val events: List<DepartureEvent>? = null
+    @SerializedName("events") val events: List<DepartureEvent>? = null,
+    @SerializedName("isCancelled") val apiCancelled: Boolean? = false,
+    @SerializedName("infos") val infos: List<DepartureInfo>? = null,
+    @SerializedName("hints") val hints: List<DepartureHint>? = null
 ) {
     // Hilfsabfragen für das UI-Filtering
     val isBus: Boolean get() {
@@ -70,7 +73,9 @@ data class DepartureItem(
 data class DepartureEvent(
     @SerializedName("plannedTime") val plannedTime: String?,
     // Die API liefert "estimated_time" (snake_case), NICHT "estimatedTime" (camelCase)!
-    @SerializedName("estimated_time") val estimatedTime: String?
+    @SerializedName("estimated_time") val estimatedTime: String?,
+    @SerializedName("isCancelled") val apiCancelled: Boolean? = false,
+    @SerializedName("realtimeState") val realtimeState: String? = null
 )
 
 /**
@@ -89,7 +94,9 @@ data class FlatDeparture(
     val plannedTime: String?,
     val estimatedTime: String?,
     val delayMinutes: Long?,
-    val lineShort: String
+    val lineShort: String,
+    val isCancelled: Boolean = false,
+    val messages: List<String> = emptyList()
 )
 
 /** Klappt alle zukünftigen Events eines DepartureItem zu einzelnen FlatDeparture-Zeilen auf. */
@@ -113,7 +120,12 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
                 plannedTime = event.plannedTime,
                 estimatedTime = event.estimatedTime,
                 delayMinutes = delay,
-                lineShort = lineShort
+                lineShort = lineShort,
+                isCancelled = (this@toFlatRows.apiCancelled == true) || (event.apiCancelled == true) || (event.realtimeState == "CANCELED"),
+                messages = buildList {
+                    infos?.forEach { info -> info.content?.let { add(it) } }
+                    hints?.forEach { hint -> hint.content?.let { add(it) } }
+                }
             )
         }
         .filterNotNull()
@@ -139,3 +151,12 @@ data class Platform(
     val isBus: Boolean get() = productClasses?.any { it in 5..11 } == true
     val isTram: Boolean get() = productClasses?.any { it in 2..4 } == true
 }
+
+data class DepartureInfo(
+    @SerializedName("titel") val titel: String?,
+    @SerializedName("content") val content: String?
+)
+
+data class DepartureHint(
+    @SerializedName("content") val content: String?
+)

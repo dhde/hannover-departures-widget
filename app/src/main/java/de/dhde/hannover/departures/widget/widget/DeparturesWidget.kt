@@ -469,15 +469,18 @@ class DeparturesWidget : GlanceAppWidget() {
             else -> Color.Transparent
         }
 
-        Row(
+        Column(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .padding(vertical = 1.dp)
                 .cornerRadius(6.dp)
                 .background(ColorProvider(rowBgColor))
-                .padding(vertical = 2.dp, horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(vertical = 2.dp, horizontal = 6.dp)
         ) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             LineBadge(departure.lineShort, departure.isBus)
             Spacer(modifier = GlanceModifier.width(8.dp))
             Text(
@@ -494,16 +497,41 @@ class DeparturesWidget : GlanceAppWidget() {
             val hasDelay = (departure.delayMinutes ?: 0) > 0
             val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
 
+            var finalTimeText = timeText + delayText
+            if (departure.isCancelled) {
+                finalTimeText = finalTimeText.map { it + "\u0336" }.joinToString("")
+            }
+
             val timeStyle = when {
                 isWarning -> TextStyle(color = ColorProvider(Color.Gray), fontSize = 14.sp, fontStyle = FontStyle.Italic)
+                departure.isCancelled -> TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 hasDelay -> TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 else -> TextStyle(color = ColorProvider(Color(0xFF4CAF50)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
 
             Text(
-                text = timeText + delayText,
+                text = finalTimeText,
                 style = timeStyle
             )
+        }
+        
+        if (departure.isCancelled) {
+            Text(
+                text = "Fahrt entfällt",
+                style = TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier.padding(start = 42.dp, top = 2.dp, bottom = 2.dp)
+            )
+        }
+        
+        if (departure.messages.isNotEmpty()) {
+            val combinedMsg = departure.messages.joinToString(" • ")
+            Text(
+                text = combinedMsg,
+                style = TextStyle(color = ColorProvider(Color(0xFFFFB300)), fontSize = 11.sp),
+                modifier = GlanceModifier.padding(start = 42.dp, top = 2.dp, bottom = 2.dp),
+                maxLines = 2
+            )
+        }
         }
     }
 
