@@ -12,6 +12,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -45,7 +49,13 @@ import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
 
+import android.content.Intent
+
+data class InfoDialogData(val line: String, val dest: String, val msgs: String)
+
 class MainActivity : ComponentActivity() {
+
+    private var infoDialogState by mutableStateOf<InfoDialogData?>(null)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -53,6 +63,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        handleIntent(intent)
 
         if (ContextCompat.checkSelfPermission(
                 this, Manifest.permission.ACCESS_FINE_LOCATION
@@ -82,7 +94,80 @@ class MainActivity : ComponentActivity() {
                     onSurface      = Color(0xFFE0E0E0),
                 )
             ) {
-                ConfigurationScreen(repo)
+                ConfigurationScreen(repo, onInfoClick = { infoDialogState = it })
+                
+                infoDialogState?.let { data ->
+                    Dialog(
+                        onDismissRequest = { infoDialogState = null },
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .fillMaxHeight(0.8f)
+                                .padding(16.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E))
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(24.dp)
+                            ) {
+                                Text(
+                                    text = "Meldung: ${data.line} ${data.dest}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                val scrollState = rememberScrollState()
+                                Text(
+                                    text = data.msgs,
+                                    color = Color(0xFFE0E0E0),
+                                    fontSize = 16.sp,
+                                    lineHeight = 24.sp,
+                                    modifier = Modifier.weight(1f).verticalScroll(scrollState)
+                                )
+                                
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(onClick = { infoDialogState = null }) {
+                                        Text("Zur App", color = Color(0xFF9090AA), fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Button(
+                                        onClick = { 
+                                            infoDialogState = null
+                                            this@MainActivity.finishAffinity()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE94560))
+                                    ) {
+                                        Text("Verlassen", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == "de.dhde.hannover.departures.SHOW_INFO") {
+            val msgs = intent.getStringExtra("info_msgs")
+            if (!msgs.isNullOrEmpty()) {
+                val line = intent.getStringExtra("info_line") ?: ""
+                val dest = intent.getStringExtra("info_dest") ?: ""
+                infoDialogState = InfoDialogData(line, dest, msgs)
             }
         }
     }
@@ -109,34 +194,32 @@ enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.v
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
-fun ConfigurationScreen(repo: FavoritesRepository) {
+fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
     val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
 
     Scaffold(
         containerColor = DarkBg,
         topBar = {
-            if (currentScreen != AppScreen.DASHBOARD) {
-                TopAppBar(
-                    title = {
-                    Column {
-                        Text(
-                            "Hannover Abfahrten Stadtbahnen",
-                            fontWeight = FontWeight.Bold,
-                            fontSize   = 18.sp,
-                            color      = TextMain
-                        )
-                        Text(
-                            "Aktiv: $activeStationName",
-                            fontSize = 12.sp,
-                            color    = Teal,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
-                )
-            }
+            TopAppBar(
+                title = {
+                Column {
+                    Text(
+                        "Hannover Abfahrten Stadtbahnen",
+                        fontWeight = FontWeight.Bold,
+                        fontSize   = 18.sp,
+                        color      = TextMain
+                    )
+                    Text(
+                        text = if (currentScreen == AppScreen.DASHBOARD) "Widget Vorschau · $activeStationName" else "Aktiv: $activeStationName",
+                        fontSize = 12.sp,
+                        color    = if (currentScreen == AppScreen.DASHBOARD) Color(0xFFFFB300) else Teal,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
+            )
         },
         bottomBar = {
             NavigationBar(containerColor = CardBg) {
@@ -160,7 +243,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (currentScreen) {
-                AppScreen.DASHBOARD -> DashboardScreen(repo)
+                AppScreen.DASHBOARD -> DashboardScreen(repo, onInfoClick = onInfoClick)
                 AppScreen.SEARCH -> SearchScreen(repo)
                 AppScreen.OPTIONS -> OptionsScreen(repo)
                 AppScreen.FAVORITES -> FavoritesScreen(repo)
@@ -171,7 +254,7 @@ fun ConfigurationScreen(repo: FavoritesRepository) {
 }
 
 @Composable
-fun DashboardScreen(repo: FavoritesRepository) {
+fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
@@ -305,11 +388,14 @@ fun DashboardScreen(repo: FavoritesRepository) {
                 onDirChange = { directionState = it }
             )
 
+            val minutesSinceUpdate = lastUpdate?.let { java.time.Duration.between(it, java.time.Instant.now()).toMinutes() } ?: 0
+            val isWarning = minutesSinceUpdate >= 10
+
             // List
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(filtered.take(maxRows)) { dep ->
-                        WidgetFlatDepartureRow(dep, timeDisplayMode)
+                        WidgetFlatDepartureRow(dep, timeDisplayMode, isWarning, onInfoClick = onInfoClick)
                     }
                 }
                 // Invisible box to toggle time display mode
@@ -457,64 +543,115 @@ fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, onC
 }
 
 @Composable
-fun WidgetFlatDepartureRow(dep: FlatDeparture, timeDisplayMode: String) {
+fun WidgetFlatDepartureRow(dep: FlatDeparture, timeDisplayMode: String, isWarning: Boolean, onInfoClick: (InfoDialogData) -> Unit = {}) {
     val rowBgColor = when {
         dep.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
         dep.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
         else -> Color.Transparent
     }
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 1.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(rowBgColor)
-            .padding(vertical = 4.dp, horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 4.dp, horizontal = 6.dp)
     ) {
-        WidgetLineBadge(dep.lineShort, dep.isBus)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = dep.destination ?: "Unbekannt",
-            color = Color.White,
-            fontSize = 14.sp,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            WidgetLineBadge(dep.lineShort, dep.isBus)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = dep.destination ?: "Unbekannt",
+                color = Color.White,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
 
-        val minutes = try {
-            val depTime = java.time.Instant.parse(dep.departureTime)
-            java.time.Duration.between(java.time.Instant.now(), depTime).toMinutes()
-        } catch (e: Exception) { -1L }
+            val minutes = try {
+                val depTime = java.time.Instant.parse(dep.departureTime)
+                java.time.Duration.between(java.time.Instant.now(), depTime).toMinutes()
+            } catch (e: Exception) { -1L }
 
-        val timeText = if (timeDisplayMode == "CLOCK") {
-            try {
-                java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                    .withZone(java.time.ZoneId.systemDefault())
-                    .format(java.time.Instant.parse(dep.departureTime))
-            } catch (e: Exception) { "--:--" }
-        } else {
-            if (minutes in 0..60) "$minutes min" else "-- min"
+            val timeText = if (timeDisplayMode == "CLOCK") {
+                try {
+                    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                        .withZone(java.time.ZoneId.systemDefault())
+                        .format(java.time.Instant.parse(dep.departureTime))
+                } catch (e: Exception) { "--:--" }
+            } else {
+                if (minutes in 0..60) "$minutes min" else "-- min"
+            }
+
+            val hasDelay = (dep.delayMinutes ?: 0) > 0
+            val delayText = if (hasDelay) " (+${dep.delayMinutes})" else ""
+
+            var finalTimeText = timeText + delayText
+            if (dep.isCancelled) {
+                finalTimeText = finalTimeText.map { it + "\u0336" }.joinToString("")
+            }
+
+            val timeColor = when {
+                isWarning -> Color.Gray
+                dep.isCancelled -> Color(0xFFE94560)
+                hasDelay -> Color(0xFFFF9800)
+                else -> Color(0xFF4CAF50)
+            }
+            
+            val fontStyle = if (isWarning) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+
+            Text(
+                text = finalTimeText,
+                color = timeColor,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontStyle = fontStyle
+            )
         }
 
-        val hasDelay = (dep.delayMinutes ?: 0) > 0
-        val delayText = if (hasDelay) " (+${dep.delayMinutes})" else ""
+        if (dep.isCancelled || dep.messages.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 42.dp, top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (dep.isCancelled) {
+                    Text(
+                        text = "Fahrt entfällt",
+                        color = Color(0xFFE94560),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
 
-        val timeColor = when {
-            minutes < 5 -> Color.Gray // Warning state
-            hasDelay -> Color(0xFFFF9800)
-            else -> Color(0xFF4CAF50)
+                if (dep.messages.isNotEmpty()) {
+                    val infoData = InfoDialogData(dep.lineShort, dep.destination ?: "", dep.messages.joinToString("\n\n"))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onInfoClick(infoData) }
+                    ) {
+                        Icon(
+                            androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
+                            contentDescription = "Info",
+                            tint = Color(0xFFFFB300),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = " Meldung",
+                            color = Color(0xFFFFB300),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 2.dp)
+                        )
+                    }
+                }
+            }
         }
-
-        Text(
-            text = timeText + delayText,
-            color = timeColor,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            fontStyle = if (minutes < 5) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
-        )
     }
 }
 
