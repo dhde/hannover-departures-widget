@@ -16,6 +16,7 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
@@ -488,6 +489,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp),
                 modifier = GlanceModifier.defaultWeight()
             )
+
+
             val timeText = if (timeDisplayMode == "CLOCK") {
                 clockTime(departure.departureTime)
             } else {
@@ -514,23 +517,40 @@ class DeparturesWidget : GlanceAppWidget() {
                 style = timeStyle
             )
         }
-        
-        if (departure.isCancelled) {
-            Text(
-                text = "Fahrt entfällt",
-                style = TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 12.sp, fontWeight = FontWeight.Bold),
-                modifier = GlanceModifier.padding(start = 42.dp, top = 2.dp, bottom = 2.dp)
-            )
-        }
-        
-        if (departure.messages.isNotEmpty()) {
-            val combinedMsg = departure.messages.joinToString(" • ")
-            Text(
-                text = combinedMsg,
-                style = TextStyle(color = ColorProvider(Color(0xFFFFB300)), fontSize = 11.sp),
-                modifier = GlanceModifier.padding(start = 42.dp, top = 2.dp, bottom = 2.dp),
-                maxLines = 2
-            )
+        if (departure.isCancelled || departure.messages.isNotEmpty()) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth().padding(start = 42.dp, top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (departure.isCancelled) {
+                    Text(
+                        text = "Fahrt entfällt",
+                        style = TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                        modifier = GlanceModifier.padding(end = 8.dp)
+                    )
+                }
+
+                if (departure.messages.isNotEmpty()) {
+                    val intent = Intent(LocalContext.current, de.dhde.hannover.departures.widget.MainActivity::class.java).apply {
+                        action = "de.dhde.hannover.departures.SHOW_INFO"
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        putExtra("info_line", departure.lineShort)
+                        putExtra("info_dest", departure.destination)
+                        putExtra("info_msgs", departure.messages.joinToString("\n\n"))
+                    }
+                    Image(
+                        provider = ImageProvider(android.R.drawable.ic_dialog_info),
+                        contentDescription = "Info",
+                        modifier = GlanceModifier.size(16.dp).clickable(actionStartActivity(intent)),
+                        colorFilter = ColorFilter.tint(ColorProvider(Color(0xFFFFB300)))
+                    )
+                    Text(
+                        text = " Meldung",
+                        style = TextStyle(color = ColorProvider(Color(0xFFFFB300)), fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        modifier = GlanceModifier.padding(start = 2.dp).clickable(actionStartActivity(intent))
+                    )
+                }
+            }
         }
         }
     }
