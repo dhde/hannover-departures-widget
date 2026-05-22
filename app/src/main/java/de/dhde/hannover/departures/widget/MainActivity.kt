@@ -51,7 +51,7 @@ import kotlin.math.roundToInt
 
 import android.content.Intent
 
-data class InfoDialogData(val line: String, val dest: String, val msgs: String)
+data class InfoDialogData(val title: String, val msgs: String)
 
 class MainActivity : ComponentActivity() {
 
@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxSize().padding(24.dp)
                             ) {
                                 Text(
-                                    text = "Meldung: ${data.line} ${data.dest}",
+                                    text = data.title,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 20.sp,
                                     color = Color.White
@@ -165,9 +165,8 @@ class MainActivity : ComponentActivity() {
         if (intent?.action == "de.dhde.hannover.departures.SHOW_INFO") {
             val msgs = intent.getStringExtra("info_msgs")
             if (!msgs.isNullOrEmpty()) {
-                val line = intent.getStringExtra("info_line") ?: ""
-                val dest = intent.getStringExtra("info_dest") ?: ""
-                infoDialogState = InfoDialogData(line, dest, msgs)
+                val title = intent.getStringExtra("info_title") ?: "Meldungen"
+                infoDialogState = InfoDialogData(title, msgs)
             }
         }
     }
@@ -333,6 +332,14 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         typeMatch && dirMatch
     }
 
+    val messagesDeps = rawDepartures.flatMap { it.toFlatRows() }.filter { it.messages.isNotEmpty() }
+    val hasMessages = messagesDeps.isNotEmpty()
+    val groupedMessages = if (hasMessages) {
+        messagesDeps.groupBy { it.lineShort }
+            .map { (line, deps) -> "Linie $line:\n" + deps.flatMap { it.messages }.distinct().joinToString("\n") }
+            .joinToString("\n\n")
+    } else ""
+
     Column(
         modifier = Modifier.fillMaxSize().background(DarkBg)
     ) {
@@ -376,6 +383,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             WidgetHeader(
                 stationName = activeStationName,
                 isRefreshing = isLoading,
+                hasMessages = hasMessages,
+                onInfoClick = { onInfoClick(InfoDialogData("Meldungen: $activeStationName", groupedMessages)) },
                 onRefresh = { activeStationId?.let { loadData(it) } }
             )
             
@@ -440,7 +449,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
 // ---------------- UI COMPONENTS ----------------
 
 @Composable
-fun WidgetHeader(stationName: String, isRefreshing: Boolean, onRefresh: () -> Unit) {
+fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolean = false, onInfoClick: () -> Unit = {}, onRefresh: () -> Unit) {
     val cleanName = stationName
         .replace(Regex("\\b(Hannover|Landeshauptstadt)\\b", RegexOption.IGNORE_CASE), "")
         .replace(Regex("[,/()]+"), " ")
@@ -451,6 +460,14 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, onRefresh: () -> Un
         modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (hasMessages) {
+            Icon(
+                androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
+                contentDescription = "Info",
+                tint = Color(0xFFFFB300),
+                modifier = Modifier.size(20.dp).padding(end = 4.dp).clickable { onInfoClick() }
+            )
+        }
         Text(
             text = cleanName,
             color = Color.White,
@@ -614,42 +631,18 @@ fun WidgetFlatDepartureRow(dep: FlatDeparture, timeDisplayMode: String, isWarnin
             )
         }
 
-        if (dep.isCancelled || dep.messages.isNotEmpty()) {
+        if (dep.isCancelled) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 42.dp, top = 2.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (dep.isCancelled) {
-                    Text(
-                        text = "Fahrt entfällt",
-                        color = Color(0xFFE94560),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                }
-
-                if (dep.messages.isNotEmpty()) {
-                    val infoData = InfoDialogData(dep.lineShort, dep.destination ?: "", dep.messages.joinToString("\n\n"))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { onInfoClick(infoData) }
-                    ) {
-                        Icon(
-                            androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
-                            contentDescription = "Info",
-                            tint = Color(0xFFFFB300),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = " Meldung",
-                            color = Color(0xFFFFB300),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 2.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = "Fahrt entfällt",
+                    color = Color(0xFFE94560),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
             }
         }
     }

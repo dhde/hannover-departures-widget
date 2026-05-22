@@ -198,7 +198,15 @@ class DeparturesWidget : GlanceAppWidget() {
                     .fillMaxSize()
                     .padding(8.dp)
             ) {
-            Header(stationName, gpsModeActive, isRefreshing)
+            val messagesDeps = flatDepartures.filter { it.messages.isNotEmpty() }
+            val hasMessages = messagesDeps.isNotEmpty()
+            val groupedMessages = if (hasMessages) {
+                messagesDeps.groupBy { it.lineShort }
+                    .map { (line, deps) -> "Linie $line:\n" + deps.flatMap { it.messages }.distinct().joinToString("\n") }
+                    .joinToString("\n\n")
+            } else ""
+
+            Header(stationName, gpsModeActive, isRefreshing, hasMessages, groupedMessages)
             
             FilterSegmentedRow(departures, tabState, directionState)
 
@@ -295,11 +303,25 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Header(stationName: String, gpsModeActive: Boolean, isRefreshing: Boolean) {
+    private fun Header(stationName: String, gpsModeActive: Boolean, isRefreshing: Boolean, hasMessages: Boolean = false, groupedMessages: String = "") {
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (hasMessages) {
+                val intent = Intent(LocalContext.current, de.dhde.hannover.departures.widget.MainActivity::class.java).apply {
+                    action = "de.dhde.hannover.departures.SHOW_INFO"
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    putExtra("info_title", "Meldungen: $stationName")
+                    putExtra("info_msgs", groupedMessages)
+                }
+                Image(
+                    provider = ImageProvider(android.R.drawable.ic_dialog_info),
+                    contentDescription = "Meldungen",
+                    modifier = GlanceModifier.size(20.dp).padding(end = 4.dp).clickable(actionStartActivity(intent)),
+                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFFFFB300)))
+                )
+            }
             val cleanName = stationName
                 .replace(Regex("\\b(Hannover|Landeshauptstadt)\\b", RegexOption.IGNORE_CASE), "")
                 .replace(Regex("[,/()]+"), " ")
@@ -517,39 +539,16 @@ class DeparturesWidget : GlanceAppWidget() {
                 style = timeStyle
             )
         }
-        if (departure.isCancelled || departure.messages.isNotEmpty()) {
+        if (departure.isCancelled) {
             Row(
                 modifier = GlanceModifier.fillMaxWidth().padding(start = 42.dp, top = 2.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (departure.isCancelled) {
-                    Text(
-                        text = "Fahrt entfällt",
-                        style = TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 12.sp, fontWeight = FontWeight.Bold),
-                        modifier = GlanceModifier.padding(end = 8.dp)
-                    )
-                }
-
-                if (departure.messages.isNotEmpty()) {
-                    val intent = Intent(LocalContext.current, de.dhde.hannover.departures.widget.MainActivity::class.java).apply {
-                        action = "de.dhde.hannover.departures.SHOW_INFO"
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        putExtra("info_line", departure.lineShort)
-                        putExtra("info_dest", departure.destination)
-                        putExtra("info_msgs", departure.messages.joinToString("\n\n"))
-                    }
-                    Image(
-                        provider = ImageProvider(android.R.drawable.ic_dialog_info),
-                        contentDescription = "Info",
-                        modifier = GlanceModifier.size(16.dp).clickable(actionStartActivity(intent)),
-                        colorFilter = ColorFilter.tint(ColorProvider(Color(0xFFFFB300)))
-                    )
-                    Text(
-                        text = " Meldung",
-                        style = TextStyle(color = ColorProvider(Color(0xFFFFB300)), fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                        modifier = GlanceModifier.padding(start = 2.dp).clickable(actionStartActivity(intent))
-                    )
-                }
+                Text(
+                    text = "Fahrt entfällt",
+                    style = TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                    modifier = GlanceModifier.padding(end = 8.dp)
+                )
             }
         }
         }
