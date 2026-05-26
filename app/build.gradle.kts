@@ -13,8 +13,8 @@ android {
         applicationId = "de.dhde.hannover.departures.widget"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.1.1"
+        versionCode = 13
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -85,6 +85,8 @@ dependencies {
     // Glance für das Widget
     implementation("androidx.glance:glance-appwidget:1.1.0")
     implementation("androidx.glance:glance-material3:1.1.0")
+    implementation("androidx.glance:glance-appwidget-proto:1.1.1")
+    implementation("androidx.glance:glance-appwidget-external-protobuf:1.1.1")
 
     // Retrofit für die Abfahrtszeiten-API
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
