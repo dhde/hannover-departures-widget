@@ -37,6 +37,7 @@ import de.dhde.hannover.departures.widget.api.UestraApi
 import de.dhde.hannover.departures.widget.data.FavoriteStation
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.DeparturesCache
+import de.dhde.hannover.departures.widget.data.filterMessages
 import de.dhde.hannover.departures.widget.widget.RefreshAction
 import de.dhde.hannover.departures.widget.widget.ChangeTabAction
 import de.dhde.hannover.departures.widget.widget.ChangeStationAction
@@ -116,6 +117,9 @@ class DeparturesWidget : GlanceAppWidget() {
             
             val errorState by cache.getErrorStateFlow().collectAsState(initial = "")
             val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
+            val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
+            val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
+            val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
@@ -159,7 +163,10 @@ class DeparturesWidget : GlanceAppWidget() {
                 maxFavorites    = maxFavorites,
                 maxFavRows      = maxFavRows,
                 maxRows         = maxRows,
-                transportFilters = transportFilters
+                transportFilters = transportFilters,
+                ignoredMessages  = ignoredMessages,
+                favoritesHeight  = favoritesHeight,
+                filterHeight     = filterHeight
             )
         }
     }
@@ -182,7 +189,10 @@ class DeparturesWidget : GlanceAppWidget() {
         maxFavorites: Int,
         maxFavRows: Int,
         maxRows: Int,
-        transportFilters: Set<String>
+        transportFilters: Set<String>,
+        ignoredMessages: Set<String>,
+        favoritesHeight: String,
+        filterHeight: String
     ) {
         Box(
             modifier = GlanceModifier
@@ -198,31 +208,6 @@ class DeparturesWidget : GlanceAppWidget() {
                     .fillMaxSize()
                     .padding(8.dp)
             ) {
-            val messagesDeps = flatDepartures.filter { it.messages.isNotEmpty() }
-            val hasMessages = messagesDeps.isNotEmpty()
-            val groupedMessages = if (hasMessages) {
-                messagesDeps.groupBy { it.lineShort }
-                    .map { (line, deps) -> "Linie $line:\n" + deps.flatMap { it.messages }.distinct().joinToString("\n") }
-                    .joinToString("\n\n")
-            } else ""
-
-            Header(stationName, gpsModeActive, isRefreshing, hasMessages, groupedMessages)
-            
-            FilterSegmentedRow(departures, tabState, directionState)
-
-            if (status == "error" && errorMsg.isNotEmpty()) {
-                Text("⚠️ $errorMsg", style = TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 12.sp, fontWeight = FontWeight.Medium), modifier = GlanceModifier.padding(vertical = 4.dp))
-            }
-
-            val minutesSinceUpdate = if (lastUpdated.isNotEmpty()) {
-                val lastTime = Instant.ofEpochMilli(lastUpdated.toLong())
-                Duration.between(lastTime, Instant.now()).toMinutes()
-            } else 0L
-
-            val isStale = minutesSinceUpdate >= 5
-            val isWarning = minutesSinceUpdate >= 10
-
-
             val filtered = flatDepartures.filter {
                 // Globaler Transport-Filter
                 val globalTypeMatch = when {
@@ -251,6 +236,32 @@ class DeparturesWidget : GlanceAppWidget() {
                 typeMatch && dirMatch
             }
 
+            val messagesDeps = filtered.map { dep ->
+                dep.copy(messages = filterMessages(dep.messages, ignoredMessages))
+            }.filter { it.messages.isNotEmpty() }
+            val hasMessages = messagesDeps.isNotEmpty()
+            val groupedMessages = if (hasMessages) {
+                messagesDeps.groupBy { it.lineShort }
+                    .map { (line, deps) -> "Linie $line:\n" + deps.flatMap { it.messages }.distinct().joinToString("\n") }
+                    .joinToString("\n\n")
+            } else ""
+
+            Header(stationName, gpsModeActive, isRefreshing, hasMessages, groupedMessages)
+            
+            FilterSegmentedRow(departures, tabState, directionState, filterHeight)
+
+            if (status == "error" && errorMsg.isNotEmpty()) {
+                Text("⚠️ $errorMsg", style = TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 12.sp, fontWeight = FontWeight.Medium), modifier = GlanceModifier.padding(vertical = 4.dp))
+            }
+
+            val minutesSinceUpdate = if (lastUpdated.isNotEmpty()) {
+                val lastTime = Instant.ofEpochMilli(lastUpdated.toLong())
+                Duration.between(lastTime, Instant.now()).toMinutes()
+            } else 0L
+
+            val isStale = minutesSinceUpdate >= 5
+            val isWarning = minutesSinceUpdate >= 10
+
             Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.CenterEnd) {
                 val limitedFiltered = if (maxRows >= 15) filtered else filtered.take(maxRows)
                 if (limitedFiltered.isEmpty()) {
@@ -273,7 +284,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
             }
 
-            FavoritesRow(favorites, stationId, maxFavorites, maxFavRows)
+            FavoritesRow(favorites, stationId, maxFavorites, maxFavRows, favoritesHeight)
             Footer(lastUpdated, isStale)
         }
     }
@@ -315,12 +326,19 @@ class DeparturesWidget : GlanceAppWidget() {
                     putExtra("info_title", "Meldungen: $stationName")
                     putExtra("info_msgs", groupedMessages)
                 }
-                Image(
-                    provider = ImageProvider(android.R.drawable.ic_dialog_info),
-                    contentDescription = "Meldungen",
-                    modifier = GlanceModifier.size(20.dp).padding(end = 4.dp).clickable(actionStartActivity(intent)),
-                    colorFilter = ColorFilter.tint(ColorProvider(Color(0xFFFFB300)))
-                )
+                Box(
+                    modifier = GlanceModifier
+                        .size(36.dp)
+                        .clickable(actionStartActivity(intent)),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Image(
+                        provider = ImageProvider(android.R.drawable.ic_dialog_info),
+                        contentDescription = "Meldungen",
+                        modifier = GlanceModifier.size(20.dp),
+                        colorFilter = ColorFilter.tint(ColorProvider(Color(0xFFFFB300)))
+                    )
+                }
             }
             val cleanName = stationName
                 .replace(Regex("\\b(Hannover|Landeshauptstadt)\\b", RegexOption.IGNORE_CASE), "")
@@ -369,8 +387,14 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FavoritesRow(favorites: List<FavoriteStation>, currentStationId: String, maxFavorites: Int, maxFavRows: Int) {
+    private fun FavoritesRow(favorites: List<FavoriteStation>, currentStationId: String, maxFavorites: Int, maxFavRows: Int, favoritesHeight: String = "STANDARD") {
         if (favorites.isEmpty() || maxFavorites <= 0 || maxFavRows <= 0) return
+
+        val (vertPadding, fontSize) = when (favoritesHeight) {
+            "KOMPAKT" -> 1.dp to 10.sp
+            "GROSS" -> 7.dp to 13.sp
+            else -> 3.dp to 11.sp
+        }
 
         Column(modifier = GlanceModifier.fillMaxWidth()) {
             val maxVisible = maxFavorites * maxFavRows
@@ -415,11 +439,11 @@ class DeparturesWidget : GlanceAppWidget() {
                                 text = shortLabel,
                                 style = TextStyle(
                                     color = ColorProvider(Color.White),
-                                    fontSize = 11.sp,
+                                    fontSize = fontSize,
                                     fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                                 ),
                                 maxLines = 1,
-                                modifier = GlanceModifier.padding(vertical = 3.dp)
+                                modifier = GlanceModifier.padding(vertical = vertPadding)
                             )
                         }
                     }
@@ -441,8 +465,8 @@ class DeparturesWidget : GlanceAppWidget() {
                         ) {
                             Text(
                                 text = "▶",
-                                style = TextStyle(color = ColorProvider(Color.White), fontSize = 11.sp),
-                                modifier = GlanceModifier.padding(vertical = 3.dp)
+                                style = TextStyle(color = ColorProvider(Color.White), fontSize = fontSize),
+                                modifier = GlanceModifier.padding(vertical = vertPadding)
                             )
                         }
                     } else if (endIndex - startIndex < maxFavorites) {
@@ -642,7 +666,7 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FilterSegmentedRow(departures: List<DepartureItem>, tabState: String, directionState: String) {
+    private fun FilterSegmentedRow(departures: List<DepartureItem>, tabState: String, directionState: String, filterHeight: String = "STANDARD") {
         val hasH = departures.any { it.lineId?.endsWith("H") == true }
         val hasR = departures.any { it.lineId?.endsWith("R") == true }
         val showDirectionGroup = hasH || hasR
@@ -654,16 +678,16 @@ class DeparturesWidget : GlanceAppWidget() {
         ) {
             // --- Gruppe VEHICLE (Links-bündig) ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "BUS", Color(0xFFE94560)) { 
-                    actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "BUS")) 
+                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "BUS", Color(0xFFE94560), filterHeight) { 
+                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "BUS")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "TRAIN", Color(0xFF005A9B)) { 
-                    actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "TRAIN")) 
+                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { 
+                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "TRAIN")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(R.drawable.ic_widget_all, null, tabState == "ALL", Color(0xFF555555)) { 
-                    actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "ALL")) 
+                SegmentButton(R.drawable.ic_widget_all, null, tabState == "ALL", Color(0xFF555555), filterHeight) { 
+                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "ALL")) 
                 }
             }
 
@@ -674,19 +698,19 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showDirectionGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasH) {
-                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "H", Color(0xFF0F7173)) { 
+                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "H", Color(0xFF0F7173), filterHeight) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "H")) 
                         }
                         Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (hasR) {
-                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "R", Color(0xFFE94560)) { 
+                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "R", Color(0xFFE94560), filterHeight) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "R")) 
                         }
                         Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (showAllToggle) {
-                        SegmentButton(R.drawable.ic_widget_swap, null, directionState == "ALL", Color(0xFF555555)) { 
+                        SegmentButton(R.drawable.ic_widget_swap, null, directionState == "ALL", Color(0xFF555555), filterHeight) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "ALL")) 
                         }
                     }
@@ -701,24 +725,31 @@ class DeparturesWidget : GlanceAppWidget() {
         text: String?, 
         isActive: Boolean, 
         activeColor: Color,
+        filterHeight: String = "STANDARD",
         onClick: () -> androidx.glance.action.Action
     ) {
         val bgColor = if (isActive) activeColor else Color(0xFF252525)
         val contentColor = if (isActive) Color.White else Color.Gray
+
+        val (vertPadding, iconSize) = when (filterHeight) {
+            "KOMPAKT" -> 2.dp to 16.dp
+            "GROSS" -> 7.dp to 24.dp
+            else -> 4.dp to 20.dp
+        }
 
         Box(
             modifier = GlanceModifier
                 .cornerRadius(6.dp)
                 .background(ColorProvider(bgColor))
                 .clickable(onClick())
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+                .padding(horizontal = 6.dp, vertical = vertPadding),
             contentAlignment = Alignment.Center
         ) {
             if (iconRes != null) {
                 Image(
                     provider = ImageProvider(iconRes),
                     contentDescription = text ?: "",
-                    modifier = GlanceModifier.size(20.dp),
+                    modifier = GlanceModifier.size(iconSize),
                     colorFilter = ColorFilter.tint(ColorProvider(contentColor))
                 )
             } else if (text != null) {

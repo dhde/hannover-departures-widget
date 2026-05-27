@@ -204,7 +204,14 @@ class ToggleTimeDisplayAction : ActionCallback {
         val cache = DeparturesCache(context)
         val current = cache.getTimeDisplayMode()
         cache.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
-        RefreshAction.triggerUpdate(context)
+        // Nur API-Refresh auslösen, wenn der Nutzer es aktiviert hat (Default: AUS)
+        val autoRefresh = FavoritesRepository(context).getAutoRefreshOnInteractionNow()
+        if (autoRefresh) {
+            RefreshAction.triggerUpdate(context)
+        } else {
+            // Nur Widget-Redraw ohne API-Aufruf
+            DeparturesWidget().updateAll(context)
+        }
     }
 }
 
