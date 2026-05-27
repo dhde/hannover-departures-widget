@@ -1,6 +1,7 @@
 package de.dhde.hannover.departures.widget.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -33,6 +34,10 @@ class FavoritesRepository(private val context: Context) {
         val MAX_FAV_ROWS_KEY     = intPreferencesKey("max_fav_rows_widget")
         val MAX_ROWS_KEY         = intPreferencesKey("max_rows_widget")
         val TRANSPORT_TYPES_KEY  = stringSetPreferencesKey("transport_types_filter")
+        val IGNORED_MESSAGES_KEY = stringSetPreferencesKey("ignored_messages_filter")
+        val FAVORITES_HEIGHT_KEY = stringPreferencesKey("favorites_buttons_height")
+        val FILTER_HEIGHT_KEY    = stringPreferencesKey("filter_buttons_height")
+        val AUTO_REFRESH_ON_INTERACTION_KEY = booleanPreferencesKey("auto_refresh_on_interaction")
     }
 
     // ── Aktive Station ───────────────────────────────────────────────────────
@@ -184,5 +189,67 @@ class FavoritesRepository(private val context: Context) {
 
     suspend fun setTransportTypes(types: Set<String>) {
         context.dataStore.edit { prefs -> prefs[TRANSPORT_TYPES_KEY] = types }
+    }
+
+    // ── Meldungs-Filter ──────────────────────────────────────────────────────
+
+    val ignoredMessagesFlow: Flow<Set<String>> = context.dataStore.data
+        .map { prefs -> prefs[IGNORED_MESSAGES_KEY] ?: emptySet() }
+
+    suspend fun setIgnoredMessages(ignored: Set<String>) {
+        context.dataStore.edit { prefs -> prefs[IGNORED_MESSAGES_KEY] = ignored }
+    }
+
+    // ── Button-Höhen Einstellungen ───────────────────────────────────────────
+
+    val favoritesHeightFlow: Flow<String> = context.dataStore.data
+        .map { prefs -> prefs[FAVORITES_HEIGHT_KEY] ?: "STANDARD" }
+
+    suspend fun setFavoritesHeight(height: String) {
+        context.dataStore.edit { prefs -> prefs[FAVORITES_HEIGHT_KEY] = height }
+    }
+
+    val filterHeightFlow: Flow<String> = context.dataStore.data
+        .map { prefs -> prefs[FILTER_HEIGHT_KEY] ?: "STANDARD" }
+
+    suspend fun setFilterHeight(height: String) {
+        context.dataStore.edit { prefs -> prefs[FILTER_HEIGHT_KEY] = height }
+    }
+
+    // ── Auto-Refresh bei Interaktion ─────────────────────────────────────────
+
+    val autoRefreshOnInteractionFlow: Flow<Boolean> = context.dataStore.data
+        .map { prefs -> prefs[AUTO_REFRESH_ON_INTERACTION_KEY] ?: false }
+
+    suspend fun setAutoRefreshOnInteraction(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[AUTO_REFRESH_ON_INTERACTION_KEY] = enabled }
+    }
+
+    suspend fun getAutoRefreshOnInteractionNow(): Boolean {
+        var value = false
+        autoRefreshOnInteractionFlow.take(1).collect { value = it }
+        return value
+    }
+}
+
+/**
+ * Filtert generische Meldungen anhand der vom Benutzer ausgewählten ignorierten Kategorien.
+ */
+fun filterMessages(messages: List<String>, ignoredCategories: Set<String>): List<String> {
+    if (ignoredCategories.isEmpty()) return messages
+    
+    val keywordsToIgnore = ignoredCategories.flatMap { category ->
+        when (category) {
+            "Behindertengerechtes Fahrzeug" -> listOf("behindertengerechtes fahrzeug", "behindertengerecht", "rollstuhl", "barrierefrei")
+            "Fahrradmitnahme" -> listOf("fahrradmitnahme", "fahrrad")
+            "WLAN / WiFi" -> listOf("wlan", "wifi")
+            "Niederflur" -> listOf("niederflur")
+            else -> listOf(category.lowercase())
+        }
+    }
+
+    return messages.filter { msg ->
+        val lowerMsg = msg.lowercase()
+        keywordsToIgnore.none { keyword -> lowerMsg.contains(keyword) }
     }
 }

@@ -264,6 +264,9 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     val maxFavRows by repo.maxFavRowsFlow.collectAsState(initial = 1)
     val maxRows by repo.maxRowsFlow.collectAsState(initial = 10)
     val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
+    val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
+    val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
+    val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
     
     var departures by remember { mutableStateOf<List<FlatDeparture>>(emptyList()) }
     var rawDepartures by remember { mutableStateOf<List<de.dhde.hannover.departures.widget.api.DepartureItem>>(emptyList()) }
@@ -332,7 +335,9 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         typeMatch && dirMatch
     }
 
-    val messagesDeps = rawDepartures.flatMap { it.toFlatRows() }.filter { it.messages.isNotEmpty() }
+    val messagesDeps = filtered.map { dep ->
+        dep.copy(messages = de.dhde.hannover.departures.widget.data.filterMessages(dep.messages, ignoredMessages))
+    }.filter { it.messages.isNotEmpty() }
     val hasMessages = messagesDeps.isNotEmpty()
     val groupedMessages = if (hasMessages) {
         messagesDeps.groupBy { it.lineShort }
@@ -393,6 +398,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 departures = rawDepartures,
                 tabState = tabState,
                 directionState = directionState,
+                filterHeight = filterHeight,
                 onTabChange = { tabState = it },
                 onDirChange = { directionState = it }
             )
@@ -428,6 +434,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 currentStationId = activeStationId,
                 maxFavorites = maxFavorites,
                 maxFavRows = maxFavRows,
+                favoritesHeight = favoritesHeight,
                 onSelect = { scope.launch { repo.setActiveStation(it.id, it.name) } }
             )
 
@@ -461,12 +468,19 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (hasMessages) {
-            Icon(
-                androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
-                contentDescription = "Info",
-                tint = Color(0xFFFFB300),
-                modifier = Modifier.size(20.dp).padding(end = 4.dp).clickable { onInfoClick() }
-            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable { onInfoClick() },
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Icon(
+                    androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
+                    contentDescription = "Info",
+                    tint = Color(0xFFFFB300),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
         Text(
             text = cleanName,
@@ -501,6 +515,7 @@ fun WidgetFilterRow(
     departures: List<de.dhde.hannover.departures.widget.api.DepartureItem>, 
     tabState: String, 
     directionState: String,
+    filterHeight: String = "STANDARD",
     onTabChange: (String) -> Unit,
     onDirChange: (String) -> Unit
 ) {
@@ -513,9 +528,9 @@ fun WidgetFilterRow(
     ) {
         // Vehicle Type Filters
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "BUS", Color(0xFFE94560)) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
+            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "BUS", Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
             Spacer(modifier = Modifier.width(4.dp))
-            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "TRAIN", Color(0xFF005A9B)) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
+            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -524,15 +539,15 @@ fun WidgetFilterRow(
         if (hasH || hasR) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasH) {
-                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "H", Color(0xFF0F7173)) { onDirChange(if (directionState == "H") "ALL" else "H") }
+                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "H", Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == "H") "ALL" else "H") }
                     Spacer(modifier = Modifier.width(4.dp))
                 }
                 if (hasH && hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_all, directionState == "ALL", Color.Gray) { onDirChange("ALL") }
+                    WidgetSegmentButton(R.drawable.ic_widget_all, directionState == "ALL", Color.Gray, filterHeight) { onDirChange("ALL") }
                     Spacer(modifier = Modifier.width(4.dp))
                 }
                 if (hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "R", Color(0xFFE94560)) { onDirChange(if (directionState == "R") "ALL" else "R") }
+                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "R", Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == "R") "ALL" else "R") }
                 }
             }
         }
@@ -540,11 +555,18 @@ fun WidgetFilterRow(
 }
 
 @Composable
-fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, onClick: () -> Unit) {
+fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, filterHeight: String = "STANDARD", onClick: () -> Unit) {
     val bgColor = if (isActive) activeColor else Color(0xFF2A2A2A)
+    
+    val (width, height, iconSize) = when (filterHeight) {
+        "KOMPAKT" -> Triple(28.dp, 20.dp, 12.dp)
+        "GROSS" -> Triple(40.dp, 30.dp, 20.dp)
+        else -> Triple(34.dp, 24.dp, 16.dp)
+    }
+
     Box(
         modifier = Modifier
-            .size(32.dp, 24.dp)
+            .size(width, height)
             .clip(RoundedCornerShape(6.dp))
             .background(bgColor)
             .clickable { onClick() },
@@ -554,7 +576,7 @@ fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, onC
             androidx.compose.ui.res.painterResource(iconRes),
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(iconSize)
         )
     }
 }
@@ -685,11 +707,18 @@ fun WidgetFavoritesRow(
     currentStationId: String?, 
     maxFavorites: Int,
     maxFavRows: Int,
+    favoritesHeight: String = "STANDARD",
     onSelect: (de.dhde.hannover.departures.widget.data.FavoriteStation) -> Unit
 ) {
     if (favorites.isEmpty() || maxFavorites <= 0 || maxFavRows <= 0) return
     
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        val (vertPadding, fontSize) = when (favoritesHeight) {
+            "KOMPAKT" -> 2.dp to 10.sp
+            "GROSS" -> 10.dp to 13.sp
+            else -> 6.dp to 11.sp
+        }
+
         val visibleFavs = favorites.take(maxFavorites * maxFavRows)
         visibleFavs.chunked(maxFavorites).forEach { chunk ->
             Row(
@@ -708,13 +737,13 @@ fun WidgetFavoritesRow(
                             .clip(RoundedCornerShape(6.dp))
                             .background(bgColor)
                             .clickable { onSelect(fav) }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = vertPadding),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = shortLabel,
                             color = Color.White,
-                            fontSize = 11.sp,
+                            fontSize = fontSize,
                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1
                         )
@@ -949,7 +978,7 @@ fun HelpScreen() {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionLabel("Hilfe & Tipps") }
+        item { SectionLabel("Unterstützen & Quellcode") }
         item {
             val context = LocalContext.current
             val intentHandler = { url: String ->
@@ -979,9 +1008,14 @@ fun HelpScreen() {
                     Text("Quellcode auf GitHub", color = TextMain)
                 }
             }
-
         }
-        item { HelpCard() }
+        
+        item { SectionLabel("Widget-Funktionen") }
+        item { WidgetFeaturesCard() }
+        
+        item { SectionLabel("Interaktion & Updates") }
+        item { InteractionCard() }
+        
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBg.copy(alpha = 0.5f)),
@@ -1004,6 +1038,102 @@ fun HelpScreen() {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HelpItem(icon: @Composable () -> Unit, title: String, description: String) {
+    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.width(36.dp), contentAlignment = Alignment.CenterStart) {
+            icon()
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = TextMain, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(description, color = TextSub, fontSize = 12.sp, lineHeight = 18.sp)
+        }
+    }
+}
+
+@Composable
+private fun WidgetFeaturesCard() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            HelpItem(
+                icon = {
+                    Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info), null, tint = Color(0xFFFFB300), modifier = Modifier.size(20.dp))
+                },
+                title = "Info-Meldungen & Filter",
+                description = "Tippe auf das goldene 'i' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen. Dauerhafte Meldungen (z.B. Rollstuhl, WLAN) lassen sich in den Optionen ausblenden."
+            )
+            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HelpItem(
+                icon = {
+                    Text("1", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                },
+                title = "Favoriten-Schnellwahl",
+                description = "Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten."
+            )
+            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HelpItem(
+                icon = {
+                    Row {
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = Teal, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = Red, modifier = Modifier.size(18.dp))
+                    }
+                },
+                title = "Richtungen & Filter",
+                description = "Nutze die Symbole für City oder Home, um die Richtung zu filtern. Die Zeilen im Widget färben sich automatisch passend (hell/dunkel)."
+            )
+            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HelpItem(
+                icon = {
+                    Icon(Icons.Default.Settings, null, tint = Teal, modifier = Modifier.size(20.dp))
+                },
+                title = "Größenanpassung",
+                description = "Du kannst in den Optionen die visuelle Größe der Filter- und Favoriten-Buttons ('KOMPAKT', 'STANDARD', 'GROSS') einstellen, falls du größere Klickflächen bevorzugst."
+            )
+        }
+    }
+}
+
+@Composable
+private fun InteractionCard() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            HelpItem(
+                icon = {
+                    Text("5", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                },
+                title = "Zeit-Ansicht",
+                description = "Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten. (Tipp: In den Optionen kannst du einstellen, ob dabei offline umgeschaltet wird oder die API aktualisiert werden soll)."
+            )
+            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HelpItem(
+                icon = {
+                    Icon(Icons.Default.Refresh, null, tint = Teal, modifier = Modifier.size(20.dp))
+                },
+                title = "Aktualisierung",
+                description = "Das Widget lädt aus Strom- und Datenspargründen keine Daten im Hintergrund. Um aktuelle Echtzeitdaten und Verspätungen der API abzurufen, tippe auf den kleinen Refresh-Pfeil oben rechts."
+            )
+            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HelpItem(
+                icon = {
+                    Icon(Icons.Default.LocationOn, null, tint = Teal, modifier = Modifier.size(20.dp))
+                },
+                title = "GPS-Suche",
+                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
+            )
         }
     }
 }
@@ -1285,20 +1415,6 @@ private fun HelpCard() {
     }
 }
 
-@Composable
-private fun HelpItem(icon: @Composable () -> Unit, title: String, description: String) {
-    Row(verticalAlignment = Alignment.Top) {
-        Box(modifier = Modifier.padding(top = 2.dp).size(24.dp), contentAlignment = Alignment.Center) {
-            icon()
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = TextMain, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Spacer(Modifier.height(2.dp))
-            Text(description, color = TextSub, fontSize = 12.sp)
-        }
-    }
-}
 
 @Composable
 fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesRepository) {
@@ -1307,6 +1423,10 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val maxFavRowsFlow by repo.maxFavRowsFlow.collectAsState(initial = 1)
     val maxRowsFlow by repo.maxRowsFlow.collectAsState(initial = 10)
     val transportTypes by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
+    val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
+    val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
+    val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
+    val autoRefreshOnInteraction by repo.autoRefreshOnInteractionFlow.collectAsState(initial = false)
     
     var localMaxFavs by remember(maxFavsFlow) { mutableStateOf(maxFavsFlow.toFloat()) }
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
@@ -1366,6 +1486,46 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(type, color = TextMain, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        item { SectionLabel("Meldungs-Filter") }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Wähle aus, welche generischen/dauerhaften Infomeldungen ausgeblendet werden sollen", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val filterOptions = listOf(
+                        "Behindertengerechtes Fahrzeug" to "Info über barrierefreie Fahrzeuge ausblenden",
+                        "Fahrradmitnahme" to "Hinweise zur Fahrradmitnahme ausblenden",
+                        "Niederflur" to "Hinweise zu Niederflurfahrzeugen ausblenden",
+                        "WLAN / WiFi" to "Hinweise zu WLAN an Bord ausblenden"
+                    )
+                    filterOptions.forEach { (optionName, description) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                val newSet = if (optionName in ignoredMessages) ignoredMessages - optionName else ignoredMessages + optionName
+                                scope.launch { repo.setIgnoredMessages(newSet) }
+                            }.padding(vertical = 6.dp)
+                        ) {
+                            Checkbox(
+                                checked = optionName in ignoredMessages,
+                                onCheckedChange = null,
+                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(optionName, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text(description, color = TextSub, fontSize = 11.sp)
+                            }
                         }
                     }
                 }
@@ -1435,12 +1595,82 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                     )
                     val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
                     Text(rowLabel, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+
+                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                    Text("Höhe der Favoriten-Buttons", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Wähle die visuelle Größe aus", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
+                            val isSelected = mode == favoritesHeight
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) Teal else Color(0xFF333344))
+                                    .clickable { scope.launch { repo.setFavoritesHeight(mode) } }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                    Text("Höhe der Filter-Buttons", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Wähle die visuelle Größe aus", color = TextSub, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
+                            val isSelected = mode == filterHeight
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) Teal else Color(0xFF333344))
+                                    .clickable { scope.launch { repo.setFilterHeight(mode) } }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { scope.launch { repo.setAutoRefreshOnInteraction(!autoRefreshOnInteraction) } }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("API-Refresh bei Zeitumschaltung", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(
+                                "Wenn aktiv: Beim Umschalten zwischen Minuten und Uhrzeit werden " +
+                                "neue Daten von der API geladen (falls älter als 60 Sek.). " +
+                                "Standard: AUS (nur Redraw, kein Netzwerkaufruf).",
+                                color = TextSub, fontSize = 12.sp, lineHeight = 18.sp
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = autoRefreshOnInteraction,
+                            onCheckedChange = { scope.launch { repo.setAutoRefreshOnInteraction(it) } },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
+                        )
+                    }
                 }
             }
         }
     }
     
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes) {
+    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction) {
         de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }
