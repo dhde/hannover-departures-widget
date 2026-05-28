@@ -1427,10 +1427,13 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
     val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
     val autoRefreshOnInteraction by repo.autoRefreshOnInteractionFlow.collectAsState(initial = false)
+    val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
+    val maxGroupedDeparturesFlow by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
     
     var localMaxFavs by remember(maxFavsFlow) { mutableStateOf(maxFavsFlow.toFloat()) }
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
     var localMaxRows by remember(maxRowsFlow) { mutableStateOf(maxRowsFlow.toFloat()) }
+    var localMaxGroupedDepartures by remember(maxGroupedDeparturesFlow) { mutableStateOf(maxGroupedDeparturesFlow.toFloat()) }
     
     val context = LocalContext.current
 
@@ -1665,12 +1668,56 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
                         )
                     }
+
+                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { scope.launch { repo.setGroupDepartures(!groupDepartures) } }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Abfahrten gruppieren", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(
+                                "Fasst nachfolgende Abfahrten derselben Linie und Richtung in einer Zeile zusammen.",
+                                color = TextSub, fontSize = 12.sp, lineHeight = 18.sp
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = groupDepartures,
+                            onCheckedChange = { scope.launch { repo.setGroupDepartures(it) } },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
+                        )
+                    }
+
+                    if (groupDepartures) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Zusätzliche Abfahrten pro Linie", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Anzahl weiterer Abfahrten, die klein neben der Hauptzeit angezeigt werden (0 bis 5)", color = TextSub, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Slider(
+                            value = localMaxGroupedDepartures,
+                            onValueChange = { localMaxGroupedDepartures = it },
+                            onValueChangeFinished = { scope.launch { repo.setMaxGroupedDepartures(localMaxGroupedDepartures.roundToInt()) } },
+                            valueRange = 0f..5f,
+                            steps = 4,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Teal,
+                                activeTrackColor = Teal,
+                                inactiveTrackColor = Color(0xFF333344)
+                            )
+                        )
+                        Text("${localMaxGroupedDepartures.roundToInt()} weitere Abfahrten", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                    }
                 }
             }
         }
     }
     
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction) {
+    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, groupDepartures, maxGroupedDeparturesFlow) {
         de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }

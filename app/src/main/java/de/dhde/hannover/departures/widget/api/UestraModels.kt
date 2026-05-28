@@ -114,7 +114,7 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
                 if (d > 0) d else null
             } else null
             FlatDeparture(
-                line = line, lineId = lineId, destination = destination, number = number,
+                line = line, lineId = lineId, destination = destination?.removePrefix("Hannover/")?.trim(), number = number,
                 isBus = isBus, isTram = isTram, isTrain = isTrain,
                 departureTime = dept,
                 plannedTime = event.plannedTime,
