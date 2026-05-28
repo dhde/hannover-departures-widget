@@ -70,6 +70,18 @@ class RefreshAction : ActionCallback {
                             val departures = response.departures
                             if (departures != null) {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
+                                
+                                // Extract and track messages
+                                val msgs = buildList {
+                                    departures.forEach { dep ->
+                                        dep.infos?.forEach { it.content?.let { c -> add(c) } }
+                                        dep.hints?.forEach { it.content?.let { c -> add(c) } }
+                                    }
+                                }
+                                if (msgs.isNotEmpty()) {
+                                    repo.trackMessages(msgs)
+                                }
+                                
                                 true // Signal success
                             } else {
                                 false

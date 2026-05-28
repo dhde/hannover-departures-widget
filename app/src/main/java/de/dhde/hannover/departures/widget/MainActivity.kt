@@ -1424,11 +1424,13 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val maxRowsFlow by repo.maxRowsFlow.collectAsState(initial = 10)
     val transportTypes by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
     val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
+    val seenMessages by repo.seenMessagesFlow.collectAsState(initial = emptyMap())
     val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
     val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
     val autoRefreshOnInteraction by repo.autoRefreshOnInteractionFlow.collectAsState(initial = false)
     val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
     val maxGroupedDeparturesFlow by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
+    val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
     
     var localMaxFavs by remember(maxFavsFlow) { mutableStateOf(maxFavsFlow.toFloat()) }
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
@@ -1503,31 +1505,63 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Wähle aus, welche generischen/dauerhaften Infomeldungen ausgeblendet werden sollen", color = TextSub, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    val filterOptions = listOf(
-                        "Behindertengerechtes Fahrzeug" to "Info über barrierefreie Fahrzeuge ausblenden",
-                        "Fahrradmitnahme" to "Hinweise zur Fahrradmitnahme ausblenden",
-                        "Niederflur" to "Hinweise zu Niederflurfahrzeugen ausblenden",
-                        "WLAN / WiFi" to "Hinweise zu WLAN an Bord ausblenden"
-                    )
-                    filterOptions.forEach { (optionName, description) ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                val newSet = if (optionName in ignoredMessages) ignoredMessages - optionName else ignoredMessages + optionName
-                                scope.launch { repo.setIgnoredMessages(newSet) }
-                            }.padding(vertical = 6.dp)
-                        ) {
-                            Checkbox(
-                                checked = optionName in ignoredMessages,
-                                onCheckedChange = null,
-                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(optionName, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text(description, color = TextSub, fontSize = 11.sp)
+                    // Schwellenwert: Meldungen die >= 5x aufgetaucht sind, können gefiltert werden
+                    val threshold = 5
+                    val filterableMessages = seenMessages
+                        .filter { it.value.count >= threshold }
+                        .entries
+                        .sortedByDescending { it.value.count }
+                    if (filterableMessages.isEmpty()) {
+                        Text(
+                            "Noch keine häufigen Meldungen bekannt. Die App lernt automatisch welche " +
+                            "Infomeldungen regelmäßig von der API kommen (ab $threshold Mal). " +
+                            "Lade das Widget einige Male neu, um Meldungen hier anzuzeigen.",
+                            color = TextSub, fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            "Wähle aus, welche häufig auftauchenden Meldungen ausgeblendet werden sollen:",
+                            color = TextSub, fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        filterableMessages.forEach { (msgText, entry) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    val newSet = if (msgText in ignoredMessages) ignoredMessages - msgText else ignoredMessages + msgText
+                                    scope.launch { repo.setIgnoredMessages(newSet) }
+                                }.padding(vertical = 6.dp)
+                            ) {
+                                Checkbox(
+                                    checked = msgText in ignoredMessages,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(msgText, color = TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                                    val countLabel = if (entry.count >= 20) "20+× gesehen" else "${entry.count}× gesehen"
+                                    Text(countLabel, color = TextSub, fontSize = 11.sp)
+                                }
+                                IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            repo.removeSeenMessage(msgText)
+                                            // Auch aus ignoredMessages entfernen falls aktiv
+                                            if (msgText in ignoredMessages) {
+                                                repo.setIgnoredMessages(ignoredMessages - msgText)
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Meldung entfernen",
+                                        tint = Color(0xFF666688),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1535,7 +1569,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
             }
         }
     
-        item { SectionLabel("Widget Einstellungen") }
+        item { SectionLabel("Favoriten") }
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBg),
@@ -1559,7 +1593,6 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         )
                     )
                     Text("${localMaxFavs.roundToInt()} Knöpfe pro Zeile", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
-
                     HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
                     Text("Zeilen für Favoriten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -1581,70 +1614,81 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
 
                     HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
-                    Text("Maximale Abfahrten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Zeilen im Widget (1 bis 15, 15 = unbegrenzt)", color = TextSub, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Slider(
-                        value = localMaxRows,
-                        onValueChange = { localMaxRows = it },
-                        onValueChangeFinished = { scope.launch { repo.setMaxRows(localMaxRows.roundToInt()) } },
-                        valueRange = 1f..15f,
-                        steps = 13,
-                        colors = SliderDefaults.colors(
-                            thumbColor = Teal,
-                            activeTrackColor = Teal,
-                            inactiveTrackColor = Color(0xFF333344)
-                        )
-                    )
-                    val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
-                    Text(rowLabel, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
 
-                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
                     Text("Höhe der Favoriten-Buttons", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text("Wähle die visuelle Größe aus", color = TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                         listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
                             val isSelected = mode == favoritesHeight
+                            val (vPadding, fSize) = when (mode) {
+                                "KOMPAKT" -> 2.dp to 10.sp
+                                "GROSS" -> 14.dp to 13.sp
+                                else -> 6.dp to 11.sp
+                            }
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) Teal else Color(0xFF333344))
                                     .clickable { scope.launch { repo.setFavoritesHeight(mode) } }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = vPadding),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
 
-                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                }
+            }
 
+        item { SectionLabel("Filter") }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text("Höhe der Filter-Buttons", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text("Wähle die visuelle Größe aus", color = TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                         listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
                             val isSelected = mode == filterHeight
+                            val (vPadding, fSize) = when (mode) {
+                                "KOMPAKT" -> 2.dp to 10.sp
+                                "GROSS" -> 14.dp to 13.sp
+                                else -> 6.dp to 11.sp
+                            }
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) Teal else Color(0xFF333344))
                                     .clickable { scope.launch { repo.setFilterHeight(mode) } }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = vPadding),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
+                }
+            }
+        }
 
-                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
-
+        item { SectionLabel("API Refresh") }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -1668,9 +1712,18 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
                         )
                     }
+                }
+            }
+        }
 
-                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
-
+        item { SectionLabel("Abfahrten gruppieren") }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -1693,31 +1746,87 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         )
                     }
 
-                    if (groupDepartures) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Zusätzliche Abfahrten pro Linie", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Anzahl weiterer Abfahrten, die klein neben der Hauptzeit angezeigt werden (0 bis 5)", color = TextSub, fontSize = 12.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Slider(
-                            value = localMaxGroupedDepartures,
-                            onValueChange = { localMaxGroupedDepartures = it },
-                            onValueChangeFinished = { scope.launch { repo.setMaxGroupedDepartures(localMaxGroupedDepartures.roundToInt()) } },
-                            valueRange = 0f..5f,
-                            steps = 4,
-                            colors = SliderDefaults.colors(
-                                thumbColor = Teal,
-                                activeTrackColor = Teal,
-                                inactiveTrackColor = Color(0xFF333344)
+                        if (!groupDepartures) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Maximale Abfahrten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Zeilen im Widget (1 bis 15, 15 = unbegrenzt)", color = TextSub, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Slider(
+                                value = localMaxRows,
+                                onValueChange = { localMaxRows = it },
+                                onValueChangeFinished = { scope.launch { repo.setMaxRows(localMaxRows.roundToInt()) } },
+                                valueRange = 1f..15f,
+                                steps = 13,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Teal,
+                                    activeTrackColor = Teal,
+                                    inactiveTrackColor = Color(0xFF333344)
+                                )
                             )
-                        )
-                        Text("${localMaxGroupedDepartures.roundToInt()} weitere Abfahrten", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
-                    }
+                            val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
+                            Text(rowLabel, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                        } else {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Zusätzliche Abfahrten pro Linie", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Anzahl weiterer Abfahrten, die klein neben der Hauptzeit angezeigt werden (0 bis 5)", color = TextSub, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Slider(
+                                value = localMaxGroupedDepartures,
+                                onValueChange = { localMaxGroupedDepartures = it },
+                                onValueChangeFinished = { scope.launch { repo.setMaxGroupedDepartures(localMaxGroupedDepartures.roundToInt()) } },
+                                valueRange = 0f..5f,
+                                steps = 4,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Teal,
+                                    activeTrackColor = Teal,
+                                    inactiveTrackColor = Color(0xFF333344)
+                                )
+                            )
+                            Text("${localMaxGroupedDepartures.roundToInt()} weitere Abfahrten", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+
+                            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+
+                            Text("Schriftgröße der Folge-Abfahrten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Größe der kleinen Zeitangaben neben der Hauptabfahrt", color = TextSub, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                                listOf("KLEIN", "STANDARD", "GROSS").forEach { mode ->
+                                    val isSelected = mode == groupedFontSize
+                                    val (vPadding, fSize) = when (mode) {
+                                        "KLEIN" -> 2.dp to 9.sp
+                                        "GROSS" -> 10.dp to 13.sp
+                                        else    -> 5.dp to 11.sp
+                                    }
+                                    val label = when (mode) {
+                                        "KLEIN" -> "Klein"
+                                        "GROSS" -> "Groß"
+                                        else    -> "Standard"
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) Teal else Color(0xFF333344))
+                                            .clickable { scope.launch { repo.setGroupedFontSize(mode) } }
+                                            .padding(horizontal = 8.dp, vertical = vPadding),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            label,
+                                            color = if (isSelected) Color.White else TextSub,
+                                            fontSize = fSize,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
                 }
             }
         }
     }
     
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, groupDepartures, maxGroupedDeparturesFlow) {
+    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, groupDepartures, maxGroupedDeparturesFlow, groupedFontSize) {
         de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }
