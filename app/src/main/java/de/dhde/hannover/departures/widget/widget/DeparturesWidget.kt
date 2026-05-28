@@ -120,6 +120,8 @@ class DeparturesWidget : GlanceAppWidget() {
             val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
             val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
             val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
+            val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
+            val maxGroupedDepartures by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
@@ -166,7 +168,9 @@ class DeparturesWidget : GlanceAppWidget() {
                 transportFilters = transportFilters,
                 ignoredMessages  = ignoredMessages,
                 favoritesHeight  = favoritesHeight,
-                filterHeight     = filterHeight
+                filterHeight     = filterHeight,
+                groupDepartures  = groupDepartures,
+                maxGroupedDepartures = maxGroupedDepartures
             )
         }
     }
@@ -192,7 +196,9 @@ class DeparturesWidget : GlanceAppWidget() {
         transportFilters: Set<String>,
         ignoredMessages: Set<String>,
         favoritesHeight: String,
-        filterHeight: String
+        filterHeight: String,
+        groupDepartures: Boolean,
+        maxGroupedDepartures: Int
     ) {
         Box(
             modifier = GlanceModifier
@@ -263,13 +269,35 @@ class DeparturesWidget : GlanceAppWidget() {
             val isWarning = minutesSinceUpdate >= 10
 
             Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.CenterEnd) {
-                val limitedFiltered = if (maxRows >= 15) filtered else filtered.take(maxRows)
+                // Gruppieren der Abfahrten
+                val groupedList = mutableListOf<Pair<FlatDeparture, List<FlatDeparture>>>()
+                if (groupDepartures) {
+                    val groupedMap = mutableMapOf<String, MutableList<FlatDeparture>>()
+                    for (dep in filtered) {
+                        val key = "${dep.lineShort}|${dep.destination}"
+                        groupedMap.getOrPut(key) { mutableListOf() }.add(dep)
+                    }
+                    for (group in groupedMap.values) {
+                        val mainDep = group.first()
+                        val subDeps = group.drop(1).take(maxGroupedDepartures)
+                        groupedList.add(mainDep to subDeps)
+                    }
+                    // WICHTIG: Nach der Gruppierung wieder chronologisch sortieren!
+                    groupedList.sortBy { it.first.departureTime }
+                } else {
+                    for (dep in filtered) {
+                        groupedList.add(dep to emptyList())
+                    }
+                }
+
+                val limitedFiltered = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
+                
                 if (limitedFiltered.isEmpty()) {
                     Text("Keine Abfahrten", style = TextStyle(color = ColorProvider(Color.Gray)))
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                        items(limitedFiltered) { departure ->
-                            FlatDepartureRow(departure, timeDisplayMode, isWarning)
+                        items(limitedFiltered) { (departure, subsequent) ->
+                            FlatDepartureRow(departure, subsequent, timeDisplayMode, isWarning)
                         }
                     }
                     
@@ -509,7 +537,7 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FlatDepartureRow(departure: FlatDeparture, timeDisplayMode: String, isWarning: Boolean) {
+    private fun FlatDepartureRow(departure: FlatDeparture, subsequentDepartures: List<FlatDeparture>, timeDisplayMode: String, isWarning: Boolean) {
         val rowBgColor = when {
             departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
             departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
@@ -558,10 +586,25 @@ class DeparturesWidget : GlanceAppWidget() {
                 else -> TextStyle(color = ColorProvider(Color(0xFF4CAF50)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
 
-            Text(
-                text = finalTimeText,
-                style = timeStyle
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = finalTimeText,
+                    style = timeStyle
+                )
+                if (subsequentDepartures.isNotEmpty()) {
+                    val subText = subsequentDepartures.joinToString(", ") { dep ->
+                        val t = if (timeDisplayMode == "CLOCK") clockTime(dep.departureTime) else minutesUntil(dep.departureTime, isWarning).replace(" min", "m").replace("jetzt", "0m").replace("in ", "")
+                        val d = if ((dep.delayMinutes ?: 0) > 0) " (+${dep.delayMinutes})" else ""
+                        var res = t + d
+                        if (dep.isCancelled) res = res.map { it + "\u0336" }.joinToString("")
+                        res
+                    }
+                    Text(
+                        text = subText,
+                        style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 10.sp, fontWeight = FontWeight.Normal)
+                    )
+                }
+            }
         }
         if (departure.isCancelled) {
             Row(
