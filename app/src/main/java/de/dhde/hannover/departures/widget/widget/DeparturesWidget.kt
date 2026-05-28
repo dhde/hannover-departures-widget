@@ -122,6 +122,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
             val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
             val maxGroupedDepartures by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
+            val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
@@ -170,7 +171,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 favoritesHeight  = favoritesHeight,
                 filterHeight     = filterHeight,
                 groupDepartures  = groupDepartures,
-                maxGroupedDepartures = maxGroupedDepartures
+                maxGroupedDepartures = maxGroupedDepartures,
+                groupedFontSize  = groupedFontSize
             )
         }
     }
@@ -198,7 +200,8 @@ class DeparturesWidget : GlanceAppWidget() {
         favoritesHeight: String,
         filterHeight: String,
         groupDepartures: Boolean,
-        maxGroupedDepartures: Int
+        maxGroupedDepartures: Int,
+        groupedFontSize: String = "STANDARD"
     ) {
         Box(
             modifier = GlanceModifier
@@ -297,7 +300,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                         items(limitedFiltered) { (departure, subsequent) ->
-                            FlatDepartureRow(departure, subsequent, timeDisplayMode, isWarning)
+                            FlatDepartureRow(departure, subsequent, timeDisplayMode, isWarning, groupedFontSize)
                         }
                     }
                     
@@ -537,7 +540,7 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FlatDepartureRow(departure: FlatDeparture, subsequentDepartures: List<FlatDeparture>, timeDisplayMode: String, isWarning: Boolean) {
+    private fun FlatDepartureRow(departure: FlatDeparture, subsequentDepartures: List<FlatDeparture>, timeDisplayMode: String, isWarning: Boolean, groupedFontSize: String = "STANDARD") {
         val rowBgColor = when {
             departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
             departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
@@ -592,16 +595,21 @@ class DeparturesWidget : GlanceAppWidget() {
                     style = timeStyle
                 )
                 if (subsequentDepartures.isNotEmpty()) {
+                    val subFontSize = when (groupedFontSize) {
+                        "KLEIN"  -> 9.sp
+                        "GROSS"  -> 13.sp
+                        else     -> 10.sp
+                    }
                     val subText = subsequentDepartures.joinToString(", ") { dep ->
+                        // Keine Verspätung in der Gruppen-Kurzansicht
                         val t = if (timeDisplayMode == "CLOCK") clockTime(dep.departureTime) else minutesUntil(dep.departureTime, isWarning).replace(" min", "m").replace("jetzt", "0m").replace("in ", "")
-                        val d = if ((dep.delayMinutes ?: 0) > 0) " (+${dep.delayMinutes})" else ""
-                        var res = t + d
+                        var res = t
                         if (dep.isCancelled) res = res.map { it + "\u0336" }.joinToString("")
                         res
                     }
                     Text(
                         text = subText,
-                        style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 10.sp, fontWeight = FontWeight.Normal)
+                        style = TextStyle(color = ColorProvider(Color.Gray), fontSize = subFontSize, fontWeight = FontWeight.Normal)
                     )
                 }
             }

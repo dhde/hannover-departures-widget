@@ -20,6 +20,11 @@ data class FavoriteStation(
     val filteredLines: Set<String>? = null
 )
 
+data class SeenMessageEntry(
+    val count: Int,
+    val lastSeenMillis: Long
+)
+
 /** Persistiert Favoriten-Haltestellen und die aktive Widget-Station. */
 class FavoritesRepository(private val context: Context) {
     private val gson = Gson()
@@ -40,6 +45,8 @@ class FavoritesRepository(private val context: Context) {
         val AUTO_REFRESH_ON_INTERACTION_KEY = booleanPreferencesKey("auto_refresh_on_interaction")
         val GROUP_DEPARTURES_KEY = booleanPreferencesKey("group_departures")
         val GROUP_DEPARTURES_MAX_KEY = intPreferencesKey("group_departures_max")
+        val SEEN_MESSAGES_KEY    = stringPreferencesKey("seen_messages_json")
+        val GROUP_FONT_SIZE_KEY  = stringPreferencesKey("group_font_size")  // "KLEIN" | "STANDARD" | "GROSS"
     }
 
     // ── Aktive Station ───────────────────────────────────────────────────────
@@ -229,31 +236,119 @@ class FavoritesRepository(private val context: Context) {
     val maxGroupedDeparturesFlow: Flow<Int> = context.dataStore.data.map { it[GROUP_DEPARTURES_MAX_KEY] ?: 2 }
     suspend fun setMaxGroupedDepartures(max: Int) { context.dataStore.edit { it[GROUP_DEPARTURES_MAX_KEY] = max } }
 
+    // ── Dynamic Message Tracking ─────────────────────────────────────────────
+
+    val seenMessagesFlow: Flow<Map<String, SeenMessageEntry>> = context.dataStore.data.map { prefs ->
+        val json = prefs[SEEN_MESSAGES_KEY]
+        if (json != null) {
+            val type = object : TypeToken<Map<String, SeenMessageEntry>>() {}.type
+            try {
+                gson.fromJson(json, type) ?: emptyMap()
+            } catch (e: Exception) {
+                emptyMap() // Graceful reset if old format (Map<String, Int>) is encountered
+            }
+        } else {
+            emptyMap()
+        }
+    }
+
+    suspend fun trackMessages(messages: List<String>) {
+        val now = System.currentTimeMillis()
+        val twoDaysMillis = 2 * 24 * 60 * 60 * 1000L
+
+        context.dataStore.edit { prefs ->
+            val currentJson = prefs[SEEN_MESSAGES_KEY]
+            val type = object : TypeToken<MutableMap<String, SeenMessageEntry>>() {}.type
+            val entries: MutableMap<String, SeenMessageEntry> = if (currentJson != null) {
+                try {
+                    gson.fromJson(currentJson, type) ?: mutableMapOf()
+                } catch (e: Exception) {
+                    mutableMapOf()
+                }
+            } else {
+                mutableMapOf()
+            }
+
+            var changed = false
+            
+            // Prune old messages
+            val iterator = entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (now - entry.value.lastSeenMillis > twoDaysMillis) {
+                    iterator.remove()
+                    changed = true
+                    
+                    // Also cleanup from ignored messages list if it expired
+                    val currentIgnored = prefs[IGNORED_MESSAGES_KEY] ?: emptySet()
+                    if (entry.key in currentIgnored) {
+                        prefs[IGNORED_MESSAGES_KEY] = currentIgnored - entry.key
+                    }
+                }
+            }
+
+            // Add new messages
+            for (msg in messages) {
+                val cleanMsg = msg.trim()
+                if (cleanMsg.isNotEmpty()) {
+                    val currentCount = entries[cleanMsg]?.count ?: 0
+                    // Cap the count at 20
+                    entries[cleanMsg] = SeenMessageEntry(
+                        count = minOf(currentCount + 1, 20),
+                        lastSeenMillis = now
+                    )
+                    changed = true
+                }
+            }
+
+            if (changed) {
+                // Keep only top 50 messages to prevent unbounded growth
+                val sortedEntries = entries.entries.sortedByDescending { it.value.count }.take(50).associate { it.key to it.value }
+                prefs[SEEN_MESSAGES_KEY] = gson.toJson(sortedEntries)
+            }
+        }
+    }
+
+    suspend fun removeSeenMessage(message: String) {
+        context.dataStore.edit { prefs ->
+            val currentJson = prefs[SEEN_MESSAGES_KEY]
+            val type = object : TypeToken<MutableMap<String, SeenMessageEntry>>() {}.type
+            val entries: MutableMap<String, SeenMessageEntry> = if (currentJson != null) {
+                try {
+                    gson.fromJson(currentJson, type) ?: mutableMapOf()
+                } catch (e: Exception) {
+                    mutableMapOf()
+                }
+            } else return@edit
+            entries.remove(message.trim())
+            prefs[SEEN_MESSAGES_KEY] = gson.toJson(entries)
+        }
+    }
+
     suspend fun getAutoRefreshOnInteractionNow(): Boolean {
         var value = false
         autoRefreshOnInteractionFlow.take(1).collect { value = it }
         return value
     }
+
+    // ── Grouped Departure Font Size ──────────────────────────────────────────
+
+    val groupedFontSizeFlow: Flow<String> = context.dataStore.data
+        .map { prefs -> prefs[GROUP_FONT_SIZE_KEY] ?: "STANDARD" }
+
+    suspend fun setGroupedFontSize(size: String) {
+        context.dataStore.edit { prefs -> prefs[GROUP_FONT_SIZE_KEY] = size }
+    }
 }
 
 /**
- * Filtert generische Meldungen anhand der vom Benutzer ausgewählten ignorierten Kategorien.
+ * Filtert Meldungen anhand der vom Benutzer ausgewählten ignorierten Texte.
+ * Direkter Textvergleich (case-insensitive contains) – keine hardcodierten Keywords.
  */
 fun filterMessages(messages: List<String>, ignoredCategories: Set<String>): List<String> {
     if (ignoredCategories.isEmpty()) return messages
-    
-    val keywordsToIgnore = ignoredCategories.flatMap { category ->
-        when (category) {
-            "Behindertengerechtes Fahrzeug" -> listOf("behindertengerechtes fahrzeug", "behindertengerecht", "rollstuhl", "barrierefrei")
-            "Fahrradmitnahme" -> listOf("fahrradmitnahme", "fahrrad")
-            "WLAN / WiFi" -> listOf("wlan", "wifi")
-            "Niederflur" -> listOf("niederflur")
-            else -> listOf(category.lowercase())
-        }
-    }
-
     return messages.filter { msg ->
-        val lowerMsg = msg.lowercase()
-        keywordsToIgnore.none { keyword -> lowerMsg.contains(keyword) }
+        val lowerMsg = msg.trim().lowercase()
+        ignoredCategories.none { ignored -> lowerMsg.contains(ignored.trim().lowercase()) }
     }
 }
