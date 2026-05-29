@@ -17,8 +17,14 @@ data class FavoriteStation(
     val id: String,
     val name: String,
     val alias: String? = null,
-    val filteredLines: Set<String>? = null
-)
+    val filteredLines: Set<String>? = null,
+    val uniqueId: String? = null,
+    val transportFilter: String? = null,
+    val directionFilter: String? = null
+) {
+    val safeUniqueId: String
+        get() = uniqueId ?: id
+}
 
 data class SeenMessageEntry(
     val count: Int,
@@ -34,6 +40,7 @@ class FavoritesRepository(private val context: Context) {
         private val FAVORITES_JSON_KEY = stringPreferencesKey("favorites_json")
         val WIDGET_MODE_KEY      = stringPreferencesKey("widget_mode")            // "gps" | "station"
         val ACTIVE_STATION_ID    = stringPreferencesKey("active_station_id")
+        val ACTIVE_FAVORITE_UNIQUE_ID = stringPreferencesKey("active_fav_unique_id")
         val ACTIVE_STATION_NAME  = stringPreferencesKey("active_station_name")
         val MAX_FAV_KEY          = intPreferencesKey("max_favorites_widget")
         val MAX_FAV_ROWS_KEY     = intPreferencesKey("max_fav_rows_widget")
@@ -47,12 +54,19 @@ class FavoritesRepository(private val context: Context) {
         val GROUP_DEPARTURES_MAX_KEY = intPreferencesKey("group_departures_max")
         val SEEN_MESSAGES_KEY    = stringPreferencesKey("seen_messages_json")
         val GROUP_FONT_SIZE_KEY  = stringPreferencesKey("group_font_size")  // "KLEIN" | "STANDARD" | "GROSS"
+        val ALLOW_DUPLICATES_KEY = booleanPreferencesKey("allow_duplicates")
     }
 
     // ── Aktive Station ───────────────────────────────────────────────────────
 
+    val allowDuplicatesFlow: Flow<Boolean> = context.dataStore.data
+        .map { it[ALLOW_DUPLICATES_KEY] ?: false }
+
     val activeStationId: Flow<String?> = context.dataStore.data
         .map { it[ACTIVE_STATION_ID] }
+
+    val activeFavoriteUniqueId: Flow<String?> = context.dataStore.data
+        .map { it[ACTIVE_FAVORITE_UNIQUE_ID] ?: it[ACTIVE_STATION_ID] }
 
     val activeStationName: Flow<String?> = context.dataStore.data
         .map { it[ACTIVE_STATION_NAME] }
@@ -60,9 +74,9 @@ class FavoritesRepository(private val context: Context) {
     /** Gibt Favoriten als geordnete Liste zurück. Migriert automatisch vom alten Format. */
     val favoritesFlow: Flow<List<FavoriteStation>> = context.dataStore.data.map { prefs ->
         val json = prefs[FAVORITES_JSON_KEY]
-        if (json != null) {
+        val list = if (json != null) {
             val type = object : TypeToken<List<FavoriteStation>>() {}.type
-            gson.fromJson(json, type)
+            gson.fromJson<List<FavoriteStation>>(json, type) ?: emptyList()
         } else {
             // Migration vom alten StringSet
             val oldSet = prefs[OLD_FAVORITES_KEY] ?: emptySet()
@@ -71,19 +85,35 @@ class FavoritesRepository(private val context: Context) {
                 FavoriteStation(parts.getOrElse(0) { "" }, parts.getOrElse(1) { entry })
             }
         }
+        
+        val seen = mutableSetOf<String>()
+        list.map { fav ->
+            if (!seen.add(fav.safeUniqueId)) {
+                fav.copy(uniqueId = java.util.UUID.randomUUID().toString())
+            } else fav
+        }
     }
 
     /** Findet den Alias oder Namen für die aktuell aktive Station. */
-    val effectiveStationName: Flow<String> = combine(activeStationId, activeStationName, favoritesFlow) { id, official, favs ->
-        favs.find { it.id == id }?.alias ?: official ?: "Unbekannt"
+    val effectiveStationName: Flow<String> = combine(activeFavoriteUniqueId, activeStationName, favoritesFlow) { uniqueId, official, favs ->
+        favs.find { it.safeUniqueId == uniqueId }?.alias ?: official ?: "Unbekannt"
     }
 
-    suspend fun setActiveStation(id: String, name: String) {
+    suspend fun setActiveStation(uniqueId: String, name: String) {
+        val fav = getFavoritesNow().find { it.safeUniqueId == uniqueId }
+        val realId = fav?.id ?: uniqueId
+        
         context.dataStore.edit { prefs ->
-            prefs[ACTIVE_STATION_ID]   = id
+            prefs[ACTIVE_FAVORITE_UNIQUE_ID] = uniqueId
+            prefs[ACTIVE_STATION_ID]   = realId
             prefs[ACTIVE_STATION_NAME] = name
             prefs[WIDGET_MODE_KEY]     = "station"
         }
+        
+        // Filter des gewählten Favoriten in den Cache übernehmen
+        val cache = DeparturesCache(context)
+        cache.setTabState(realId, fav?.transportFilter ?: "ALL")
+        cache.setDirectionState(realId, fav?.directionFilter ?: "ALL")
     }
 
     suspend fun getActiveStationIdNow(): String {
@@ -92,6 +122,14 @@ class FavoritesRepository(private val context: Context) {
             if (saved != null) id = saved
         }
         return id
+    }
+
+    suspend fun getActiveFavoriteUniqueIdNow(): String? {
+        var uniqueId: String? = null
+        context.dataStore.data.map { prefs -> prefs[ACTIVE_FAVORITE_UNIQUE_ID] }.take(1).collect { saved ->
+            uniqueId = saved
+        }
+        return uniqueId
     }
 
     // ── Favoriten ────────────────────────────────────────────────────────────
@@ -110,14 +148,30 @@ class FavoritesRepository(private val context: Context) {
         }
     }
 
-    suspend fun removeFavorite(id: String) {
-        val updated = getFavoritesNow().filter { it.id != id }
+    suspend fun removeFavoriteByUniqueId(uniqueId: String) {
+        val updated = getFavoritesNow().filter { it.safeUniqueId != uniqueId }
         saveFavorites(updated)
     }
 
-    suspend fun moveFavorite(id: String, up: Boolean) {
+    suspend fun removeAllFavoritesByStationId(stationId: String) {
+        val updated = getFavoritesNow().filter { it.id != stationId }
+        saveFavorites(updated)
+    }
+
+    suspend fun duplicateFavorite(uniqueId: String) {
         val list = getFavoritesNow().toMutableList()
-        val index = list.indexOfFirst { it.id == id }
+        val index = list.indexOfFirst { it.safeUniqueId == uniqueId }
+        if (index != -1) {
+            val original = list[index]
+            val duplicate = original.copy(uniqueId = java.util.UUID.randomUUID().toString())
+            list.add(index + 1, duplicate)
+            saveFavorites(list)
+        }
+    }
+
+    suspend fun moveFavorite(uniqueId: String, up: Boolean) {
+        val list = getFavoritesNow().toMutableList()
+        val index = list.indexOfFirst { it.safeUniqueId == uniqueId }
         if (index == -1) return
         
         val target = if (up) index - 1 else index + 1
@@ -128,16 +182,30 @@ class FavoritesRepository(private val context: Context) {
         }
     }
 
-    suspend fun setFavoriteAlias(id: String, alias: String?) {
+    suspend fun setFavoriteAlias(uniqueId: String, alias: String?) {
         val list = getFavoritesNow().map { fav ->
-            if (fav.id == id) fav.copy(alias = alias?.takeIf { it.isNotBlank() }) else fav
+            if (fav.safeUniqueId == uniqueId) fav.copy(alias = alias?.takeIf { it.isNotBlank() }) else fav
         }
         saveFavorites(list)
     }
 
-    suspend fun setFavoriteLineFilter(id: String, lines: Set<String>?) {
+    suspend fun setFavoriteLineFilter(uniqueId: String, lines: Set<String>?) {
         val list = getFavoritesNow().map { fav ->
-            if (fav.id == id) fav.copy(filteredLines = lines) else fav
+            if (fav.safeUniqueId == uniqueId) fav.copy(filteredLines = lines) else fav
+        }
+        saveFavorites(list)
+    }
+
+    suspend fun setFavoriteTransportFilter(uniqueId: String, filter: String?) {
+        val list = getFavoritesNow().map { fav ->
+            if (fav.safeUniqueId == uniqueId) fav.copy(transportFilter = filter) else fav
+        }
+        saveFavorites(list)
+    }
+
+    suspend fun setFavoriteDirectionFilter(uniqueId: String, filter: String?) {
+        val list = getFavoritesNow().map { fav ->
+            if (fav.safeUniqueId == uniqueId) fav.copy(directionFilter = filter) else fav
         }
         saveFavorites(list)
     }
@@ -169,6 +237,20 @@ class FavoritesRepository(private val context: Context) {
     }
 
     // ── UI Einstellungen ─────────────────────────────────────────────────────
+
+    suspend fun setAllowDuplicates(allowed: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[ALLOW_DUPLICATES_KEY] = allowed
+        }
+        if (!allowed) {
+            val list = getFavoritesNow()
+            val seen = mutableSetOf<String>()
+            val cleaned = list.filter { seen.add(it.id) }
+            if (cleaned.size != list.size) {
+                saveFavorites(cleaned)
+            }
+        }
+    }
 
     val maxFavoritesFlow: Flow<Int> = context.dataStore.data
         .map { prefs -> prefs[MAX_FAV_KEY] ?: 3 }

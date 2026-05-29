@@ -13,8 +13,8 @@ android {
         applicationId = "de.dhde.hannover.departures.widget"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "1.4.0"
+        versionCode = 17
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

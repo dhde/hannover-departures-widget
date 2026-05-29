@@ -257,6 +257,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     val scope = rememberCoroutineScope()
     
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
+    val activeFavoriteUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
     val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
     val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
     
@@ -277,6 +278,15 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     var tabState by remember { mutableStateOf("ALL") }
     var directionState by remember { mutableStateOf("ALL") }
     var timeDisplayMode by remember { mutableStateOf("MIN") }
+
+    val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
+    
+    LaunchedEffect(currentFav) {
+        if (currentFav != null) {
+            tabState = currentFav.transportFilter ?: "ALL"
+            directionState = currentFav.directionFilter ?: "ALL"
+        }
+    }
 
     fun loadData(stationId: String) {
         if (isLoading) return
@@ -317,8 +327,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         }
         if (!globalTypeMatch) return@filter false
 
-        // Stations-spezifischer Linien-Filter
-        val currentFav = favorites.find { fav -> fav.id == activeStationId }
+        // Finde den aktuellen Favoriten-Eintrag (falls existent) für den Stern-Status in der Toolbar
+        val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
         val linesFilter = currentFav?.filteredLines
         if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
 
@@ -399,8 +409,18 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 tabState = tabState,
                 directionState = directionState,
                 filterHeight = filterHeight,
-                onTabChange = { tabState = it },
-                onDirChange = { directionState = it }
+                onTabChange = { 
+                    tabState = it 
+                    activeFavoriteUniqueId?.let { id ->
+                        scope.launch { repo.setFavoriteTransportFilter(id, it) }
+                    }
+                },
+                onDirChange = { 
+                    directionState = it 
+                    activeFavoriteUniqueId?.let { id ->
+                        scope.launch { repo.setFavoriteDirectionFilter(id, it) }
+                    }
+                }
             )
 
             val minutesSinceUpdate = lastUpdate?.let { java.time.Duration.between(it, java.time.Instant.now()).toMinutes() } ?: 0
@@ -431,11 +451,11 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             // Favorites Row
             WidgetFavoritesRow(
                 favorites = favorites,
-                currentStationId = activeStationId,
+                currentStationId = activeFavoriteUniqueId,
                 maxFavorites = maxFavorites,
                 maxFavRows = maxFavRows,
                 favoritesHeight = favoritesHeight,
-                onSelect = { scope.launch { repo.setActiveStation(it.id, it.name) } }
+                onSelect = { scope.launch { repo.setActiveStation(it.safeUniqueId, it.name) } }
             )
 
             // Footer
@@ -728,8 +748,8 @@ fun WidgetFavoritesRow(
                 chunk.forEach { fav ->
                     val label = fav.alias ?: fav.name.replace(Regex("\\bHannover\\b", RegexOption.IGNORE_CASE), "").replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
                     val shortLabel = if (label.length > 8) label.take(7) + "." else label
-                    val isActive = fav.id == currentStationId
-                    val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
+                    val isSelected = fav.safeUniqueId == currentStationId
+                    val bgColor = if (isSelected) Color(0xFF005A9B) else Color(0xFF2A2A2A)
 
                     Box(
                         modifier = Modifier
@@ -744,7 +764,7 @@ fun WidgetFavoritesRow(
                             text = shortLabel,
                             color = Color.White,
                             fontSize = fontSize,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1
                         )
                     }
@@ -878,7 +898,7 @@ fun SearchScreen(repo: FavoritesRepository) {
                     isActive = isActive,
                     onToggleFav = {
                         scope.launch {
-                            if (isFav) repo.removeFavorite(location.id)
+                            if (isFav) repo.removeAllFavoritesByStationId(location.id)
                             else       repo.addFavorite(location.id, location.name)
                         }
                     }
@@ -892,7 +912,8 @@ fun SearchScreen(repo: FavoritesRepository) {
 fun FavoritesScreen(repo: FavoritesRepository) {
     val scope = rememberCoroutineScope()
     val favoritesFromRepo by repo.favoritesFlow.collectAsState(initial = emptyList())
-    val activeStationId by repo.activeStationId.collectAsState(initial = null)
+    val activeFavoriteUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
+    val allowDuplicates by repo.allowDuplicatesFlow.collectAsState(initial = false)
 
     // Lokaler State für die Reihenfolge
     var listState by remember { mutableStateOf(favoritesFromRepo) }
@@ -909,8 +930,8 @@ fun FavoritesScreen(repo: FavoritesRepository) {
     
     // Sync mit Repository
     LaunchedEffect(favoritesFromRepo) {
-        val currentIds = listState.map { it.id }.toSet()
-        val repoIds = favoritesFromRepo.map { it.id }.toSet()
+        val currentIds = listState.map { it.safeUniqueId }.toSet()
+        val repoIds = favoritesFromRepo.map { it.safeUniqueId }.toSet()
         
         if (currentIds != repoIds) {
             // Elemente wurden hinzugefügt oder entfernt -> kompletter Reset
@@ -918,9 +939,9 @@ fun FavoritesScreen(repo: FavoritesRepository) {
         } else {
             // Die Elemente sind gleich. Wir updaten die Eigenschaften (Alias, Filter), 
             // behalten aber die lokale Reihenfolge von listState, um Drag&Drop nicht zu stören.
-            val repoMap = favoritesFromRepo.associateBy { it.id }
+            val repoMap = favoritesFromRepo.associateBy { it.safeUniqueId }
             listState = listState.mapNotNull { localFav ->
-                repoMap[localFav.id]
+                repoMap[localFav.safeUniqueId]
             }
         }
     }
@@ -937,15 +958,15 @@ fun FavoritesScreen(repo: FavoritesRepository) {
                 Text("Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.", color = TextSub, fontSize = 13.sp)
             }
         } else {
-            itemsIndexed(listState, key = { _, it -> it.id }) { index, fav ->
-                val isActive = fav.id == activeStationId
+            itemsIndexed(listState, key = { _, it -> it.safeUniqueId }) { index, fav ->
                 FavoriteRow(
                     fav      = fav,
-                    isActive = isActive,
-                    onSelect = { scope.launch { repo.setActiveStation(fav.id, fav.name) } },
-                    onDelete = { scope.launch { repo.removeFavorite(fav.id)         } },
-                    onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.id, alias) } },
+                    isActive = fav.safeUniqueId == activeFavoriteUniqueId,
+                    onSelect = { scope.launch { repo.setActiveStation(fav.safeUniqueId, fav.name) } },
+                    onDelete = { scope.launch { repo.removeFavoriteByUniqueId(fav.safeUniqueId)         } },
+                    onAlias  = { alias -> scope.launch { repo.setFavoriteAlias(fav.safeUniqueId, alias) } },
                     onFilter = { filterDialogFav = fav },
+                    onDuplicate = { scope.launch { repo.duplicateFavorite(fav.safeUniqueId) } },
                     onMove   = { from, to ->
                         if (from != to && from in listState.indices && to in listState.indices) {
                             val newList = listState.toMutableList()
@@ -957,12 +978,13 @@ fun FavoritesScreen(repo: FavoritesRepository) {
                     },
                     getHeight = { targetIndex ->
                         if (targetIndex in listState.indices) {
-                            itemHeights[listState[targetIndex].id] ?: 0f
+                            itemHeights[listState[targetIndex].safeUniqueId] ?: 0f
                         } else 0f
                     },
                     onHeightMeasured = { height ->
-                        itemHeights[fav.id] = height
+                        itemHeights[fav.safeUniqueId] = height
                     },
+                    allowDuplicates = allowDuplicates,
                     index = index,
                     totalCount = listState.size
                 )
@@ -1217,9 +1239,11 @@ private fun FavoriteRow(
     onDelete: () -> Unit,
     onAlias: (String?) -> Unit,
     onFilter: () -> Unit,
+    onDuplicate: () -> Unit,
     onMove: (Int, Int) -> Unit,
     getHeight: (Int) -> Float,
     onHeightMeasured: (Float) -> Unit,
+    allowDuplicates: Boolean,
     index: Int,
     totalCount: Int
 ) {
@@ -1321,6 +1345,22 @@ private fun FavoriteRow(
                     }
             )
             
+            if (allowDuplicates) {
+                val hash = fav.id.hashCode()
+                val favColor = Color(
+                    red = ((hash and 0xFF0000) shr 16) / 255f * 0.5f + 0.5f,
+                    green = ((hash and 0x00FF00) shr 8) / 255f * 0.5f + 0.5f,
+                    blue = (hash and 0x0000FF) / 255f * 0.5f + 0.5f
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(end = 12.dp)
+                        .size(10.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(favColor)
+                )
+            }
+            
             Column(Modifier.weight(1f)) {
                 // Remove "Hannover " prefix if there is no alias, to save space
                 val cleanName = fav.name.removePrefix("Hannover ").trim()
@@ -1347,14 +1387,37 @@ private fun FavoriteRow(
                 }
             }
 
-            IconButton(onClick = { showAliasDialog = true }) {
-                Icon(Icons.Default.Edit, null, tint = Teal, modifier = Modifier.size(20.dp))
-            }
-            IconButton(onClick = onFilter) {
-                Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) Color(0xFFFFD700) else Teal, modifier = Modifier.size(20.dp))
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, null, tint = Red, modifier = Modifier.size(20.dp))
+            if (allowDuplicates) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Row {
+                        IconButton(onClick = { showAliasDialog = true }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Edit, "Alias bearbeiten", tint = Teal, modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(onClick = onFilter, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) Color(0xFFFFD700) else Teal, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    Row {
+                        IconButton(onClick = onDuplicate, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Add, "Duplizieren", tint = Teal, modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Delete, "Löschen", tint = Red, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = { showAliasDialog = true }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Edit, "Alias bearbeiten", tint = Teal, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = onFilter, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) Color(0xFFFFD700) else Teal, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Delete, "Löschen", tint = Red, modifier = Modifier.size(20.dp))
+                    }
+                }
             }
         }
     }
@@ -1431,6 +1494,28 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
     val maxGroupedDeparturesFlow by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
     val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
+    val allowDuplicates by repo.allowDuplicatesFlow.collectAsState(initial = false)
+    
+    var showDuplicatesWarning by remember { mutableStateOf(false) }
+
+    if (showDuplicatesWarning) {
+        AlertDialog(
+            onDismissRequest = { showDuplicatesWarning = false },
+            title = { Text("Warnung", color = Red) },
+            text = { Text("Achtung: Wenn du diese Option ausschaltest, werden alle mehrfach angelegten Haltestellen gelöscht. Möchtest du fortfahren?", color = TextMain) },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { repo.setAllowDuplicates(false) }
+                    showDuplicatesWarning = false
+                }) { Text("Deaktivieren", color = Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDuplicatesWarning = false }) { Text("Abbrechen", color = TextSub) }
+            },
+            containerColor = CardBg,
+            titleContentColor = Teal
+        )
+    }
     
     var localMaxFavs by remember(maxFavsFlow) { mutableStateOf(maxFavsFlow.toFloat()) }
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
@@ -1824,9 +1909,54 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 }
             }
         }
+
+        item { SectionLabel("Experimentelle Funktionen") }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (allowDuplicates) {
+                                    showDuplicatesWarning = true
+                                } else {
+                                    scope.launch { repo.setAllowDuplicates(true) }
+                                }
+                            }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Haltestellen duplizieren", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(
+                                "Erlaubt es, dieselbe Haltestelle mehrfach anzulegen, um unterschiedliche Filter (z.B. Richtung Home / City) zu speichern.",
+                                color = TextSub, fontSize = 12.sp, lineHeight = 18.sp
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = allowDuplicates,
+                            onCheckedChange = {
+                                if (!it) {
+                                    showDuplicatesWarning = true
+                                } else {
+                                    scope.launch { repo.setAllowDuplicates(true) }
+                                }
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
+                        )
+                    }
+                }
+            }
+        }
     }
     
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, groupDepartures, maxGroupedDeparturesFlow, groupedFontSize) {
+    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, groupDepartures, maxGroupedDeparturesFlow, groupedFontSize, allowDuplicates) {
         de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }
@@ -1907,7 +2037,7 @@ fun LineFilterDialog(
                     scope.launch {
                         // Speichere null, falls alle verfügbaren Linien markiert sind (kein Filter)
                         val filterToSave = if (selectedLines.containsAll(availableLines)) null else selectedLines
-                        repo.setFavoriteLineFilter(fav.id, filterToSave)
+                        repo.setFavoriteLineFilter(fav.safeUniqueId, filterToSave)
                         onDismiss()
                     }
                 },
