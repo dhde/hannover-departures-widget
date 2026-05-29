@@ -724,7 +724,6 @@ class DeparturesWidget : GlanceAppWidget() {
         val hasH = departures.any { it.lineId?.endsWith("H") == true }
         val hasR = departures.any { it.lineId?.endsWith("R") == true }
         val showDirectionGroup = hasH || hasR
-        val showAllToggle = hasH && hasR
 
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -732,16 +731,12 @@ class DeparturesWidget : GlanceAppWidget() {
         ) {
             // --- Gruppe VEHICLE (Links-bündig) ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "BUS", Color(0xFFE94560), filterHeight) { 
+                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "ALL" || tabState == "BUS", Color(0xFFE94560), filterHeight) { 
                      actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "BUS")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { 
+                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "ALL" || tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { 
                      actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "TRAIN")) 
-                }
-                Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(R.drawable.ic_widget_all, null, tabState == "ALL", Color(0xFF555555), filterHeight) { 
-                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "ALL")) 
                 }
             }
 
@@ -752,20 +747,14 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showDirectionGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasH) {
-                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "H", Color(0xFF0F7173), filterHeight) { 
+                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "ALL" || directionState == "H", Color(0xFF0F7173), filterHeight) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "H")) 
                         }
-                        Spacer(modifier = GlanceModifier.width(2.dp))
+                        if (hasR) Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (hasR) {
-                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "R", Color(0xFFE94560), filterHeight) { 
+                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "ALL" || directionState == "R", Color(0xFFE94560), filterHeight) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "R")) 
-                        }
-                        Spacer(modifier = GlanceModifier.width(2.dp))
-                    }
-                    if (showAllToggle) {
-                        SegmentButton(R.drawable.ic_widget_swap, null, directionState == "ALL", Color(0xFF555555), filterHeight) { 
-                            actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "ALL")) 
                         }
                     }
                 }
