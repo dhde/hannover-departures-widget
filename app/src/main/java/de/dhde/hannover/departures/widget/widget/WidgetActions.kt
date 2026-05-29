@@ -124,8 +124,14 @@ class ChangeTabAction : ActionCallback {
     ) {
         val targetTab = parameters[KEY_TAB] ?: "ALL"
         val cache = DeparturesCache(context)
-        val stationId = FavoritesRepository(context).getActiveStationIdNow()
+        val repo = FavoritesRepository(context)
+        val stationId = repo.getActiveStationIdNow()
+        val uniqueId = repo.getActiveFavoriteUniqueIdNow()
+        
         cache.setTabState(stationId, targetTab)
+        if (uniqueId != null) {
+            repo.setFavoriteTransportFilter(uniqueId, targetTab)
+        }
         
         // Sofortiges UI-Feedback für den Tab-Wechsel
         DeparturesWidget().updateAll(context)
@@ -147,7 +153,7 @@ class ChangeStationAction : ActionCallback {
         parameters: ActionParameters
     ) {
         val repo = FavoritesRepository(context)
-        val currentId = repo.getActiveStationIdNow()
+        val currentId = repo.getActiveFavoriteUniqueIdNow() ?: repo.getActiveStationIdNow()
         val favorites = repo.getFavoritesNow()
         
         val targetIndex = parameters[KEY_TARGET_INDEX]
@@ -156,13 +162,13 @@ class ChangeStationAction : ActionCallback {
         if (favorites.isNotEmpty()) {
             if (targetIndex != null && targetIndex in favorites.indices) {
                 val fav = favorites[targetIndex]
-                repo.setActiveStation(fav.id, fav.name)
+                repo.setActiveStation(fav.safeUniqueId, fav.name)
             } else if (cycleRemaining) {
                 val maxFavorites = repo.maxFavoritesFlow.first()
                 val maxFavRows = repo.maxFavRowsFlow.first()
                 val maxVisible = maxFavorites * maxFavRows
                 if (favorites.size > maxVisible) {
-                    var currentIndex = favorites.indexOfFirst { it.id == currentId }
+                    var currentIndex = favorites.indexOfFirst { it.safeUniqueId == currentId }
                     if (currentIndex < maxVisible) {
                         currentIndex = maxVisible
                     } else {
@@ -170,13 +176,13 @@ class ChangeStationAction : ActionCallback {
                         if (currentIndex >= favorites.size) currentIndex = maxVisible
                     }
                     val fav = favorites[currentIndex]
-                    repo.setActiveStation(fav.id, fav.name)
+                    repo.setActiveStation(fav.safeUniqueId, fav.name)
                 }
             } else {
-                val currentIndex = favorites.indexOfFirst { it.id == currentId }
-                val nextIndex = if (currentIndex == -1 || currentIndex >= favorites.size - 1) 0 else currentIndex + 1
-                val fav = favorites[nextIndex]
-                repo.setActiveStation(fav.id, fav.name)
+                val currentIndex = favorites.indexOfFirst { it.safeUniqueId == currentId }
+                val nextIndex = (currentIndex + 1) % favorites.size
+                val nextFav = favorites[nextIndex]
+                repo.setActiveStation(nextFav.safeUniqueId, nextFav.name)
             }
             
             DeparturesCache(context).setGpsMode(false)
@@ -197,8 +203,14 @@ class ChangeDirectionAction : ActionCallback {
     ) {
         val targetDirection = parameters[KEY_DIRECTION] ?: "ALL"
         val cache = DeparturesCache(context)
-        val stationId = FavoritesRepository(context).getActiveStationIdNow()
+        val repo = FavoritesRepository(context)
+        val stationId = repo.getActiveStationIdNow()
+        val uniqueId = repo.getActiveFavoriteUniqueIdNow()
+        
         cache.setDirectionState(stationId, targetDirection)
+        if (uniqueId != null) {
+            repo.setFavoriteDirectionFilter(uniqueId, targetDirection)
+        }
         
         // Sofortiges UI-Feedback für Richtungswechsel
         DeparturesWidget().updateAll(context)

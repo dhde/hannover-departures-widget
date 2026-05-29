@@ -106,6 +106,7 @@ class DeparturesWidget : GlanceAppWidget() {
             
             val stationNameState by repo.effectiveStationName.collectAsState(initial = "Laden...")
             val stationName = stationNameState
+            val activeFavUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
 
             val tabState by cache.getTabStateFlow(stationId).collectAsState(initial = "ALL")
             val directionState by cache.getDirectionStateFlow(stationId).collectAsState(initial = "ALL")
@@ -172,7 +173,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 filterHeight     = filterHeight,
                 groupDepartures  = groupDepartures,
                 maxGroupedDepartures = maxGroupedDepartures,
-                groupedFontSize  = groupedFontSize
+                groupedFontSize  = groupedFontSize,
+                activeFavUniqueId = activeFavUniqueId
             )
         }
     }
@@ -201,7 +203,8 @@ class DeparturesWidget : GlanceAppWidget() {
         filterHeight: String,
         groupDepartures: Boolean,
         maxGroupedDepartures: Int,
-        groupedFontSize: String = "STANDARD"
+        groupedFontSize: String = "STANDARD",
+        activeFavUniqueId: String? = null
     ) {
         Box(
             modifier = GlanceModifier
@@ -227,8 +230,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
                 if (!globalTypeMatch) return@filter false
 
-                // Stations-spezifischer Linien-Filter
-                val currentFav = favorites.find { fav -> fav.id == stationId }
+                // Stations-spezifischer Linien-Filter (nach uniqueId des aktiven Duplikats)
+                val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavUniqueId }
                 val linesFilter = currentFav?.filteredLines
                 if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
 
@@ -315,7 +318,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
             }
 
-            FavoritesRow(favorites, stationId, maxFavorites, maxFavRows, favoritesHeight)
+            FavoritesRow(favorites, activeFavUniqueId ?: stationId, maxFavorites, maxFavRows, favoritesHeight)
             Footer(lastUpdated, isStale)
         }
     }
@@ -452,7 +455,7 @@ class DeparturesWidget : GlanceAppWidget() {
                                 .split(" ")
                                 .firstOrNull() ?: fav.name
                         val shortLabel = if (label.length > 8) label.take(7) + "." else label
-                        val isActive = fav.id == currentStationId
+                        val isActive = fav.safeUniqueId == currentStationId
                         val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
 
                         Box(
@@ -481,7 +484,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
                     val isLastRow = rowIndex == maxFavRows - 1
                     if (isLastRow && needsCycle) {
-                        val isRemainingActive = favorites.drop(maxVisible).any { it.id == currentStationId }
+                        val isRemainingActive = favorites.drop(maxVisible).any { it.safeUniqueId == currentStationId }
                         val bgColor = if (isRemainingActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
                         Box(
                             modifier = GlanceModifier
