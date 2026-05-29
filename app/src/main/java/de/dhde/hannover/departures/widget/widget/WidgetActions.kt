@@ -128,9 +128,12 @@ class ChangeTabAction : ActionCallback {
         val stationId = repo.getActiveStationIdNow()
         val uniqueId = repo.getActiveFavoriteUniqueIdNow()
         
-        cache.setTabState(stationId, targetTab)
+        val currentTab = cache.getTabState(stationId)
+        val newTab = if (currentTab == targetTab) "ALL" else targetTab
+        
+        cache.setTabState(stationId, newTab)
         if (uniqueId != null) {
-            repo.setFavoriteTransportFilter(uniqueId, targetTab)
+            repo.setFavoriteTransportFilter(uniqueId, newTab)
         }
         
         // Sofortiges UI-Feedback für den Tab-Wechsel
@@ -207,9 +210,12 @@ class ChangeDirectionAction : ActionCallback {
         val stationId = repo.getActiveStationIdNow()
         val uniqueId = repo.getActiveFavoriteUniqueIdNow()
         
-        cache.setDirectionState(stationId, targetDirection)
+        val currentDirection = cache.getDirectionState(stationId)
+        val newDirection = if (currentDirection == targetDirection) "ALL" else targetDirection
+        
+        cache.setDirectionState(stationId, newDirection)
         if (uniqueId != null) {
-            repo.setFavoriteDirectionFilter(uniqueId, targetDirection)
+            repo.setFavoriteDirectionFilter(uniqueId, newDirection)
         }
         
         // Sofortiges UI-Feedback für Richtungswechsel

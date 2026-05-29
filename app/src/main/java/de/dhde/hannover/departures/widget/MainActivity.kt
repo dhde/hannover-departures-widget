@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.zIndex
@@ -269,6 +271,10 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
     val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
     
+    val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
+    val maxGroupedDepartures by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
+    val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
+    
     var departures by remember { mutableStateOf<List<FlatDeparture>>(emptyList()) }
     var rawDepartures by remember { mutableStateOf<List<de.dhde.hannover.departures.widget.api.DepartureItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -426,11 +432,33 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             val minutesSinceUpdate = lastUpdate?.let { java.time.Duration.between(it, java.time.Instant.now()).toMinutes() } ?: 0
             val isWarning = minutesSinceUpdate >= 10
 
+            // Gruppieren der Abfahrten (wie im Widget)
+            val groupedList = mutableListOf<Pair<FlatDeparture, List<FlatDeparture>>>()
+            if (groupDepartures) {
+                val groupedMap = mutableMapOf<String, MutableList<FlatDeparture>>()
+                for (dep in filtered) {
+                    val key = "${dep.lineShort}|${dep.destination}"
+                    groupedMap.getOrPut(key) { mutableListOf() }.add(dep)
+                }
+                for (group in groupedMap.values) {
+                    val mainDep = group.first()
+                    val subDeps = group.drop(1).take(maxGroupedDepartures)
+                    groupedList.add(mainDep to subDeps)
+                }
+                groupedList.sortBy { it.first.departureTime }
+            } else {
+                for (dep in filtered) {
+                    groupedList.add(dep to emptyList())
+                }
+            }
+
+            val limitedFiltered = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
+
             // List
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(filtered.take(maxRows)) { dep ->
-                        WidgetFlatDepartureRow(dep, timeDisplayMode, isWarning, onInfoClick = onInfoClick)
+                    items(limitedFiltered) { (dep, subDeps) ->
+                        WidgetFlatDepartureRow(dep, subDeps, timeDisplayMode, isWarning, groupedFontSize, onInfoClick = onInfoClick)
                     }
                 }
                 // Invisible box to toggle time display mode
@@ -548,9 +576,9 @@ fun WidgetFilterRow(
     ) {
         // Vehicle Type Filters
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "BUS", Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
+            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "ALL" || tabState == "BUS", Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
             Spacer(modifier = Modifier.width(4.dp))
-            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
+            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "ALL" || tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -559,15 +587,11 @@ fun WidgetFilterRow(
         if (hasH || hasR) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasH) {
-                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "H", Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == "H") "ALL" else "H") }
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                if (hasH && hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_all, directionState == "ALL", Color.Gray, filterHeight) { onDirChange("ALL") }
-                    Spacer(modifier = Modifier.width(4.dp))
+                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "ALL" || directionState == "H", Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == "H") "ALL" else "H") }
+                    if (hasR) Spacer(modifier = Modifier.width(4.dp))
                 }
                 if (hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "R", Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == "R") "ALL" else "R") }
+                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "ALL" || directionState == "R", Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == "R") "ALL" else "R") }
                 }
             }
         }
@@ -602,7 +626,14 @@ fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, fil
 }
 
 @Composable
-fun WidgetFlatDepartureRow(dep: FlatDeparture, timeDisplayMode: String, isWarning: Boolean, onInfoClick: (InfoDialogData) -> Unit = {}) {
+fun WidgetFlatDepartureRow(
+    dep: FlatDeparture, 
+    subsequentDepartures: List<FlatDeparture> = emptyList(),
+    timeDisplayMode: String, 
+    isWarning: Boolean, 
+    groupedFontSize: String = "STANDARD",
+    onInfoClick: (InfoDialogData) -> Unit = {}
+) {
     val rowBgColor = when {
         dep.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
         dep.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
@@ -661,16 +692,46 @@ fun WidgetFlatDepartureRow(dep: FlatDeparture, timeDisplayMode: String, isWarnin
                 hasDelay -> Color(0xFFFF9800)
                 else -> Color(0xFF4CAF50)
             }
-            
-            val fontStyle = if (isWarning) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = finalTimeText,
+                    color = timeColor,
+                    fontSize = 14.sp,
+                    fontWeight = if (isWarning) FontWeight.Normal else FontWeight.Bold,
+                    fontStyle = if (isWarning) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+                )
 
-            Text(
-                text = finalTimeText,
-                color = timeColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontStyle = fontStyle
-            )
+                if (subsequentDepartures.isNotEmpty()) {
+                    val subFontSize = when (groupedFontSize) {
+                        "KLEIN"  -> 9.sp
+                        "GROSS"  -> 13.sp
+                        else     -> 10.sp
+                    }
+                    val subText = subsequentDepartures.joinToString(", ") { subDep ->
+                        var t = if (timeDisplayMode == "CLOCK") {
+                            try {
+                                java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                                    .withZone(java.time.ZoneId.systemDefault())
+                                    .format(java.time.Instant.parse(subDep.departureTime))
+                            } catch (e: Exception) { "--:--" }
+                        } else {
+                            try {
+                                val dTime = java.time.Instant.parse(subDep.departureTime)
+                                val m = java.time.Duration.between(java.time.Instant.now(), dTime).toMinutes()
+                                if (m <= 0) "0m" else "${m}m"
+                            } catch (e: Exception) { "?" }
+                        }
+                        if (subDep.isCancelled) t = t.map { it + "\u0336" }.joinToString("")
+                        t
+                    }
+                    Text(
+                        text = subText,
+                        color = Color.Gray,
+                        fontSize = subFontSize,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+            }
         }
 
         if (dep.isCancelled) {
@@ -687,6 +748,75 @@ fun WidgetFlatDepartureRow(dep: FlatDeparture, timeDisplayMode: String, isWarnin
                 )
             }
         }
+    }
+}
+
+@Composable
+fun DuplicateBlob(name: String, modifier: Modifier = Modifier) {
+    val hash = name.hashCode()
+    // Generate a vibrant color from the hash
+    val color = Color(
+        red = ((hash shr 16) and 0xFF) / 255f * 0.6f + 0.4f,
+        green = ((hash shr 8) and 0xFF) / 255f * 0.6f + 0.4f,
+        blue = (hash and 0xFF) / 255f * 0.6f + 0.4f
+    )
+    
+    // Generate a pseudo-random shape based on the hash
+    val random = java.util.Random(hash.toLong())
+    
+    Canvas(
+        modifier = modifier
+            .padding(end = 12.dp)
+            .size(16.dp)
+    ) {
+        val width = size.width
+        val height = size.height
+        
+        // Base radius is slightly smaller to allow for "blobbiness"
+        val radius = minOf(width, height) / 2f * 0.8f
+        val center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f)
+        
+        val numPoints = 6
+        val points = mutableListOf<androidx.compose.ui.geometry.Offset>()
+        
+        for (i in 0 until numPoints) {
+            val angle = (i.toFloat() / numPoints) * 2f * Math.PI
+            // Vary the radius by up to +/- 20%
+            val variance = (random.nextFloat() * 0.4f - 0.2f)
+            val r = radius * (1f + variance)
+            
+            val x = center.x + r * kotlin.math.cos(angle).toFloat()
+            val y = center.y + r * kotlin.math.sin(angle).toFloat()
+            points.add(androidx.compose.ui.geometry.Offset(x, y))
+        }
+        
+        val path = Path()
+        path.moveTo(points[0].x, points[0].y)
+        
+        for (i in 0 until numPoints) {
+            val p0 = points[(i - 1 + numPoints) % numPoints]
+            val p1 = points[i]
+            val p2 = points[(i + 1) % numPoints]
+            val p3 = points[(i + 2) % numPoints]
+            
+            // Catmull-Rom to Bezier conversion for smooth curves
+            val tension = 0.2f
+            
+            val cp1x = p1.x + (p2.x - p0.x) * tension
+            val cp1y = p1.y + (p2.y - p0.y) * tension
+            
+            val cp2x = p2.x - (p3.x - p1.x) * tension
+            val cp2y = p2.y - (p3.y - p1.y) * tension
+            
+            path.cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+        }
+        
+        path.close()
+        
+        drawPath(
+            path = path,
+            color = color
+        )
     }
 }
 
@@ -1346,19 +1476,7 @@ private fun FavoriteRow(
             )
             
             if (allowDuplicates) {
-                val hash = fav.id.hashCode()
-                val favColor = Color(
-                    red = ((hash and 0xFF0000) shr 16) / 255f * 0.5f + 0.5f,
-                    green = ((hash and 0x00FF00) shr 8) / 255f * 0.5f + 0.5f,
-                    blue = (hash and 0x0000FF) / 255f * 0.5f + 0.5f
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(end = 12.dp)
-                        .size(10.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(favColor)
-                )
+                DuplicateBlob(name = fav.name)
             }
             
             Column(Modifier.weight(1f)) {
