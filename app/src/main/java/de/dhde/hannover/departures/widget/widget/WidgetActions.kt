@@ -72,14 +72,20 @@ class RefreshAction : ActionCallback {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
                                 
                                 // Extract and track messages
-                                val msgs = buildList {
-                                    departures.forEach { dep ->
-                                        dep.infos?.forEach { it.content?.let { c -> add(c) } }
-                                        dep.hints?.forEach { it.content?.let { c -> add(c) } }
-                                    }
+                                val msgsWithTypes = mutableMapOf<String, MutableSet<String>>()
+                                departures.forEach { dep ->
+                                    val types = mutableSetOf<String>()
+                                    if (dep.isBus) types.add("Bus")
+                                    if (dep.isTram) types.add("Stadtbahn")
+                                    if (dep.isTrain) types.add("S-Bahn")
+                                    if (dep.isDB) types.add("DB")
+                                    if (dep.isFernbus) types.add("Fernbus")
+                                    
+                                    dep.infos?.forEach { it.content?.let { c -> msgsWithTypes.getOrPut(c) { mutableSetOf() }.addAll(types) } }
+                                    dep.hints?.forEach { it.content?.let { c -> msgsWithTypes.getOrPut(c) { mutableSetOf() }.addAll(types) } }
                                 }
-                                if (msgs.isNotEmpty()) {
-                                    repo.trackMessages(msgs)
+                                if (msgsWithTypes.isNotEmpty()) {
+                                    repo.trackMessages(msgsWithTypes)
                                 }
                                 
                                 true // Signal success

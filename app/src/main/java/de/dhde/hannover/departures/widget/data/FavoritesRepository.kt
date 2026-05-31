@@ -28,7 +28,8 @@ data class FavoriteStation(
 
 data class SeenMessageEntry(
     val count: Int,
-    val lastSeenMillis: Long
+    val lastSeenMillis: Long,
+    val transportTypes: Set<String> = emptySet()
 )
 
 /** Persistiert Favoriten-Haltestellen und die aktive Widget-Station. */
@@ -45,7 +46,7 @@ class FavoritesRepository(private val context: Context) {
         val MAX_FAV_KEY          = intPreferencesKey("max_favorites_widget")
         val MAX_FAV_ROWS_KEY     = intPreferencesKey("max_fav_rows_widget")
         val MAX_ROWS_KEY         = intPreferencesKey("max_rows_widget")
-        val TRANSPORT_TYPES_KEY  = stringSetPreferencesKey("transport_types_filter")
+        val TRANSPORT_TYPES_KEY  = stringSetPreferencesKey("transport_types_filter_v2")
         val IGNORED_MESSAGES_KEY = stringSetPreferencesKey("ignored_messages_filter")
         val FAVORITES_HEIGHT_KEY = stringPreferencesKey("favorites_buttons_height")
         val FILTER_HEIGHT_KEY    = stringPreferencesKey("filter_buttons_height")
@@ -276,7 +277,7 @@ class FavoritesRepository(private val context: Context) {
     // ── Verkehrsmittel Filter ────────────────────────────────────────────────
 
     val transportTypesFlow: Flow<Set<String>> = context.dataStore.data
-        .map { prefs -> prefs[TRANSPORT_TYPES_KEY] ?: setOf("Stadtbahn", "Bus", "S-Bahn") }
+        .map { prefs -> prefs[TRANSPORT_TYPES_KEY] ?: setOf("Stadtbahn", "Bus", "S-Bahn", "DB") }
 
     suspend fun setTransportTypes(types: Set<String>) {
         context.dataStore.edit { prefs -> prefs[TRANSPORT_TYPES_KEY] = types }
@@ -334,7 +335,7 @@ class FavoritesRepository(private val context: Context) {
         }
     }
 
-    suspend fun trackMessages(messages: List<String>) {
+    suspend fun trackMessages(messagesWithTypes: Map<String, Set<String>>) {
         val now = System.currentTimeMillis()
         val twoDaysMillis = 2 * 24 * 60 * 60 * 1000L
 
@@ -370,14 +371,18 @@ class FavoritesRepository(private val context: Context) {
             }
 
             // Add new messages
-            for (msg in messages) {
+            for ((msg, types) in messagesWithTypes) {
                 val cleanMsg = msg.trim()
                 if (cleanMsg.isNotEmpty()) {
-                    val currentCount = entries[cleanMsg]?.count ?: 0
-                    // Cap the count at 20
+                    val currentEntry = entries[cleanMsg]
+                    val currentCount = currentEntry?.count ?: 0
+                    val currentTypes = currentEntry?.transportTypes ?: emptySet()
+                    
+                    // Cap the count at 10000
                     entries[cleanMsg] = SeenMessageEntry(
-                        count = minOf(currentCount + 1, 20),
-                        lastSeenMillis = now
+                        count = minOf(currentCount + 1, 10000),
+                        lastSeenMillis = now,
+                        transportTypes = currentTypes + types
                     )
                     changed = true
                 }

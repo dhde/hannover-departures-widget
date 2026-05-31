@@ -23,7 +23,37 @@ data class DepartureItem(
     @SerializedName("hints") val hints: List<DepartureHint>? = null
 ) {
     // Hilfsabfragen für das UI-Filtering
+    val isFernbus: Boolean get() {
+        val s = lineShort.uppercase()
+        // Nur explizit als Fernbus identifizierbare Linien (FLX = FlixBus)
+        return s.startsWith("FLX") ||
+               line?.contains("Fernbus", ignoreCase = true) == true ||
+               lineId?.contains("flx%3A", ignoreCase = true) == true ||
+               lineId?.contains("flx:", ignoreCase = true) == true
+    }
+    
+    val isDB: Boolean get() {
+        val s = lineShort.uppercase()
+        // Wenn es explizit eine S-Bahn ist, ist es nicht "DB" im Sinne des Filters
+        if (s.startsWith("S") && s.length <= 2 && s.toIntOrNull() == null) return false
+        if (line?.contains("S-Bahn", ignoreCase = true) == true) return false
+        // Priorität: lineId-Präfix prüfen
+        val idMatch = lineId?.contains("ddb%3A", ignoreCase = true) == true ||
+               lineId?.contains("ddb:", ignoreCase = true) == true ||
+               lineId?.contains("db%3A", ignoreCase = true) == true ||
+               lineId?.contains("db:", ignoreCase = true) == true ||
+               lineId?.contains("met%3A", ignoreCase = true) == true ||
+               lineId?.contains("erx%3A", ignoreCase = true) == true
+        if (idMatch) return true
+        // Fallback: Linienbezeichner
+        return s.startsWith("RE") || s.startsWith("RB") ||
+               s.startsWith("IC") || s.startsWith("EC") || s.startsWith("EN") ||
+               s.startsWith("TGV") ||
+               line?.contains("Regionalbahn", ignoreCase = true) == true
+    }
+
     val isBus: Boolean get() {
+        if (isFernbus || isDB) return false
         val s = lineShort.uppercase()
         // Busse haben oft Nummern >= 100 oder fangen mit N an, oder enthalten explizit "Bus"
         return line?.contains("Bus", ignoreCase = true) == true || 
@@ -38,12 +68,11 @@ data class DepartureItem(
                s == "E"
     }
     val isTrain: Boolean get() {
+        if (isDB || isFernbus) return false
         val s = lineShort.uppercase()
-        // S-Bahn, Regionalexpress, Regionalbahn
+        // Nur noch reine S-Bahnen
         return line?.contains("S-Bahn", ignoreCase = true) == true ||
-               line?.contains("Regionalbahn", ignoreCase = true) == true ||
-               line?.contains("Express", ignoreCase = true) == true ||
-               s.startsWith("S") || s.startsWith("RE") || s.startsWith("RB")
+               (s.startsWith("S") && s.length <= 2)
     }
     
     // Die nächste verfügbare Abfahrtszeit (Echtzeit bevorzugt, abgelaufene Events überspringen)
@@ -90,6 +119,8 @@ data class FlatDeparture(
     val isBus: Boolean,
     val isTram: Boolean,
     val isTrain: Boolean,
+    val isDB: Boolean,
+    val isFernbus: Boolean,
     val departureTime: String,   // Echtzeit, falls vorhanden, sonst Planzeit
     val plannedTime: String?,
     val estimatedTime: String?,
@@ -115,7 +146,7 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
             } else null
             FlatDeparture(
                 line = line, lineId = lineId, destination = destination?.removePrefix("Hannover/")?.trim(), number = number,
-                isBus = isBus, isTram = isTram, isTrain = isTrain,
+                isBus = isBus, isTram = isTram, isTrain = isTrain, isDB = isDB, isFernbus = isFernbus,
                 departureTime = dept,
                 plannedTime = event.plannedTime,
                 estimatedTime = event.estimatedTime,
