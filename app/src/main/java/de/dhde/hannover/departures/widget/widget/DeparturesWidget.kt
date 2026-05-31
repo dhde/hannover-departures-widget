@@ -221,12 +221,14 @@ class DeparturesWidget : GlanceAppWidget() {
                     .padding(8.dp)
             ) {
             val filtered = flatDepartures.filter {
-                // Globaler Transport-Filter
+                val isAnyTypeExcluded = transportFilters.size < 5
                 val globalTypeMatch = when {
+                    it.isFernbus -> "Fernbus" in transportFilters
+                    it.isDB -> "DB" in transportFilters
                     it.isBus -> "Bus" in transportFilters
                     it.isTram -> "Stadtbahn" in transportFilters
                     it.isTrain -> "S-Bahn" in transportFilters
-                    else -> true
+                    else -> !isAnyTypeExcluded
                 }
                 if (!globalTypeMatch) return@filter false
 
@@ -252,13 +254,17 @@ class DeparturesWidget : GlanceAppWidget() {
                 dep.copy(messages = filterMessages(dep.messages, ignoredMessages))
             }.filter { it.messages.isNotEmpty() }
             val hasMessages = messagesDeps.isNotEmpty()
-            val groupedMessages = if (hasMessages) {
+            val groupedMessagesMap = if (hasMessages) {
                 messagesDeps.groupBy { it.lineShort }
-                    .map { (line, deps) -> "Linie $line:\n" + deps.flatMap { it.messages }.distinct().joinToString("\n") }
-                    .joinToString("\n\n")
-            } else ""
+                    .map { (line, deps) -> listOf(line, deps.flatMap { it.messages }.distinct()) }
+            } else emptyList()
+            val groupedMessages = groupedMessagesMap
+                .joinToString("\n\n") { item ->
+                    "Linie ${item[0]}:\n" + (item[1] as List<*>).joinToString("\n")
+                }
+            val groupedMessagesJson = com.google.gson.Gson().toJson(groupedMessagesMap)
 
-            Header(stationName, gpsModeActive, isRefreshing, hasMessages, groupedMessages)
+            Header(stationName, gpsModeActive, isRefreshing, hasMessages, groupedMessages, groupedMessagesJson)
             
             FilterSegmentedRow(departures, tabState, directionState, filterHeight)
 
@@ -348,7 +354,7 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Header(stationName: String, gpsModeActive: Boolean, isRefreshing: Boolean, hasMessages: Boolean = false, groupedMessages: String = "") {
+    private fun Header(stationName: String, gpsModeActive: Boolean, isRefreshing: Boolean, hasMessages: Boolean = false, groupedMessages: String = "", groupedMessagesJson: String = "") {
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -359,6 +365,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra("info_title", "Meldungen: $stationName")
                     putExtra("info_msgs", groupedMessages)
+                    putExtra("info_msgs_json", groupedMessagesJson)
                 }
                 Box(
                     modifier = GlanceModifier
@@ -701,9 +708,10 @@ class DeparturesWidget : GlanceAppWidget() {
             }
         }
 
+        val width = if (line.length >= 4) 42.dp else 34.dp
         Box(
             modifier = GlanceModifier
-                .width(34.dp).height(24.dp)
+                .width(width).height(24.dp)
                 .background(ColorProvider(bgColor)),
             contentAlignment = Alignment.Center
         ) {
@@ -714,6 +722,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 ),
+                maxLines = 1,
                 modifier = GlanceModifier.padding(horizontal = 2.dp)
             )
         }
@@ -731,11 +740,11 @@ class DeparturesWidget : GlanceAppWidget() {
         ) {
             // --- Gruppe VEHICLE (Links-bündig) ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "ALL" || tabState == "BUS", Color(0xFFE94560), filterHeight) { 
+                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "BUS", Color(0xFFE94560), filterHeight) { 
                      actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "BUS")) 
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "ALL" || tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { 
+                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { 
                      actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "TRAIN")) 
                 }
             }
@@ -747,13 +756,13 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showDirectionGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasH) {
-                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "ALL" || directionState == "H", Color(0xFF0F7173), filterHeight) { 
+                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "H", Color(0xFF0F7173), filterHeight) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "H")) 
                         }
                         if (hasR) Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (hasR) {
-                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "ALL" || directionState == "R", Color(0xFFE94560), filterHeight) { 
+                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "R", Color(0xFFE94560), filterHeight) { 
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "R")) 
                         }
                     }

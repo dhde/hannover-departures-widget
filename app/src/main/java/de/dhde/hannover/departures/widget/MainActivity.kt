@@ -37,6 +37,8 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -53,7 +55,7 @@ import kotlin.math.roundToInt
 
 import android.content.Intent
 
-data class InfoDialogData(val title: String, val msgs: String)
+data class InfoDialogData(val title: String, val msgs: String? = null, val groupedMsgs: List<Pair<String, List<String>>>? = null)
 
 class MainActivity : ComponentActivity() {
 
@@ -96,6 +98,9 @@ class MainActivity : ComponentActivity() {
                     onSurface      = Color(0xFFE0E0E0),
                 )
             ) {
+                val scope = rememberCoroutineScope()
+                val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
+                
                 ConfigurationScreen(repo, onInfoClick = { infoDialogState = it })
                 
                 infoDialogState?.let { data ->
@@ -123,13 +128,52 @@ class MainActivity : ComponentActivity() {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 
                                 val scrollState = rememberScrollState()
-                                Text(
-                                    text = data.msgs,
-                                    color = Color(0xFFE0E0E0),
-                                    fontSize = 16.sp,
-                                    lineHeight = 24.sp,
+                                Column(
                                     modifier = Modifier.weight(1f).verticalScroll(scrollState)
-                                )
+                                ) {
+                                    if (data.msgs != null) {
+                                        Text(
+                                            text = data.msgs,
+                                            color = Color(0xFFE0E0E0),
+                                            fontSize = 16.sp,
+                                            lineHeight = 24.sp
+                                        )
+                                    } else if (data.groupedMsgs != null) {
+                                        data.groupedMsgs.forEach { (line, lineMsgs) ->
+                                            Text(
+                                                text = "Linie $line:",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                            )
+                                            lineMsgs.forEach { msg ->
+                                                val isIgnored = msg in ignoredMessages
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                                    verticalAlignment = Alignment.Top
+                                                ) {
+                                                    Text(
+                                                        text = msg,
+                                                        color = if (isIgnored) Color.Gray else Color(0xFFE0E0E0),
+                                                        fontSize = 14.sp,
+                                                        lineHeight = 20.sp,
+                                                        modifier = Modifier.weight(1f).padding(top = 10.dp)
+                                                    )
+                                                    Checkbox(
+                                                        checked = isIgnored,
+                                                        onCheckedChange = { checked ->
+                                                            scope.launch {
+                                                                val newSet = if (checked) ignoredMessages + msg else ignoredMessages - msg
+                                                                repo.setIgnoredMessages(newSet)
+                                                            }
+                                                        },
+                                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFF0F7173), uncheckedColor = Color(0xFF9090AA))
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Row(
@@ -165,10 +209,29 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == "de.dhde.hannover.departures.SHOW_INFO") {
-            val msgs = intent.getStringExtra("info_msgs")
-            if (!msgs.isNullOrEmpty()) {
-                val title = intent.getStringExtra("info_title") ?: "Meldungen"
-                infoDialogState = InfoDialogData(title, msgs)
+            val title = intent.getStringExtra("info_title") ?: "Meldungen"
+            val msgsJson = intent.getStringExtra("info_msgs_json")
+            if (msgsJson != null) {
+                // Structured JSON: List<List<Any>> = [[line, [msg1, msg2]], ...]
+                try {
+                    val type = object : com.google.gson.reflect.TypeToken<List<List<Any>>>() {}.type
+                    val parsed: List<List<Any>> = com.google.gson.Gson().fromJson(msgsJson, type)
+                    val grouped = parsed.map { item ->
+                        val line = item[0] as? String ?: ""
+                        @Suppress("UNCHECKED_CAST")
+                        val msgs = (item[1] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        line to msgs
+                    }
+                    infoDialogState = InfoDialogData(title = title, groupedMsgs = grouped)
+                } catch (e: Exception) {
+                    val fallback = intent.getStringExtra("info_msgs") ?: ""
+                    infoDialogState = InfoDialogData(title = title, msgs = fallback)
+                }
+            } else {
+                val msgs = intent.getStringExtra("info_msgs") ?: ""
+                if (msgs.isNotEmpty()) {
+                    infoDialogState = InfoDialogData(title = title, msgs = msgs)
+                }
             }
         }
     }
@@ -193,7 +256,7 @@ enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.v
     HELP("Hilfe", Icons.Default.Info)
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
@@ -324,14 +387,20 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
 
     // Filter logic
     val filtered = departures.filter {
-        // Globaler Transport-Filter aus den Optionen
+        // Tab-Filter: wenn aktiv, übersteuert er den globalen Typ-Filter für den gewählten Typ
+        val tabOverride = (tabState == "BUS" && it.isBus) || (tabState == "TRAIN" && it.isTram)
+        
+        val isAnyTypeExcluded = transportFilters.size < 5 // 5 types total
         val globalTypeMatch = when {
+            it.isFernbus -> "Fernbus" in transportFilters
+            it.isDB -> "DB" in transportFilters
             it.isBus -> "Bus" in transportFilters
             it.isTram -> "Stadtbahn" in transportFilters
             it.isTrain -> "S-Bahn" in transportFilters
-            else -> true
+            // Unbekannter Typ (z.B. unbekannte Züge): nur anzeigen wenn kein Filter aktiv
+            else -> !isAnyTypeExcluded
         }
-        if (!globalTypeMatch) return@filter false
+        if (!tabOverride && !globalTypeMatch) return@filter false
 
         // Finde den aktuellen Favoriten-Eintrag (falls existent) für den Stern-Status in der Toolbar
         val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
@@ -355,11 +424,11 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         dep.copy(messages = de.dhde.hannover.departures.widget.data.filterMessages(dep.messages, ignoredMessages))
     }.filter { it.messages.isNotEmpty() }
     val hasMessages = messagesDeps.isNotEmpty()
-    val groupedMessages = if (hasMessages) {
+    
+    val groupedMessagesList = if (hasMessages) {
         messagesDeps.groupBy { it.lineShort }
-            .map { (line, deps) -> "Linie $line:\n" + deps.flatMap { it.messages }.distinct().joinToString("\n") }
-            .joinToString("\n\n")
-    } else ""
+            .map { (line, deps) -> line to deps.flatMap { it.messages }.distinct() }
+    } else emptyList()
 
     Column(
         modifier = Modifier.fillMaxSize().background(DarkBg)
@@ -405,7 +474,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 stationName = activeStationName,
                 isRefreshing = isLoading,
                 hasMessages = hasMessages,
-                onInfoClick = { onInfoClick(InfoDialogData("Meldungen: $activeStationName", groupedMessages)) },
+                onInfoClick = { onInfoClick(InfoDialogData(title = "Meldungen: $activeStationName", groupedMsgs = groupedMessagesList)) },
                 onRefresh = { activeStationId?.let { loadData(it) } }
             )
             
@@ -576,9 +645,9 @@ fun WidgetFilterRow(
     ) {
         // Vehicle Type Filters
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "ALL" || tabState == "BUS", Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
+            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "BUS", Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
             Spacer(modifier = Modifier.width(4.dp))
-            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "ALL" || tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
+            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -587,11 +656,11 @@ fun WidgetFilterRow(
         if (hasH || hasR) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasH) {
-                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "ALL" || directionState == "H", Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == "H") "ALL" else "H") }
+                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "H", Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == "H") "ALL" else "H") }
                     if (hasR) Spacer(modifier = Modifier.width(4.dp))
                 }
                 if (hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "ALL" || directionState == "R", Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == "R") "ALL" else "R") }
+                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "R", Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == "R") "ALL" else "R") }
                 }
             }
         }
@@ -817,6 +886,24 @@ fun DuplicateBlob(name: String, modifier: Modifier = Modifier) {
             path = path,
             color = color
         )
+        
+        // Draw 2-4 small splatters around the blob
+        val numSplatters = 2 + random.nextInt(3)
+        for (i in 0 until numSplatters) {
+            val splatterAngle = random.nextFloat() * 2f * Math.PI.toFloat()
+            // Distance from center, outside the main blob (1.2 to 2.0 times the radius)
+            val splatterDist = radius * (1.2f + random.nextFloat() * 0.8f)
+            val sx = center.x + splatterDist * kotlin.math.cos(splatterAngle)
+            val sy = center.y + splatterDist * kotlin.math.sin(splatterAngle)
+            // Splatter radius (10% to 25% of the main radius)
+            val sr = radius * (0.1f + random.nextFloat() * 0.15f)
+            
+            drawCircle(
+                color = color,
+                radius = sr,
+                center = androidx.compose.ui.geometry.Offset(sx, sy)
+            )
+        }
     }
 }
 
@@ -836,9 +923,10 @@ fun WidgetLineBadge(line: String, isBus: Boolean) {
         }
     }
 
+    val width = if (line.length >= 4) 42.dp else 34.dp
     Box(
         modifier = Modifier
-            .size(34.dp, 24.dp)
+            .size(width, 24.dp)
             .background(bgColor, RoundedCornerShape(2.dp)),
         contentAlignment = Alignment.Center
     ) {
@@ -846,7 +934,9 @@ fun WidgetLineBadge(line: String, isBus: Boolean) {
             text = line,
             color = textColor,
             fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Visible
         )
     }
 }
@@ -1600,6 +1690,7 @@ private fun HelpCard() {
 @Composable
 fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesRepository) {
     val scope = rememberCoroutineScope()
+    var showAllMessages by remember { mutableStateOf(false) }
     val maxFavsFlow by repo.maxFavoritesFlow.collectAsState(initial = 3)
     val maxFavRowsFlow by repo.maxFavRowsFlow.collectAsState(initial = 1)
     val maxRowsFlow by repo.maxRowsFlow.collectAsState(initial = 10)
@@ -1676,7 +1767,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Wähle aus, welche Verkehrsmittel angezeigt werden sollen", color = TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(12.dp))
-                    val allTypes = listOf("Stadtbahn", "Bus", "S-Bahn")
+                    val allTypes = listOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus")
                     allTypes.forEach { type ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1710,8 +1801,17 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 Column(modifier = Modifier.padding(16.dp)) {
                     // Schwellenwert: Meldungen die >= 5x aufgetaucht sind, können gefiltert werden
                     val threshold = 5
+                    val allTypesActive = transportTypes.containsAll(setOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus"))
                     val filterableMessages = seenMessages
-                        .filter { it.value.count >= threshold }
+                        .filter { entry -> 
+                            entry.value.count >= threshold && 
+                            if (entry.value.transportTypes.isEmpty()) {
+                                // Alte Einträge ohne Typ-Info: nur zeigen wenn alle Typen aktiv
+                                allTypesActive
+                            } else {
+                                entry.value.transportTypes.any { it in transportTypes }
+                            }
+                        }
                         .entries
                         .sortedByDescending { it.value.count }
                     if (filterableMessages.isEmpty()) {
@@ -1727,7 +1827,14 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             color = TextSub, fontSize = 12.sp
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        filterableMessages.forEach { (msgText, entry) ->
+                        
+                        val displayMessages = if (showAllMessages || filterableMessages.size <= 5) {
+                            filterableMessages
+                        } else {
+                            filterableMessages.take(5)
+                        }
+                        
+                        displayMessages.forEach { (msgText, entry) ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth().clickable {
@@ -1743,7 +1850,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                 Spacer(Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(msgText, color = TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                                    val countLabel = if (entry.count >= 20) "20+× gesehen" else "${entry.count}× gesehen"
+                                    val countLabel = if (entry.count >= 10000) "10k+× gesehen" else "${entry.count}× gesehen"
                                     Text(countLabel, color = TextSub, fontSize = 11.sp)
                                 }
                                 IconButton(
@@ -1765,6 +1872,18 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
+                            }
+                        }
+                        
+                        if (filterableMessages.size > 5) {
+                            TextButton(
+                                onClick = { showAllMessages = !showAllMessages },
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            ) {
+                                Text(
+                                    text = if (showAllMessages) "Weniger anzeigen" else "Alle ${filterableMessages.size} anzeigen",
+                                    color = Teal
+                                )
                             }
                         }
                     }
