@@ -47,6 +47,7 @@ import de.dhde.hannover.departures.widget.api.UestraApi
 import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.toFlatRows
 import de.dhde.hannover.departures.widget.data.DirectionFilter
+import de.dhde.hannover.departures.widget.data.lineDirection
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
@@ -407,8 +408,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             else -> true
         }
         val dirMatch = when (directionState) {
-            DirectionFilter.INBOUND -> it.lineId?.endsWith("H", ignoreCase = true) == true
-            DirectionFilter.OUTBOUND -> it.lineId?.endsWith("R", ignoreCase = true) == true
+            DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
+            DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
             else -> true
         }
         typeMatch && dirMatch
@@ -630,8 +631,8 @@ fun WidgetFilterRow(
     onTabChange: (TransportFilter) -> Unit,
     onDirChange: (DirectionFilter) -> Unit
 ) {
-    val hasH = departures.any { it.lineId?.endsWith("H") == true }
-    val hasR = departures.any { it.lineId?.endsWith("R") == true }
+    val hasH = departures.any { lineDirection(it.lineId) == DirectionFilter.INBOUND }
+    val hasR = departures.any { lineDirection(it.lineId) == DirectionFilter.OUTBOUND }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -697,18 +698,11 @@ fun WidgetFlatDepartureRow(
     groupedFontSize: String = "STANDARD",
     onInfoClick: (InfoDialogData) -> Unit = {}
 ) {
-    val rowBgColor = when {
-        dep.lineId?.endsWith("H", ignoreCase = true) == true -> UestraColors.SubtleWhite
-        dep.lineId?.endsWith("R", ignoreCase = true) == true -> UestraColors.Shadow
-        else -> Color.Transparent
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 1.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(rowBgColor)
             .padding(vertical = 4.dp, horizontal = 6.dp)
     ) {
         Row(
@@ -717,6 +711,18 @@ fun WidgetFlatDepartureRow(
         ) {
             WidgetLineBadge(dep.lineShort, dep.isBus)
             Spacer(modifier = Modifier.width(8.dp))
+            val dir = lineDirection(dep.lineId)
+            if (dir != null) {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(
+                        if (dir == DirectionFilter.INBOUND) R.drawable.ic_widget_city else R.drawable.ic_widget_home
+                    ),
+                    contentDescription = null,
+                    tint = if (dir == DirectionFilter.INBOUND) UestraColors.Teal else UestraColors.AccentRed,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
             Text(
                 text = dep.destination ?: "Unbekannt",
                 color = Color.White,

@@ -42,6 +42,7 @@ import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.filterMessages
+import de.dhde.hannover.departures.widget.data.lineDirection
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.data.DEFAULT_STATION_ID
 import de.dhde.hannover.departures.widget.widget.RefreshAction
@@ -251,8 +252,8 @@ class DeparturesWidget : GlanceAppWidget() {
                     else -> true
                 }
                 val dirMatch = when (directionState) {
-                    DirectionFilter.INBOUND -> it.lineId?.endsWith("H", ignoreCase = true) == true
-                    DirectionFilter.OUTBOUND -> it.lineId?.endsWith("R", ignoreCase = true) == true
+                    DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
+                    DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
                     else -> true
                 }
                 typeMatch && dirMatch
@@ -559,18 +560,11 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun FlatDepartureRow(departure: FlatDeparture, subsequentDepartures: List<FlatDeparture>, timeDisplayMode: String, isWarning: Boolean, groupedFontSize: String = "STANDARD") {
-        val rowBgColor = when {
-            departure.lineId?.endsWith("H", ignoreCase = true) == true -> UestraColors.SubtleWhite
-            departure.lineId?.endsWith("R", ignoreCase = true) == true -> UestraColors.Shadow
-            else -> Color.Transparent
-        }
-
         Column(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .padding(vertical = 1.dp)
                 .cornerRadius(6.dp)
-                .background(ColorProvider(rowBgColor))
                 .padding(vertical = 2.dp, horizontal = 6.dp)
         ) {
             Row(
@@ -579,6 +573,20 @@ class DeparturesWidget : GlanceAppWidget() {
             ) {
             LineBadge(departure.lineShort, departure.isBus)
             Spacer(modifier = GlanceModifier.width(8.dp))
+            val dir = lineDirection(departure.lineId)
+            if (dir != null) {
+                Image(
+                    provider = ImageProvider(
+                        if (dir == DirectionFilter.INBOUND) R.drawable.ic_widget_city else R.drawable.ic_widget_home
+                    ),
+                    contentDescription = null,
+                    modifier = GlanceModifier.size(16.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(
+                        if (dir == DirectionFilter.INBOUND) UestraColors.Teal else UestraColors.AccentRed
+                    ))
+                )
+                Spacer(modifier = GlanceModifier.width(4.dp))
+            }
             Text(
                 text = departure.destination ?: "Unbekannt",
                 style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp),
@@ -648,55 +656,6 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun DepartureRow(departure: DepartureItem, timeDisplayMode: String, isWarning: Boolean) {
-        val rowBgColor = when {
-            // "City" (H) aufhellen: Sehr sanftes, transluzentes Weiß (ca. 8% Deckkraft)
-            departure.lineId?.endsWith("H", ignoreCase = true) == true -> UestraColors.SubtleWhite
-            // "Home" (R) abdunkeln: Zartes, dunkles Schwarz (ca. 30% Deckkraft macht das Dunkelgrau zu Tiefschwarz)
-            departure.lineId?.endsWith("R", ignoreCase = true) == true -> UestraColors.Shadow
-            else -> Color.Transparent
-        }
-
-        Row(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .padding(vertical = 1.dp)
-                .cornerRadius(6.dp)
-                .background(ColorProvider(rowBgColor))
-                .padding(vertical = 2.dp, horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            LineBadge(departure.lineShort, departure.isBus)
-            Spacer(modifier = GlanceModifier.width(8.dp))
-            Text(
-                text = departure.destination ?: "Unbekannt",
-                style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp),
-                modifier = GlanceModifier.defaultWeight()
-            )
-            val timeText = if (timeDisplayMode == "CLOCK") {
-                clockTime(departure.nextDepartureTime)
-            } else {
-                minutesUntil(departure.nextDepartureTime, isWarning)
-            }
-            
-            val hasDelay = (departure.delayMinutes ?: 0) > 0
-            val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
-            
-            // Wenn ab 2 Min veraltet: Grau und Kursiv. Wenn Verspätung: Orange. Sonst Gruen und Fett
-            val timeStyle = when {
-                isWarning -> TextStyle(color = ColorProvider(Color.Gray), fontSize = 14.sp, fontStyle = FontStyle.Italic)
-                hasDelay -> TextStyle(color = ColorProvider(UestraColors.Warning), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                else -> TextStyle(color = ColorProvider(UestraColors.OkGreen), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Text(
-                text = timeText + delayText,
-                style = timeStyle
-            )
-        }
-    }
-
-    @Composable
     private fun LineBadge(line: String, isBus: Boolean) {
         val (bgColor, textColor) = if (isBus) {
             val isSprintH = line.length == 3 && line[0] in '3'..'9' && line.substring(1) == "00"
@@ -738,8 +697,8 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun FilterSegmentedRow(departures: List<DepartureItem>, tabState: TransportFilter, directionState: DirectionFilter, filterHeight: String = "STANDARD") {
-        val hasH = departures.any { it.lineId?.endsWith("H") == true }
-        val hasR = departures.any { it.lineId?.endsWith("R") == true }
+        val hasH = departures.any { lineDirection(it.lineId) == DirectionFilter.INBOUND }
+        val hasR = departures.any { lineDirection(it.lineId) == DirectionFilter.OUTBOUND }
         val showDirectionGroup = hasH || hasR
 
         Row(
