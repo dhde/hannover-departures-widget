@@ -11,8 +11,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Regressionstests für die Crash-Absicherung der Verspätungsberechnung (malformte API-Timestamps).
- * Reine JVM-Tests auf den Datenmodellen – kein Android-Context erforderlich.
+ * JVM-Tests für die Datenmodelle (kein Android-Context):
+ * - Crash-Absicherung der Verspätungsberechnung bei malformten API-Timestamps
+ * - Verkehrsmittel-Klassifikation (transportTypes) und ihre Propagation in FlatDeparture
  */
 class UestraModelsTest {
 
@@ -90,6 +91,13 @@ class UestraModelsTest {
     }
 
     @Test
+    fun classify_dbAndFernbus_suppressBus() {
+        // Nummer >= 100 würde sonst BUS triggern – DB/Fernbus haben Vorrang (Ausschluss-Guard)
+        assertEquals(setOf(TransportType.DB), line(number = "190", lineId = "ddb:RB190").transportTypes)
+        assertEquals(setOf(TransportType.FERNBUS), line(number = "350", lineId = "flx:350").transportTypes)
+    }
+
+    @Test
     fun classify_overlap_dbAndTram() {
         assertEquals(setOf(TransportType.DB, TransportType.TRAM), line(number = "3", lineId = "ddb:3").transportTypes)
     }
@@ -105,5 +113,32 @@ class UestraModelsTest {
         assertTrue(dep.isTram)
         assertFalse(dep.isBus)
         assertFalse(dep.isDB)
+    }
+
+    @Test
+    fun toFlatRows_propagatesTransportTypes() {
+        val rows = item("2099-01-01T10:00:00Z", "2099-01-01T10:00:00Z").toFlatRows()
+        assertEquals(1, rows.size)
+        assertEquals(setOf(TransportType.TRAM), rows.first().transportTypes)
+        assertTrue(rows.first().isTram)
+        assertFalse(rows.first().isBus)
+        assertFalse(rows.first().isTrain)
+    }
+
+    @Test
+    fun classify_tram_rangeUpperBoundIsExclusiveAbove17() {
+        assertEquals(emptySet<TransportType>(), line("18").transportTypes)
+    }
+
+    @Test
+    fun classify_byLineName_tramAndSbahn() {
+        assertEquals(setOf(TransportType.TRAM), line(number = null, line = "Stadtbahn 10").transportTypes)
+        assertEquals(setOf(TransportType.SBAHN), line(number = null, line = "S-Bahn").transportTypes)
+    }
+
+    @Test
+    fun classify_overlap_tramAndBus_byNameAndNumber() {
+        // "Stadtbahn"-Name (TRAM) UND Nummer >= 100 (BUS) → beide, pre-existing Verhalten
+        assertEquals(setOf(TransportType.TRAM, TransportType.BUS), line(number = "100", line = "Stadtbahn 100").transportTypes)
     }
 }

@@ -130,11 +130,7 @@ data class FlatDeparture(
     val lineId: String?,
     val destination: String?,
     val number: String?,
-    val isBus: Boolean,
-    val isTram: Boolean,
-    val isTrain: Boolean,
-    val isDB: Boolean,
-    val isFernbus: Boolean,
+    val transportTypes: Set<TransportType>,
     val departureTime: String,   // Echtzeit, falls vorhanden, sonst Planzeit
     val plannedTime: String?,
     val estimatedTime: String?,
@@ -142,11 +138,18 @@ data class FlatDeparture(
     val lineShort: String,
     val isCancelled: Boolean = false,
     val messages: List<String> = emptyList()
-)
+) {
+    val isBus: Boolean get() = TransportType.BUS in transportTypes
+    val isTram: Boolean get() = TransportType.TRAM in transportTypes
+    val isTrain: Boolean get() = TransportType.SBAHN in transportTypes   // S-Bahn only; DB-Fernverkehr ist isDB
+    val isDB: Boolean get() = TransportType.DB in transportTypes
+    val isFernbus: Boolean get() = TransportType.FERNBUS in transportTypes
+}
 
 /** Klappt alle zukünftigen Events eines DepartureItem zu einzelnen FlatDeparture-Zeilen auf. */
 fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
     val now = Instant.now().minusSeconds(cutoffSeconds)
+    val types = transportTypes
     return events.orEmpty()
         .filter { event ->
             val t = event.estimatedTime ?: event.plannedTime
@@ -163,7 +166,7 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
             } else null
             FlatDeparture(
                 line = line, lineId = lineId, destination = destination?.removePrefix("Hannover/")?.trim(), number = number,
-                isBus = isBus, isTram = isTram, isTrain = isTrain, isDB = isDB, isFernbus = isFernbus,
+                transportTypes = types,
                 departureTime = dept,
                 plannedTime = event.plannedTime,
                 estimatedTime = event.estimatedTime,
