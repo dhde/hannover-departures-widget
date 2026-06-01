@@ -29,3 +29,6 @@ captures/
 *.old
 app-icons/
 local_tools/
+
+# Superpowers brainstorming specs (bleiben lokal, nie committen)
+docs/superpowers/
