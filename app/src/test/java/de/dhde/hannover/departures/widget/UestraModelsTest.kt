@@ -2,8 +2,10 @@ package de.dhde.hannover.departures.widget
 
 import de.dhde.hannover.departures.widget.api.DepartureEvent
 import de.dhde.hannover.departures.widget.api.DepartureItem
+import de.dhde.hannover.departures.widget.api.TransportType
 import de.dhde.hannover.departures.widget.api.toFlatRows
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,6 +15,9 @@ import org.junit.Test
  * Reine JVM-Tests auf den Datenmodellen – kein Android-Context erforderlich.
  */
 class UestraModelsTest {
+
+    private fun line(number: String?, line: String? = null, lineId: String? = null) =
+        DepartureItem(line = line, lineId = lineId, destination = null, number = number)
 
     private fun item(planned: String?, estimated: String?) = DepartureItem(
         line = "Stadtbahn 3", lineId = null, destination = "Wettbergen", number = "3",
@@ -52,5 +57,53 @@ class UestraModelsTest {
         assertEquals(1, rows.size)
         assertEquals(5L, rows.first().delayMinutes)
         assertTrue(rows.first().departureTime.startsWith("2099"))
+    }
+
+    @Test
+    fun classify_tram_byNumber() {
+        assertEquals(setOf(TransportType.TRAM), line("3").transportTypes)
+        assertEquals(setOf(TransportType.TRAM), line("17").transportTypes)
+        assertEquals(setOf(TransportType.TRAM), line("E").transportTypes)
+    }
+
+    @Test
+    fun classify_bus_byHighNumberAndNightPrefix() {
+        assertEquals(setOf(TransportType.BUS), line("100").transportTypes)
+        assertEquals(setOf(TransportType.BUS), line("300").transportTypes)
+        assertEquals(setOf(TransportType.BUS), line("N1").transportTypes)
+    }
+
+    @Test
+    fun classify_sbahn_byPrefix() {
+        assertEquals(setOf(TransportType.SBAHN), line("S3").transportTypes)
+    }
+
+    @Test
+    fun classify_db_byPrefixAndLineId() {
+        assertEquals(setOf(TransportType.DB), line("RE1").transportTypes)
+        assertEquals(setOf(TransportType.DB), line(number = null, lineId = "ddb:RE60").transportTypes)
+    }
+
+    @Test
+    fun classify_fernbus_byFlxPrefix() {
+        assertEquals(setOf(TransportType.FERNBUS), line("FLX10").transportTypes)
+    }
+
+    @Test
+    fun classify_overlap_dbAndTram() {
+        assertEquals(setOf(TransportType.DB, TransportType.TRAM), line(number = "3", lineId = "ddb:3").transportTypes)
+    }
+
+    @Test
+    fun classify_noMatch_isEmpty() {
+        assertEquals(emptySet<TransportType>(), line("??").transportTypes)
+    }
+
+    @Test
+    fun derivedBooleans_matchTypes() {
+        val dep = line("3")
+        assertTrue(dep.isTram)
+        assertFalse(dep.isBus)
+        assertFalse(dep.isDB)
     }
 }
