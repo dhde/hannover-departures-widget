@@ -2,7 +2,9 @@ package de.dhde.hannover.departures.widget
 
 import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.TransportFilter
+import de.dhde.hannover.departures.widget.data.lineDirection
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class FiltersTest {
@@ -48,5 +50,20 @@ class FiltersTest {
         assertEquals(DirectionFilter.OUTBOUND, DirectionFilter.fromStorage("R"))
         assertEquals(DirectionFilter.ALL, DirectionFilter.fromStorage(null))
         assertEquals(DirectionFilter.ALL, DirectionFilter.fromStorage("x"))
+    }
+
+    @Test
+    fun lineDirection_suffixHandR() {
+        assertEquals(DirectionFilter.INBOUND, lineDirection("de:rnv:3:H"))
+        assertEquals(DirectionFilter.OUTBOUND, lineDirection("de:rnv:3:R"))
+        assertEquals(DirectionFilter.INBOUND, lineDirection("xyzh"))
+        assertEquals(DirectionFilter.OUTBOUND, lineDirection("xyzr"))
+    }
+
+    @Test
+    fun lineDirection_unknownIsNull() {
+        assertNull(lineDirection(null))
+        assertNull(lineDirection(""))
+        assertNull(lineDirection("de:rnv:3:X"))
     }
 }
