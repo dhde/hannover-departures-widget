@@ -15,8 +15,10 @@ import de.dhde.hannover.departures.widget.api.*
 import de.dhde.hannover.departures.widget.data.DeparturesCache
 import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
+import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.StopsRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
+import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import java.time.Instant
 import java.time.Duration
 import java.time.OffsetDateTime
@@ -31,25 +33,26 @@ import kotlinx.coroutines.flow.first
 class RefreshAction : ActionCallback {
     companion object {
         val KEY_FORCE = ActionParameters.Key<Boolean>("force")
-        
+
         /** Zentraler Auslöser für Updates, um Kaskaden zu vermeiden */
         suspend fun triggerUpdate(context: Context, isForce: Boolean = false) {
             val repo = FavoritesRepository(context)
             val cache = DeparturesCache(context)
-            
+            val session = WidgetSessionStore(context)
+
             // 1. WICHTIG: UI sofort updaten (z.B. für Tab-Wechsel)
-            // Auch wenn wir danach den Netzwerkabruf überspringen, 
+            // Auch wenn wir danach den Netzwerkabruf überspringen,
             // ist die Klick-Aktion (wie Tab-Wechsel) dann schon sichtbar.
             DeparturesWidget().updateAll(context)
-            
-            // Falls bereits ein Refresh läuft, brechen wir hier ab, 
+
+            // Falls bereits ein Refresh läuft, brechen wir hier ab,
             // um den DataStore nicht zu überlasten.
-            if (cache.isRefreshing()) return
-            
-            if (cache.isGpsModeActive()) {
+            if (session.isRefreshing()) return
+
+            if (session.isGpsModeActive()) {
                 findAndSetActiveNearestStation(context)
             }
-            
+
             val stationId = repo.getActiveStationIdNow()
             val lastUpdatedStr = cache.getLastUpdated(stationId)
             val secondsOld = if (lastUpdatedStr.isNotEmpty()) {
@@ -59,10 +62,10 @@ class RefreshAction : ActionCallback {
 
             // Drosselung: Nur alle 60s anfragen, außer bei manuellem Force
             if (isForce || secondsOld >= 60) {
-                cache.setRefreshing(true)
+                session.setRefreshing(true)
                 cache.updateRefreshTime(stationId)
                 DeparturesWidget().updateAll(context)
-                
+
                 try {
                     // Wir führen den Netzwerk-Check in einem begrenzten Zeitfenster aus
                     val success = kotlinx.coroutines.withTimeoutOrNull(10000) {
@@ -72,7 +75,8 @@ class RefreshAction : ActionCallback {
                             val departures = response.departures
                             if (departures != null) {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
-                                
+                                session.setErrorState("")
+
                                 // Extract and track messages
                                 val msgsWithTypes = mutableMapOf<String, MutableSet<String>>()
                                 departures.forEach { dep ->
@@ -82,14 +86,14 @@ class RefreshAction : ActionCallback {
                                     if (dep.isSBahn) types.add("S-Bahn")
                                     if (dep.isDB) types.add("DB")
                                     if (dep.isFernbus) types.add("Fernbus")
-                                    
+
                                     dep.infos?.forEach { it.content?.let { c -> msgsWithTypes.getOrPut(c) { mutableSetOf() }.addAll(types) } }
                                     dep.hints?.forEach { it.content?.let { c -> msgsWithTypes.getOrPut(c) { mutableSetOf() }.addAll(types) } }
                                 }
                                 if (msgsWithTypes.isNotEmpty()) {
                                     repo.trackMessages(msgsWithTypes)
                                 }
-                                
+
                                 true // Signal success
                             } else {
                                 false
@@ -97,19 +101,19 @@ class RefreshAction : ActionCallback {
                         }
                     }
                     if (success == null) {
-                        cache.setErrorState("Zeitüberschreitung") // Timeout
+                        session.setErrorState("Zeitüberschreitung") // Timeout
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    cache.setErrorState("Verbindung fehlgeschlagen")
+                    session.setErrorState("Verbindung fehlgeschlagen")
                 } finally {
-                    cache.setRefreshing(false)
+                    session.setRefreshing(false)
                     DeparturesWidget().updateAll(context)
                 }
             }
         }
     }
-    
+
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
@@ -124,30 +128,31 @@ class ChangeTabAction : ActionCallback {
     companion object {
         val KEY_TAB = ActionParameters.Key<String>("tab")
     }
-    
+
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
         val targetTab = TransportFilter.fromStorage(parameters[KEY_TAB])
-        val cache = DeparturesCache(context)
+        val filters = FilterStateStore(context)
+        val session = WidgetSessionStore(context)
         val repo = FavoritesRepository(context)
         val stationId = repo.getActiveStationIdNow()
         val uniqueId = repo.getActiveFavoriteUniqueIdNow()
 
-        val currentTab = cache.getTabState(stationId)
+        val currentTab = filters.getTabState(stationId)
         val newTab = if (currentTab == targetTab) TransportFilter.ALL else targetTab
-        
-        cache.setTabState(stationId, newTab)
+
+        filters.setTabState(stationId, newTab)
         if (uniqueId != null) {
             repo.setFavoriteTransportFilter(uniqueId, newTab)
         }
-        
+
         // Sofortiges UI-Feedback für den Tab-Wechsel
         DeparturesWidget().updateAll(context)
-        
-        if (cache.isGpsModeActive()) findAndSetActiveNearestStation(context)
+
+        if (session.isGpsModeActive()) findAndSetActiveNearestStation(context)
         RefreshAction.triggerUpdate(context)
     }
 }
@@ -166,10 +171,10 @@ class ChangeStationAction : ActionCallback {
         val repo = FavoritesRepository(context)
         val currentId = repo.getActiveFavoriteUniqueIdNow() ?: repo.getActiveStationIdNow()
         val favorites = repo.getFavoritesNow()
-        
+
         val targetIndex = parameters[KEY_TARGET_INDEX]
         val cycleRemaining = parameters[KEY_CYCLE_REMAINING] ?: false
-        
+
         if (favorites.isNotEmpty()) {
             if (targetIndex != null && targetIndex in favorites.indices) {
                 val fav = favorites[targetIndex]
@@ -195,8 +200,8 @@ class ChangeStationAction : ActionCallback {
                 val nextFav = favorites[nextIndex]
                 repo.setActiveStation(nextFav.safeUniqueId, nextFav.name)
             }
-            
-            DeparturesCache(context).setGpsMode(false)
+
+            WidgetSessionStore(context).setGpsMode(false)
             RefreshAction.triggerUpdate(context)
         }
     }
@@ -206,29 +211,29 @@ class ChangeDirectionAction : ActionCallback {
     companion object {
         val KEY_DIRECTION = ActionParameters.Key<String>("direction")
     }
-    
+
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
         val targetDirection = DirectionFilter.fromStorage(parameters[KEY_DIRECTION])
-        val cache = DeparturesCache(context)
+        val filters = FilterStateStore(context)
         val repo = FavoritesRepository(context)
         val stationId = repo.getActiveStationIdNow()
         val uniqueId = repo.getActiveFavoriteUniqueIdNow()
 
-        val currentDirection = cache.getDirectionState(stationId)
+        val currentDirection = filters.getDirectionState(stationId)
         val newDirection = if (currentDirection == targetDirection) DirectionFilter.ALL else targetDirection
-        
-        cache.setDirectionState(stationId, newDirection)
+
+        filters.setDirectionState(stationId, newDirection)
         if (uniqueId != null) {
             repo.setFavoriteDirectionFilter(uniqueId, newDirection)
         }
-        
+
         // Sofortiges UI-Feedback für Richtungswechsel
         DeparturesWidget().updateAll(context)
-        
+
         RefreshAction.triggerUpdate(context)
     }
 }
@@ -239,9 +244,9 @@ class ToggleTimeDisplayAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        val cache = DeparturesCache(context)
-        val current = cache.getTimeDisplayMode()
-        cache.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
+        val session = WidgetSessionStore(context)
+        val current = session.getTimeDisplayMode()
+        session.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
         // Nur API-Refresh auslösen, wenn der Nutzer es aktiviert hat (Default: AUS)
         val autoRefresh = FavoritesRepository(context).getAutoRefreshOnInteractionNow()
         if (autoRefresh) {
@@ -259,9 +264,9 @@ class LocateNearestStationAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        val cache = DeparturesCache(context)
-        val next = !cache.isGpsModeActive()
-        cache.setGpsMode(next)
+        val session = WidgetSessionStore(context)
+        val next = !session.isGpsModeActive()
+        session.setGpsMode(next)
         if (next) findAndSetActiveNearestStation(context)
         RefreshAction.triggerUpdate(context)
     }
@@ -277,11 +282,11 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     val stopsRepo = StopsRepository(context)
     val allStops = stopsRepo.getAllStops()
     if (allStops.isEmpty()) return
-    
+
     val repo = FavoritesRepository(context)
     val currentStationId = repo.getActiveStationIdNow()
-    val cache = DeparturesCache(context)
-    val currentTabState = cache.getTabState(currentStationId)
+    val filters = FilterStateStore(context)
+    val currentTabState = filters.getTabState(currentStationId)
 
     val stopsWithCoords = allStops.filter { stop ->
         if (stop.lat == null || stop.lon == null) return@filter false
@@ -296,7 +301,7 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     var nearestStop: StationSearchResult? = null
     var minDistance = Float.MAX_VALUE
     val results = FloatArray(1)
-    
+
     for (stop in stopsWithCoords) {
         Location.distanceBetween(lastLoc.latitude, lastLoc.longitude, stop.lat!!, stop.lon!!, results)
         if (results[0] < minDistance) {
@@ -308,6 +313,6 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     if (nearestStop != null) {
         repo.setActiveStation(nearestStop.id, nearestStop.name)
         // Den Filter (Bus/Bahn) für die neue Haltestelle übernehmen, damit das Erlebnis konsistent bleibt
-        cache.setTabState(nearestStop.id, currentTabState)
+        filters.setTabState(nearestStop.id, currentTabState)
     }
 }

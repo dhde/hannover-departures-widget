@@ -117,9 +117,9 @@ class FavoritesRepository(private val context: Context) {
         }
         
         // Filter des gewählten Favoriten in den Cache übernehmen
-        val cache = DeparturesCache(context)
-        cache.setTabState(realId, TransportFilter.fromStorage(fav?.transportFilter))
-        cache.setDirectionState(realId, DirectionFilter.fromStorage(fav?.directionFilter))
+        val filters = FilterStateStore(context)
+        filters.setTabState(realId, TransportFilter.fromStorage(fav?.transportFilter))
+        filters.setDirectionState(realId, DirectionFilter.fromStorage(fav?.directionFilter))
     }
 
     suspend fun getActiveStationIdNow(): String =

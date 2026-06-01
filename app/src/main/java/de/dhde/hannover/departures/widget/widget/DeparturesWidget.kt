@@ -38,6 +38,8 @@ import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoriteStation
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.DeparturesCache
+import de.dhde.hannover.departures.widget.data.FilterStateStore
+import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.filterMessages
 import de.dhde.hannover.departures.widget.data.DEFAULT_STATION_ID
@@ -95,31 +97,33 @@ class DeparturesWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val cache = DeparturesCache(context)
+        val filters = FilterStateStore(context)
+        val session = WidgetSessionStore(context)
         val repo = FavoritesRepository(context)
 
         provideContent {
             val stationIdState by repo.activeStationId.collectAsState(initial = DEFAULT_STATION_ID)
             val stationId = stationIdState ?: DEFAULT_STATION_ID
-            
+
             val maxFavorites by repo.maxFavoritesFlow.collectAsState(initial = 3)
             val maxFavRows by repo.maxFavRowsFlow.collectAsState(initial = 1)
             val maxRows by repo.maxRowsFlow.collectAsState(initial = 10)
-            
+
             val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
-            
+
             val stationNameState by repo.effectiveStationName.collectAsState(initial = "Laden...")
             val stationName = stationNameState
             val activeFavUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
 
-            val tabState by cache.getTabStateFlow(stationId).collectAsState(initial = TransportFilter.ALL)
-            val directionState by cache.getDirectionStateFlow(stationId).collectAsState(initial = DirectionFilter.ALL)
-            val gpsModeActive by cache.getGpsModeFlow().collectAsState(initial = false)
-            val timeDisplayMode by cache.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
-            
+            val tabState by filters.getTabStateFlow(stationId).collectAsState(initial = TransportFilter.ALL)
+            val directionState by filters.getDirectionStateFlow(stationId).collectAsState(initial = DirectionFilter.ALL)
+            val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
+            val timeDisplayMode by session.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
+
             val cachedJson by cache.getDeparturesJsonFlow(stationId).collectAsState(initial = "[]")
             val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
-            
-            val errorState by cache.getErrorStateFlow().collectAsState(initial = "")
+
+            val errorState by session.getErrorStateFlow().collectAsState(initial = "")
             val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
             val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
             val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
@@ -151,7 +155,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
             }
 
-            val isRefreshing by cache.isRefreshingFlow().collectAsState(initial = false)
+            val isRefreshing by session.isRefreshingFlow().collectAsState(initial = false)
 
             WidgetContent(
                 stationName     = stationName,
