@@ -789,7 +789,7 @@ fun WidgetFlatDepartureRow(
                     }
                     Text(
                         text = subText,
-                        color = Color.Gray,
+                        color = UestraColors.TextSub,
                         fontSize = subFontSize,
                         fontWeight = FontWeight.Normal
                     )

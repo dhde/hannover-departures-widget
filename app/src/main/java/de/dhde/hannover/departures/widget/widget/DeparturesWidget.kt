@@ -627,7 +627,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     }
                     Text(
                         text = subText,
-                        style = TextStyle(color = ColorProvider(Color.Gray), fontSize = subFontSize, fontWeight = FontWeight.Normal)
+                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = subFontSize, fontWeight = FontWeight.Normal)
                     )
                 }
             }
