@@ -228,7 +228,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     it.isDB -> "DB" in transportFilters
                     it.isBus -> "Bus" in transportFilters
                     it.isTram -> "Stadtbahn" in transportFilters
-                    it.isTrain -> "S-Bahn" in transportFilters
+                    it.isSBahn -> "S-Bahn" in transportFilters
                     else -> !isAnyTypeExcluded
                 }
                 if (!globalTypeMatch) return@filter false
