@@ -52,17 +52,17 @@ class DeparturesCache(private val context: Context) {
     suspend fun getLastUpdated(stationId: String): String = 
         context.cacheDataStore.data.map { it[updatedKey(stationId)] }.first() ?: ""
 
-    suspend fun getTabState(stationId: String): String = 
-        context.cacheDataStore.data.map { it[tabKey(stationId)] }.first() ?: "ALL"
+    suspend fun getTabState(stationId: String): TransportFilter =
+        TransportFilter.fromStorage(context.cacheDataStore.data.map { it[tabKey(stationId)] }.first())
 
-    suspend fun getDirectionState(stationId: String): String = 
-        context.cacheDataStore.data.map { it[directionKey(stationId)] }.first() ?: "ALL"
+    suspend fun getDirectionState(stationId: String): DirectionFilter =
+        DirectionFilter.fromStorage(context.cacheDataStore.data.map { it[directionKey(stationId)] }.first())
 
-    fun getTabStateFlow(stationId: String): Flow<String> = 
-        context.cacheDataStore.data.map { it[tabKey(stationId)] ?: "ALL" }
+    fun getTabStateFlow(stationId: String): Flow<TransportFilter> =
+        context.cacheDataStore.data.map { TransportFilter.fromStorage(it[tabKey(stationId)]) }
 
-    fun getDirectionStateFlow(stationId: String): Flow<String> = 
-        context.cacheDataStore.data.map { it[directionKey(stationId)] ?: "ALL" }
+    fun getDirectionStateFlow(stationId: String): Flow<DirectionFilter> =
+        context.cacheDataStore.data.map { DirectionFilter.fromStorage(it[directionKey(stationId)]) }
 
     fun getDeparturesJsonFlow(stationId: String): Flow<String> = 
         context.cacheDataStore.data.map { it[departuresKey(stationId)] ?: "[]" }
@@ -73,15 +73,15 @@ class DeparturesCache(private val context: Context) {
     fun getLastUpdatedFlow(stationId: String): Flow<String> = 
         context.cacheDataStore.data.map { it[updatedKey(stationId)] ?: "" }
 
-    suspend fun setTabState(stationId: String, state: String) {
+    suspend fun setTabState(stationId: String, state: TransportFilter) {
         context.cacheDataStore.edit { prefs ->
-            prefs[tabKey(stationId)] = state
+            prefs[tabKey(stationId)] = state.storageValue
         }
     }
 
-    suspend fun setDirectionState(stationId: String, state: String) {
+    suspend fun setDirectionState(stationId: String, state: DirectionFilter) {
         context.cacheDataStore.edit { prefs ->
-            prefs[directionKey(stationId)] = state
+            prefs[directionKey(stationId)] = state.storageValue
         }
     }
 

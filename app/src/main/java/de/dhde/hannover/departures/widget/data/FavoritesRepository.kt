@@ -118,8 +118,8 @@ class FavoritesRepository(private val context: Context) {
         
         // Filter des gewählten Favoriten in den Cache übernehmen
         val cache = DeparturesCache(context)
-        cache.setTabState(realId, fav?.transportFilter ?: "ALL")
-        cache.setDirectionState(realId, fav?.directionFilter ?: "ALL")
+        cache.setTabState(realId, TransportFilter.fromStorage(fav?.transportFilter))
+        cache.setDirectionState(realId, DirectionFilter.fromStorage(fav?.directionFilter))
     }
 
     suspend fun getActiveStationIdNow(): String =
@@ -188,16 +188,16 @@ class FavoritesRepository(private val context: Context) {
         saveFavorites(list)
     }
 
-    suspend fun setFavoriteTransportFilter(uniqueId: String, filter: String?) {
+    suspend fun setFavoriteTransportFilter(uniqueId: String, filter: TransportFilter?) {
         val list = getFavoritesNow().map { fav ->
-            if (fav.safeUniqueId == uniqueId) fav.copy(transportFilter = filter) else fav
+            if (fav.safeUniqueId == uniqueId) fav.copy(transportFilter = filter?.storageValue) else fav
         }
         saveFavorites(list)
     }
 
-    suspend fun setFavoriteDirectionFilter(uniqueId: String, filter: String?) {
+    suspend fun setFavoriteDirectionFilter(uniqueId: String, filter: DirectionFilter?) {
         val list = getFavoritesNow().map { fav ->
-            if (fav.safeUniqueId == uniqueId) fav.copy(directionFilter = filter) else fav
+            if (fav.safeUniqueId == uniqueId) fav.copy(directionFilter = filter?.storageValue) else fav
         }
         saveFavorites(list)
     }

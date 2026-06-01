@@ -13,8 +13,10 @@ import androidx.glance.appwidget.action.ActionCallback
 import com.google.gson.Gson
 import de.dhde.hannover.departures.widget.api.*
 import de.dhde.hannover.departures.widget.data.DeparturesCache
+import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.StopsRepository
+import de.dhde.hannover.departures.widget.data.TransportFilter
 import java.time.Instant
 import java.time.Duration
 import java.time.OffsetDateTime
@@ -128,14 +130,14 @@ class ChangeTabAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        val targetTab = parameters[KEY_TAB] ?: "ALL"
+        val targetTab = TransportFilter.fromStorage(parameters[KEY_TAB])
         val cache = DeparturesCache(context)
         val repo = FavoritesRepository(context)
         val stationId = repo.getActiveStationIdNow()
         val uniqueId = repo.getActiveFavoriteUniqueIdNow()
-        
+
         val currentTab = cache.getTabState(stationId)
-        val newTab = if (currentTab == targetTab) "ALL" else targetTab
+        val newTab = if (currentTab == targetTab) TransportFilter.ALL else targetTab
         
         cache.setTabState(stationId, newTab)
         if (uniqueId != null) {
@@ -210,14 +212,14 @@ class ChangeDirectionAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        val targetDirection = parameters[KEY_DIRECTION] ?: "ALL"
+        val targetDirection = DirectionFilter.fromStorage(parameters[KEY_DIRECTION])
         val cache = DeparturesCache(context)
         val repo = FavoritesRepository(context)
         val stationId = repo.getActiveStationIdNow()
         val uniqueId = repo.getActiveFavoriteUniqueIdNow()
-        
+
         val currentDirection = cache.getDirectionState(stationId)
-        val newDirection = if (currentDirection == targetDirection) "ALL" else targetDirection
+        val newDirection = if (currentDirection == targetDirection) DirectionFilter.ALL else targetDirection
         
         cache.setDirectionState(stationId, newDirection)
         if (uniqueId != null) {
@@ -285,8 +287,8 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
         if (stop.lat == null || stop.lon == null) return@filter false
         val platforms = stop.platforms
         when (currentTabState) {
-            "BUS" -> platforms.isNullOrEmpty() || platforms.any { it.isBus }
-            "TRAIN" -> platforms.isNullOrEmpty() || platforms.any { it.isTram }
+            TransportFilter.BUS -> platforms.isNullOrEmpty() || platforms.any { it.isBus }
+            TransportFilter.TRAM -> platforms.isNullOrEmpty() || platforms.any { it.isTram }
             else -> true
         }
     }

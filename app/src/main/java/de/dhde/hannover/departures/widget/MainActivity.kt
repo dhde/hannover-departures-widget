@@ -46,7 +46,9 @@ import de.dhde.hannover.departures.widget.api.StationSearchResult
 import de.dhde.hannover.departures.widget.api.UestraApi
 import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.toFlatRows
+import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
+import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -344,16 +346,16 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     var lastUpdate by remember { mutableStateOf<java.time.Instant?>(null) }
     
     // States matching the widget
-    var tabState by remember { mutableStateOf("ALL") }
-    var directionState by remember { mutableStateOf("ALL") }
+    var tabState by remember { mutableStateOf(TransportFilter.ALL) }
+    var directionState by remember { mutableStateOf(DirectionFilter.ALL) }
     var timeDisplayMode by remember { mutableStateOf("MIN") }
 
     val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
     
     LaunchedEffect(currentFav) {
         if (currentFav != null) {
-            tabState = currentFav.transportFilter ?: "ALL"
-            directionState = currentFav.directionFilter ?: "ALL"
+            tabState = TransportFilter.fromStorage(currentFav.transportFilter)
+            directionState = DirectionFilter.fromStorage(currentFav.directionFilter)
         }
     }
 
@@ -388,8 +390,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     // Filter logic
     val filtered = departures.filter {
         // Tab-Filter: wenn aktiv, übersteuert er den globalen Typ-Filter für den gewählten Typ
-        val tabOverride = (tabState == "BUS" && it.isBus) || (tabState == "TRAIN" && it.isTram)
-        
+        val tabOverride = (tabState == TransportFilter.BUS && it.isBus) || (tabState == TransportFilter.TRAM && it.isTram)
+
         val isAnyTypeExcluded = transportFilters.size < 5 // 5 types total
         val globalTypeMatch = when {
             it.isFernbus -> "Fernbus" in transportFilters
@@ -408,13 +410,13 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
 
         val typeMatch = when (tabState) {
-            "BUS" -> it.isBus
-            "TRAIN" -> it.isTram
+            TransportFilter.BUS -> it.isBus
+            TransportFilter.TRAM -> it.isTram
             else -> true
         }
         val dirMatch = when (directionState) {
-            "H" -> it.lineId?.endsWith("H", ignoreCase = true) == true
-            "R" -> it.lineId?.endsWith("R", ignoreCase = true) == true
+            DirectionFilter.INBOUND -> it.lineId?.endsWith("H", ignoreCase = true) == true
+            DirectionFilter.OUTBOUND -> it.lineId?.endsWith("R", ignoreCase = true) == true
             else -> true
         }
         typeMatch && dirMatch
@@ -458,8 +460,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 .padding(12.dp)
         ) {
             // Background Icon
-            if (tabState != "ALL") {
-                val iconRes = if (tabState == "BUS") R.drawable.ic_widget_bus else R.drawable.ic_widget_tram
+            if (tabState != TransportFilter.ALL) {
+                val iconRes = if (tabState == TransportFilter.BUS) R.drawable.ic_widget_bus else R.drawable.ic_widget_tram
                 Icon(
                     androidx.compose.ui.res.painterResource(iconRes),
                     contentDescription = null,
@@ -484,16 +486,16 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 tabState = tabState,
                 directionState = directionState,
                 filterHeight = filterHeight,
-                onTabChange = { 
-                    tabState = it 
+                onTabChange = { newTab ->
+                    tabState = newTab
                     activeFavoriteUniqueId?.let { id ->
-                        scope.launch { repo.setFavoriteTransportFilter(id, it) }
+                        scope.launch { repo.setFavoriteTransportFilter(id, newTab) }
                     }
                 },
-                onDirChange = { 
-                    directionState = it 
+                onDirChange = { newDir ->
+                    directionState = newDir
                     activeFavoriteUniqueId?.let { id ->
-                        scope.launch { repo.setFavoriteDirectionFilter(id, it) }
+                        scope.launch { repo.setFavoriteDirectionFilter(id, newDir) }
                     }
                 }
             )
@@ -629,12 +631,12 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
 
 @Composable
 fun WidgetFilterRow(
-    departures: List<de.dhde.hannover.departures.widget.api.DepartureItem>, 
-    tabState: String, 
-    directionState: String,
+    departures: List<de.dhde.hannover.departures.widget.api.DepartureItem>,
+    tabState: TransportFilter,
+    directionState: DirectionFilter,
     filterHeight: String = "STANDARD",
-    onTabChange: (String) -> Unit,
-    onDirChange: (String) -> Unit
+    onTabChange: (TransportFilter) -> Unit,
+    onDirChange: (DirectionFilter) -> Unit
 ) {
     val hasH = departures.any { it.lineId?.endsWith("H") == true }
     val hasR = departures.any { it.lineId?.endsWith("R") == true }
@@ -645,9 +647,9 @@ fun WidgetFilterRow(
     ) {
         // Vehicle Type Filters
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == "BUS", Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == "BUS") "ALL" else "BUS") }
+            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == TransportFilter.BUS, Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == TransportFilter.BUS) TransportFilter.ALL else TransportFilter.BUS) }
             Spacer(modifier = Modifier.width(4.dp))
-            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == "TRAIN") "ALL" else "TRAIN") }
+            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == TransportFilter.TRAM, Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == TransportFilter.TRAM) TransportFilter.ALL else TransportFilter.TRAM) }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -656,11 +658,11 @@ fun WidgetFilterRow(
         if (hasH || hasR) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasH) {
-                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == "H", Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == "H") "ALL" else "H") }
+                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == DirectionFilter.INBOUND, Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == DirectionFilter.INBOUND) DirectionFilter.ALL else DirectionFilter.INBOUND) }
                     if (hasR) Spacer(modifier = Modifier.width(4.dp))
                 }
                 if (hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == "R", Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == "R") "ALL" else "R") }
+                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == DirectionFilter.OUTBOUND, Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == DirectionFilter.OUTBOUND) DirectionFilter.ALL else DirectionFilter.OUTBOUND) }
                 }
             }
         }

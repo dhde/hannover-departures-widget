@@ -34,9 +34,11 @@ import de.dhde.hannover.departures.widget.api.DepartureItem
 import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.toFlatRows
 import de.dhde.hannover.departures.widget.api.UestraApi
+import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoriteStation
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.DeparturesCache
+import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.filterMessages
 import de.dhde.hannover.departures.widget.data.DEFAULT_STATION_ID
 import de.dhde.hannover.departures.widget.widget.RefreshAction
@@ -109,8 +111,8 @@ class DeparturesWidget : GlanceAppWidget() {
             val stationName = stationNameState
             val activeFavUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
 
-            val tabState by cache.getTabStateFlow(stationId).collectAsState(initial = "ALL")
-            val directionState by cache.getDirectionStateFlow(stationId).collectAsState(initial = "ALL")
+            val tabState by cache.getTabStateFlow(stationId).collectAsState(initial = TransportFilter.ALL)
+            val directionState by cache.getDirectionStateFlow(stationId).collectAsState(initial = DirectionFilter.ALL)
             val gpsModeActive by cache.getGpsModeFlow().collectAsState(initial = false)
             val timeDisplayMode by cache.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
             
@@ -188,8 +190,8 @@ class DeparturesWidget : GlanceAppWidget() {
         departures: List<DepartureItem>,
         flatDepartures: List<FlatDeparture>,
         favorites: List<FavoriteStation>,
-        tabState: String,
-        directionState: String,
+        tabState: TransportFilter,
+        directionState: DirectionFilter,
         gpsModeActive: Boolean,
         timeDisplayMode: String,
         status: String,
@@ -239,13 +241,13 @@ class DeparturesWidget : GlanceAppWidget() {
                 if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
 
                 val typeMatch = when (tabState) {
-                    "BUS" -> it.isBus
-                    "TRAIN" -> it.isTram
+                    TransportFilter.BUS -> it.isBus
+                    TransportFilter.TRAM -> it.isTram
                     else -> true
                 }
                 val dirMatch = when (directionState) {
-                    "H" -> it.lineId?.endsWith("H", ignoreCase = true) == true
-                    "R" -> it.lineId?.endsWith("R", ignoreCase = true) == true
+                    DirectionFilter.INBOUND -> it.lineId?.endsWith("H", ignoreCase = true) == true
+                    DirectionFilter.OUTBOUND -> it.lineId?.endsWith("R", ignoreCase = true) == true
                     else -> true
                 }
                 typeMatch && dirMatch
@@ -332,12 +334,12 @@ class DeparturesWidget : GlanceAppWidget() {
 }
 
     @Composable
-    private fun BackgroundIcon(tabState: String) {
-        if (tabState == "ALL") return // Nur bei spezifischer Wahl anzeigen
+    private fun BackgroundIcon(tabState: TransportFilter) {
+        if (tabState == TransportFilter.ALL) return // Nur bei spezifischer Wahl anzeigen
 
         val iconRes = when (tabState) {
-            "BUS" -> R.drawable.ic_widget_bus
-            "TRAIN" -> R.drawable.ic_widget_tram
+            TransportFilter.BUS -> R.drawable.ic_widget_bus
+            TransportFilter.TRAM -> R.drawable.ic_widget_tram
             else -> return
         }
 
@@ -524,10 +526,10 @@ class DeparturesWidget : GlanceAppWidget() {
 
 
     @Composable
-    private fun FilterToggleButton(tabState: String) {
+    private fun FilterToggleButton(tabState: TransportFilter) {
         val (label, bgColor) = when (tabState) {
-            "BUS" -> "Nur Bus" to Color(0xFFE94560)
-            "TRAIN" -> "Nur Bahn" to Color(0xFF0F7173)
+            TransportFilter.BUS -> "Nur Bus" to Color(0xFFE94560)
+            TransportFilter.TRAM -> "Nur Bahn" to Color(0xFF0F7173)
             else -> "Alle Typen" to Color(0xFF333333)
         }
         
@@ -730,7 +732,7 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FilterSegmentedRow(departures: List<DepartureItem>, tabState: String, directionState: String, filterHeight: String = "STANDARD") {
+    private fun FilterSegmentedRow(departures: List<DepartureItem>, tabState: TransportFilter, directionState: DirectionFilter, filterHeight: String = "STANDARD") {
         val hasH = departures.any { it.lineId?.endsWith("H") == true }
         val hasR = departures.any { it.lineId?.endsWith("R") == true }
         val showDirectionGroup = hasH || hasR
@@ -741,12 +743,12 @@ class DeparturesWidget : GlanceAppWidget() {
         ) {
             // --- Gruppe VEHICLE (Links-bündig) ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SegmentButton(R.drawable.ic_widget_bus, null, tabState == "BUS", Color(0xFFE94560), filterHeight) { 
-                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "BUS")) 
+                SegmentButton(R.drawable.ic_widget_bus, null, tabState == TransportFilter.BUS, Color(0xFFE94560), filterHeight) {
+                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to TransportFilter.BUS.storageValue))
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(R.drawable.ic_widget_tram, null, tabState == "TRAIN", Color(0xFF005A9B), filterHeight) { 
-                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to "TRAIN")) 
+                SegmentButton(R.drawable.ic_widget_tram, null, tabState == TransportFilter.TRAM, Color(0xFF005A9B), filterHeight) {
+                     actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to TransportFilter.TRAM.storageValue))
                 }
             }
 
@@ -757,14 +759,14 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showDirectionGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasH) {
-                        SegmentButton(R.drawable.ic_widget_city, null, directionState == "H", Color(0xFF0F7173), filterHeight) { 
-                            actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "H")) 
+                        SegmentButton(R.drawable.ic_widget_city, null, directionState == DirectionFilter.INBOUND, Color(0xFF0F7173), filterHeight) {
+                            actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to DirectionFilter.INBOUND.storageValue))
                         }
                         if (hasR) Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (hasR) {
-                        SegmentButton(R.drawable.ic_widget_home, null, directionState == "R", Color(0xFFE94560), filterHeight) { 
-                            actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to "R")) 
+                        SegmentButton(R.drawable.ic_widget_home, null, directionState == DirectionFilter.OUTBOUND, Color(0xFFE94560), filterHeight) {
+                            actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to DirectionFilter.OUTBOUND.storageValue))
                         }
                     }
                 }
