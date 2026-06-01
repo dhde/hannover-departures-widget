@@ -50,6 +50,7 @@ import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
+import de.dhde.hannover.departures.widget.ui.UestraColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
@@ -92,12 +93,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    primary        = Color(0xFF0F7173),
-                    secondary      = Color(0xFFE94560),
-                    background     = Color(0xFF0D0D1A),
-                    surface        = Color(0xFF1A1A2E),
-                    onBackground   = Color(0xFFE0E0E0),
-                    onSurface      = Color(0xFFE0E0E0),
+                    primary        = UestraColors.Teal,
+                    secondary      = UestraColors.AccentRed,
+                    background     = UestraColors.DarkBg,
+                    surface        = UestraColors.CardBg,
+                    onBackground   = UestraColors.TextMain,
+                    onSurface      = UestraColors.TextMain,
                 )
             ) {
                 val scope = rememberCoroutineScope()
@@ -116,7 +117,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxHeight(0.8f)
                                 .padding(16.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E))
+                            colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg)
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxSize().padding(24.dp)
@@ -136,7 +137,7 @@ class MainActivity : ComponentActivity() {
                                     if (data.msgs != null) {
                                         Text(
                                             text = data.msgs,
-                                            color = Color(0xFFE0E0E0),
+                                            color = UestraColors.TextMain,
                                             fontSize = 16.sp,
                                             lineHeight = 24.sp
                                         )
@@ -156,7 +157,7 @@ class MainActivity : ComponentActivity() {
                                                 ) {
                                                     Text(
                                                         text = msg,
-                                                        color = if (isIgnored) Color.Gray else Color(0xFFE0E0E0),
+                                                        color = if (isIgnored) Color.Gray else UestraColors.TextMain,
                                                         fontSize = 14.sp,
                                                         lineHeight = 20.sp,
                                                         modifier = Modifier.weight(1f).padding(top = 10.dp)
@@ -169,7 +170,7 @@ class MainActivity : ComponentActivity() {
                                                                 repo.setIgnoredMessages(newSet)
                                                             }
                                                         },
-                                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFF0F7173), uncheckedColor = Color(0xFF9090AA))
+                                                        colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                                                     )
                                                 }
                                             }
@@ -183,7 +184,7 @@ class MainActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.End
                                 ) {
                                     TextButton(onClick = { infoDialogState = null }) {
-                                        Text("Zur App", color = Color(0xFF9090AA), fontWeight = FontWeight.Bold)
+                                        Text("Zur App", color = UestraColors.TextSub, fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Button(
@@ -191,7 +192,7 @@ class MainActivity : ComponentActivity() {
                                             infoDialogState = null
                                             this@MainActivity.finishAffinity()
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE94560))
+                                        colors = ButtonDefaults.buttonColors(containerColor = UestraColors.AccentRed)
                                     ) {
                                         Text("Verlassen", color = Color.White, fontWeight = FontWeight.Bold)
                                     }
@@ -239,15 +240,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ── Farben und Design-Token ──────────────────────────────────────────────────
-
-private val DarkBg     = Color(0xFF0D0D1A)
-private val CardBg     = Color(0xFF1A1A2E)
-private val Teal       = Color(0xFF0F7173)
-private val Red        = Color(0xFFE94560)
-private val TextMain   = Color(0xFFE0E0E0)
-private val TextSub    = Color(0xFF9090AA)
-
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
@@ -265,7 +257,7 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
     val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
 
     Scaffold(
-        containerColor = DarkBg,
+        containerColor = UestraColors.DarkBg,
         topBar = {
             TopAppBar(
                 title = {
@@ -274,21 +266,21 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
                         "Hannover Abfahrten Stadtbahnen",
                         fontWeight = FontWeight.Bold,
                         fontSize   = 18.sp,
-                        color      = TextMain
+                        color      = UestraColors.TextMain
                     )
                     Text(
                         text = if (currentScreen == AppScreen.DASHBOARD) "Widget Vorschau · $activeStationName" else "Aktiv: $activeStationName",
                         fontSize = 12.sp,
-                        color    = if (currentScreen == AppScreen.DASHBOARD) Color(0xFFFFB300) else Teal,
+                        color    = if (currentScreen == AppScreen.DASHBOARD) UestraColors.Amber else UestraColors.Teal,
                         fontWeight = FontWeight.Medium
                     )
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = CardBg)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = UestraColors.CardBg)
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = CardBg) {
+            NavigationBar(containerColor = UestraColors.CardBg) {
                 AppScreen.values().forEach { screen ->
                     NavigationBarItem(
                         icon = { Icon(screen.icon, contentDescription = screen.label) },
@@ -296,11 +288,11 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
                         selected = currentScreen == screen,
                         onClick = { currentScreen = screen },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Teal,
-                            selectedTextColor = Teal,
-                            unselectedIconColor = TextSub,
-                            unselectedTextColor = TextSub,
-                            indicatorColor = Teal.copy(alpha = 0.2f)
+                            selectedIconColor = UestraColors.Teal,
+                            selectedTextColor = UestraColors.Teal,
+                            unselectedIconColor = UestraColors.TextSub,
+                            unselectedTextColor = UestraColors.TextSub,
+                            indicatorColor = UestraColors.Teal.copy(alpha = 0.2f)
                         )
                     )
                 }
@@ -433,19 +425,19 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     } else emptyList()
 
     Column(
-        modifier = Modifier.fillMaxSize().background(DarkBg)
+        modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg)
     ) {
         // "Widget Vorschau" label
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF1A1A2E))
+                .background(UestraColors.CardBg)
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 "Widget Vorschau",
-                color = TextSub,
+                color = UestraColors.TextSub,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 1.sp
@@ -456,7 +448,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(Color(0xFF121212)) // Widget Bg
+                .background(UestraColors.WidgetBackground) // Widget Bg
                 .padding(12.dp)
         ) {
             // Background Icon
@@ -465,7 +457,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 Icon(
                     androidx.compose.ui.res.painterResource(iconRes),
                     contentDescription = null,
-                    tint = Color(0xFF141F14), // Subtle dark green
+                    tint = UestraColors.DarkGreenTint, // Subtle dark green
                     modifier = Modifier.fillMaxSize().padding(32.dp)
                 )
             }
@@ -596,7 +588,7 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
                 Icon(
                     androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
                     contentDescription = "Info",
-                    tint = Color(0xFFFFB300),
+                    tint = UestraColors.Amber,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -617,7 +609,7 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
             modifier = Modifier.padding(end = 8.dp).size(20.dp)
         )
         if (isRefreshing) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color(0xFF4285F4), strokeWidth = 2.dp)
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = UestraColors.GpsBlue, strokeWidth = 2.dp)
         } else {
             Icon(
                 Icons.Default.Refresh,
@@ -647,9 +639,9 @@ fun WidgetFilterRow(
     ) {
         // Vehicle Type Filters
         Row(verticalAlignment = Alignment.CenterVertically) {
-            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == TransportFilter.BUS, Color(0xFFE94560), filterHeight) { onTabChange(if (tabState == TransportFilter.BUS) TransportFilter.ALL else TransportFilter.BUS) }
+            WidgetSegmentButton(R.drawable.ic_widget_bus, tabState == TransportFilter.BUS, UestraColors.AccentRed, filterHeight) { onTabChange(if (tabState == TransportFilter.BUS) TransportFilter.ALL else TransportFilter.BUS) }
             Spacer(modifier = Modifier.width(4.dp))
-            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == TransportFilter.TRAM, Color(0xFF005A9B), filterHeight) { onTabChange(if (tabState == TransportFilter.TRAM) TransportFilter.ALL else TransportFilter.TRAM) }
+            WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == TransportFilter.TRAM, UestraColors.LineBlue, filterHeight) { onTabChange(if (tabState == TransportFilter.TRAM) TransportFilter.ALL else TransportFilter.TRAM) }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -658,11 +650,11 @@ fun WidgetFilterRow(
         if (hasH || hasR) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (hasH) {
-                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == DirectionFilter.INBOUND, Color(0xFF0F7173), filterHeight) { onDirChange(if (directionState == DirectionFilter.INBOUND) DirectionFilter.ALL else DirectionFilter.INBOUND) }
+                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == DirectionFilter.INBOUND, UestraColors.Teal, filterHeight) { onDirChange(if (directionState == DirectionFilter.INBOUND) DirectionFilter.ALL else DirectionFilter.INBOUND) }
                     if (hasR) Spacer(modifier = Modifier.width(4.dp))
                 }
                 if (hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == DirectionFilter.OUTBOUND, Color(0xFFE94560), filterHeight) { onDirChange(if (directionState == DirectionFilter.OUTBOUND) DirectionFilter.ALL else DirectionFilter.OUTBOUND) }
+                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == DirectionFilter.OUTBOUND, UestraColors.AccentRed, filterHeight) { onDirChange(if (directionState == DirectionFilter.OUTBOUND) DirectionFilter.ALL else DirectionFilter.OUTBOUND) }
                 }
             }
         }
@@ -671,7 +663,7 @@ fun WidgetFilterRow(
 
 @Composable
 fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, filterHeight: String = "STANDARD", onClick: () -> Unit) {
-    val bgColor = if (isActive) activeColor else Color(0xFF2A2A2A)
+    val bgColor = if (isActive) activeColor else UestraColors.ChipInactive
     
     val (width, height, iconSize) = when (filterHeight) {
         "KOMPAKT" -> Triple(28.dp, 20.dp, 12.dp)
@@ -706,8 +698,8 @@ fun WidgetFlatDepartureRow(
     onInfoClick: (InfoDialogData) -> Unit = {}
 ) {
     val rowBgColor = when {
-        dep.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
-        dep.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
+        dep.lineId?.endsWith("H", ignoreCase = true) == true -> UestraColors.SubtleWhite
+        dep.lineId?.endsWith("R", ignoreCase = true) == true -> UestraColors.Shadow
         else -> Color.Transparent
     }
 
@@ -759,9 +751,9 @@ fun WidgetFlatDepartureRow(
 
             val timeColor = when {
                 isWarning -> Color.Gray
-                dep.isCancelled -> Color(0xFFE94560)
-                hasDelay -> Color(0xFFFF9800)
-                else -> Color(0xFF4CAF50)
+                dep.isCancelled -> UestraColors.AccentRed
+                hasDelay -> UestraColors.Warning
+                else -> UestraColors.OkGreen
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -812,7 +804,7 @@ fun WidgetFlatDepartureRow(
             ) {
                 Text(
                     text = "Fahrt entfällt",
-                    color = Color(0xFFE94560),
+                    color = UestraColors.AccentRed,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(end = 8.dp)
@@ -913,14 +905,14 @@ fun DuplicateBlob(name: String, modifier: Modifier = Modifier) {
 fun WidgetLineBadge(line: String, isBus: Boolean) {
     val (bgColor, textColor) = if (isBus) {
         val isSprintH = line.length == 3 && line[0] in '3'..'9' && line.substring(1) == "00"
-        if (isSprintH) Color(0xFFB42082) to Color.White
-        else Color(0xFFE3001B) to Color.White
+        if (isSprintH) UestraColors.SprintMagenta to Color.White
+        else UestraColors.LineRed to Color.White
     } else {
         when (line) {
-            "1", "2", "8" -> Color(0xFFE3001B) to Color.White
-            "3", "7", "9", "13" -> Color(0xFF005A9B) to Color.White
-            "4", "5", "6", "11" -> Color(0xFFFFCC00) to Color.Black
-            "10", "17" -> Color(0xFF009A44) to Color.White
+            "1", "2", "8" -> UestraColors.LineRed to Color.White
+            "3", "7", "9", "13" -> UestraColors.LineBlue to Color.White
+            "4", "5", "6", "11" -> UestraColors.LineYellow to Color.Black
+            "10", "17" -> UestraColors.LineGreen to Color.White
             else -> Color.Gray to Color.White
         }
     }
@@ -971,7 +963,7 @@ fun WidgetFavoritesRow(
                     val label = fav.alias ?: fav.name.replace(Regex("\\bHannover\\b", RegexOption.IGNORE_CASE), "").replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
                     val shortLabel = if (label.length > 8) label.take(7) + "." else label
                     val isSelected = fav.safeUniqueId == currentStationId
-                    val bgColor = if (isSelected) Color(0xFF005A9B) else Color(0xFF2A2A2A)
+                    val bgColor = if (isSelected) UestraColors.LineBlue else UestraColors.ChipInactive
 
                     Box(
                         modifier = Modifier
@@ -1064,7 +1056,7 @@ fun SearchScreen(repo: FavoritesRepository) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(DarkBg),
+        modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1073,27 +1065,27 @@ fun SearchScreen(repo: FavoritesRepository) {
             OutlinedTextField(
                 value         = query,
                 onValueChange = { query = it },
-                placeholder   = { Text("z.B. Kröpcke, Roderbruch…", color = TextSub) },
+                placeholder   = { Text("z.B. Kröpcke, Roderbruch…", color = UestraColors.TextSub) },
                 leadingIcon   = {
                     if (isSearching)
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Teal, strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = UestraColors.Teal, strokeWidth = 2.dp)
                     else
-                        Icon(Icons.Default.Search, null, tint = TextSub)
+                        Icon(Icons.Default.Search, null, tint = UestraColors.TextSub)
                 },
                 singleLine  = true,
                 colors      = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor   = Teal,
-                    unfocusedBorderColor = Color(0xFF3A3A5A),
-                    focusedTextColor     = TextMain,
-                    unfocusedTextColor   = TextMain,
-                    cursorColor          = Teal
+                    focusedBorderColor   = UestraColors.Teal,
+                    unfocusedBorderColor = UestraColors.BorderSubtle,
+                    focusedTextColor     = UestraColors.TextMain,
+                    unfocusedTextColor   = UestraColors.TextMain,
+                    cursorColor          = UestraColors.Teal
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 shape    = RoundedCornerShape(12.dp)
             )
 
             searchError?.let {
-                Text(it, color = Red, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(it, color = UestraColors.AccentRed, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
 
@@ -1169,7 +1161,7 @@ fun FavoritesScreen(repo: FavoritesRepository) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(DarkBg),
+        modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1177,7 +1169,7 @@ fun FavoritesScreen(repo: FavoritesRepository) {
 
         if (listState.isEmpty()) {
             item {
-                Text("Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.", color = TextSub, fontSize = 13.sp)
+                Text("Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.", color = UestraColors.TextSub, fontSize = 13.sp)
             }
         } else {
             itemsIndexed(listState, key = { _, it -> it.safeUniqueId }) { index, fav ->
@@ -1218,7 +1210,7 @@ fun FavoritesScreen(repo: FavoritesRepository) {
 @Composable
 fun HelpScreen() {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(DarkBg),
+        modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1232,7 +1224,7 @@ fun HelpScreen() {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = { intentHandler("https://www.buymeacoffee.com/dhde") },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDD00)),
+                    colors = ButtonDefaults.buttonColors(containerColor = UestraColors.ButtonYellow),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -1245,11 +1237,11 @@ fun HelpScreen() {
                     onClick = { intentHandler("https://github.com/dhde/hannover-departures-widget") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, TextSub)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, UestraColors.TextSub)
                 ) {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = TextMain)
+                    Icon(Icons.Default.Search, contentDescription = null, tint = UestraColors.TextMain)
                     Spacer(Modifier.width(8.dp))
-                    Text("Quellcode auf GitHub", color = TextMain)
+                    Text("Quellcode auf GitHub", color = UestraColors.TextMain)
                 }
             }
         }
@@ -1262,21 +1254,21 @@ fun HelpScreen() {
         
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg.copy(alpha = 0.5f)),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg.copy(alpha = 0.5f)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
                         "Rechtlicher Hinweis",
-                        color = Red,
+                        color = UestraColors.AccentRed,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "Dies ist eine inoffizielle App. Sie steht in keiner Verbindung zur ÜSTRA Hannoversche Verkehrsbetriebe AG oder dem GVH. Alle Daten werden über öffentliche Schnittstellen bezogen. Nutzung auf eigene Gefahr.",
-                        color = TextSub,
+                        color = UestraColors.TextSub,
                         fontSize = 11.sp,
                         lineHeight = 16.sp
                     )
@@ -1293,9 +1285,9 @@ private fun HelpItem(icon: @Composable () -> Unit, title: String, description: S
             icon()
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = TextMain, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(title, color = UestraColors.TextMain, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Spacer(Modifier.height(4.dp))
-            Text(description, color = TextSub, fontSize = 12.sp, lineHeight = 18.sp)
+            Text(description, color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp)
         }
     }
 }
@@ -1303,42 +1295,42 @@ private fun HelpItem(icon: @Composable () -> Unit, title: String, description: S
 @Composable
 private fun WidgetFeaturesCard() {
     Card(
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             HelpItem(
                 icon = {
-                    Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info), null, tint = Color(0xFFFFB300), modifier = Modifier.size(20.dp))
+                    Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info), null, tint = UestraColors.Amber, modifier = Modifier.size(20.dp))
                 },
                 title = "Info-Meldungen & Filter",
                 description = "Tippe auf das goldene 'i' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen. Dauerhafte Meldungen (z.B. Rollstuhl, WLAN) lassen sich in den Optionen ausblenden."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
-                    Text("1", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 },
                 title = "Favoriten-Schnellwahl",
                 description = "Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
                     Row {
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = Teal, modifier = Modifier.size(18.dp))
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = UestraColors.Teal, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(2.dp))
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = Red, modifier = Modifier.size(18.dp))
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = UestraColors.AccentRed, modifier = Modifier.size(18.dp))
                     }
                 },
                 title = "Richtungen & Filter",
                 description = "Nutze die Symbole für City oder Home, um die Richtung zu filtern. Die Zeilen im Widget färben sich automatisch passend (hell/dunkel)."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
-                    Icon(Icons.Default.Settings, null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Settings, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "Größenanpassung",
                 description = "Du kannst in den Optionen die visuelle Größe der Filter- und Favoriten-Buttons ('KOMPAKT', 'STANDARD', 'GROSS') einstellen, falls du größere Klickflächen bevorzugst."
@@ -1350,30 +1342,30 @@ private fun WidgetFeaturesCard() {
 @Composable
 private fun InteractionCard() {
     Card(
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             HelpItem(
                 icon = {
-                    Text("5", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("5", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 },
                 title = "Zeit-Ansicht",
                 description = "Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten. (Tipp: In den Optionen kannst du einstellen, ob dabei offline umgeschaltet wird oder die API aktualisiert werden soll)."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
-                    Icon(Icons.Default.Refresh, null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Refresh, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "Aktualisierung",
                 description = "Das Widget lädt aus Strom- und Datenspargründen keine Daten im Hintergrund. Um aktuelle Echtzeitdaten und Verspätungen der API abzurufen, tippe auf den kleinen Refresh-Pfeil oben rechts."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
-                    Icon(Icons.Default.LocationOn, null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.LocationOn, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "GPS-Suche",
                 description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
@@ -1388,7 +1380,7 @@ private fun InteractionCard() {
 private fun SectionLabel(text: String) {
     Text(
         text     = text.uppercase(),
-        color    = TextSub,
+        color    = UestraColors.TextSub,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.2.sp,
@@ -1406,7 +1398,7 @@ private fun SearchResultRow(
 ) {
     Card(
         colors  = CardDefaults.cardColors(
-            containerColor = if (isActive) Color(0xFF0F2A2A) else CardBg
+            containerColor = if (isActive) UestraColors.TealSurface else UestraColors.CardBg
         ),
         shape   = RoundedCornerShape(10.dp),
         modifier = Modifier
@@ -1421,32 +1413,32 @@ private fun SearchResultRow(
                 val displayName = location.name.substringAfter(", ").ifBlank { location.name }
                 Text(
                     displayName,
-                    color      = if (isActive) Teal else TextMain,
+                    color      = if (isActive) UestraColors.Teal else UestraColors.TextMain,
                     fontWeight = FontWeight.SemiBold,
                     fontSize   = 14.sp
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (displayName != location.name) {
-                        Text(location.name, color = TextSub, fontSize = 11.sp)
+                        Text(location.name, color = UestraColors.TextSub, fontSize = 11.sp)
                     }
                     if (distanceText != null) {
                         if (displayName != location.name) {
-                            Text(" • ", color = TextSub, fontSize = 11.sp)
+                            Text(" • ", color = UestraColors.TextSub, fontSize = 11.sp)
                         }
-                        Text(distanceText, color = TextSub, fontSize = 11.sp)
+                        Text(distanceText, color = UestraColors.TextSub, fontSize = 11.sp)
                     }
                 }
             }
             if (isActive) {
-                Text("AKTIV", color = Teal, fontWeight = FontWeight.Bold, fontSize = 10.sp, 
-                    modifier = Modifier.background(Teal.copy(0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
+                Text("AKTIV", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 10.sp, 
+                    modifier = Modifier.background(UestraColors.Teal.copy(0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
                 Spacer(Modifier.width(8.dp))
             }
             IconButton(onClick = onToggleFav) {
                 Icon(
                     if (isFav) Icons.Filled.Star else Icons.Outlined.Star,
                     contentDescription = if (isFav) "Favorit entfernen" else "Favorit hinzufügen",
-                    tint = if (isFav) Color(0xFFFFD700) else TextSub
+                    tint = if (isFav) UestraColors.FavoriteGold else UestraColors.TextSub
                 )
             }
         }
@@ -1503,7 +1495,7 @@ private fun FavoriteRow(
 
     Card(
         colors  = CardDefaults.cardColors(
-            containerColor = if (isActive) Color(0xFF0F2A2A) else CardBg
+            containerColor = if (isActive) UestraColors.TealSurface else UestraColors.CardBg
         ),
         shape   = RoundedCornerShape(10.dp),
         modifier = Modifier
@@ -1527,7 +1519,7 @@ private fun FavoriteRow(
             Icon(
                 Icons.Default.DragHandle,
                 contentDescription = "Verschieben",
-                tint = if (dragOffset != 0f) Teal else TextSub,
+                tint = if (dragOffset != 0f) UestraColors.Teal else UestraColors.TextSub,
                 modifier = Modifier
                     .size(32.dp)
                     .padding(end = 8.dp)
@@ -1578,7 +1570,7 @@ private fun FavoriteRow(
                 
                 Text(
                     text       = displayName,
-                    color      = if (isActive) Teal else TextMain,
+                    color      = if (isActive) UestraColors.Teal else UestraColors.TextMain,
                     fontWeight = FontWeight.SemiBold,
                     fontSize   = 14.sp,
                     maxLines   = 1,
@@ -1589,7 +1581,7 @@ private fun FavoriteRow(
                 if (!fav.alias.isNullOrBlank()) {
                     Text(
                         text     = fav.name, 
-                        color    = TextSub, 
+                        color    = UestraColors.TextSub,
                         fontSize = 11.sp,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -1601,31 +1593,31 @@ private fun FavoriteRow(
                 Column(horizontalAlignment = Alignment.End) {
                     Row {
                         IconButton(onClick = { showAliasDialog = true }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Edit, "Alias bearbeiten", tint = Teal, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Edit, "Alias bearbeiten", tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                         }
                         IconButton(onClick = onFilter, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) Color(0xFFFFD700) else Teal, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) UestraColors.FavoriteGold else UestraColors.Teal, modifier = Modifier.size(20.dp))
                         }
                     }
                     Row {
                         IconButton(onClick = onDuplicate, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Add, "Duplizieren", tint = Teal, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Add, "Duplizieren", tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                         }
                         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Delete, "Löschen", tint = Red, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Delete, "Löschen", tint = UestraColors.AccentRed, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.End) {
                     IconButton(onClick = { showAliasDialog = true }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Edit, "Alias bearbeiten", tint = Teal, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Edit, "Alias bearbeiten", tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = onFilter, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) Color(0xFFFFD700) else Teal, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) UestraColors.FavoriteGold else UestraColors.Teal, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Delete, "Löschen", tint = Red, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Delete, "Löschen", tint = UestraColors.AccentRed, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -1636,50 +1628,50 @@ private fun FavoriteRow(
 @Composable
 private fun HelpCard() {
     Card(
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             HelpItem(
                 icon = { 
-                    Text("1", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
+                    Text("1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
                 },
                 title = "Favoriten-Schnellwahl",
                 description = "Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
                     Row {
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = Teal, modifier = Modifier.size(18.dp))
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = UestraColors.Teal, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(2.dp))
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = Red, modifier = Modifier.size(18.dp))
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = UestraColors.AccentRed, modifier = Modifier.size(18.dp))
                     }
                 },
                 title = "Richtungen & Filter",
                 description = "Nutze die Symbole für City oder Home, um die Richtung zu filtern. Die Zeilen im Widget färben sich automatisch passend (hell/dunkel)."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Text("5", color = Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
+                    Text("5", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
                 },
                 title = "Zeit-Ansicht",
                 description = "Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Icon(Icons.Default.Refresh, null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Refresh, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "Aktualisierung",
                 description = "Das Widget frischt sich ca. alle 15 Minuten selbst auf. Für sofortige Echtzeitdaten tippe auf den kleinen Refresh-Pfeil oben rechts."
             )
-            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Icon(Icons.Default.LocationOn, null, tint = Teal, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.LocationOn, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "GPS-Suche",
                 description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
@@ -1712,19 +1704,19 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     if (showDuplicatesWarning) {
         AlertDialog(
             onDismissRequest = { showDuplicatesWarning = false },
-            title = { Text("Warnung", color = Red) },
-            text = { Text("Achtung: Wenn du diese Option ausschaltest, werden alle mehrfach angelegten Haltestellen gelöscht. Möchtest du fortfahren?", color = TextMain) },
+            title = { Text("Warnung", color = UestraColors.AccentRed) },
+            text = { Text("Achtung: Wenn du diese Option ausschaltest, werden alle mehrfach angelegten Haltestellen gelöscht. Möchtest du fortfahren?", color = UestraColors.TextMain) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { repo.setAllowDuplicates(false) }
                     showDuplicatesWarning = false
-                }) { Text("Deaktivieren", color = Red) }
+                }) { Text("Deaktivieren", color = UestraColors.AccentRed) }
             },
             dismissButton = {
-                TextButton(onClick = { showDuplicatesWarning = false }) { Text("Abbrechen", color = TextSub) }
+                TextButton(onClick = { showDuplicatesWarning = false }) { Text("Abbrechen", color = UestraColors.TextSub) }
             },
-            containerColor = CardBg,
-            titleContentColor = Teal
+            containerColor = UestraColors.CardBg,
+            titleContentColor = UestraColors.Teal
         )
     }
     
@@ -1736,7 +1728,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val context = LocalContext.current
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(DarkBg),
+        modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1748,7 +1740,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         val myProvider = android.content.ComponentName(context, de.dhde.hannover.departures.widget.widget.DeparturesWidgetReceiver::class.java)
                         appWidgetManager.requestPinAppWidget(myProvider, null, null)
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                    colors = ButtonDefaults.buttonColors(containerColor = UestraColors.Teal),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1762,12 +1754,12 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { SectionLabel("Verkehrsmittel") }
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Wähle aus, welche Verkehrsmittel angezeigt werden sollen", color = TextSub, fontSize = 12.sp)
+                    Text("Wähle aus, welche Verkehrsmittel angezeigt werden sollen", color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     val allTypes = listOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus")
                     allTypes.forEach { type ->
@@ -1783,10 +1775,10 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             Checkbox(
                                 checked = type in transportTypes,
                                 onCheckedChange = null,
-                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                                colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(type, color = TextMain, fontSize = 14.sp)
+                            Text(type, color = UestraColors.TextMain, fontSize = 14.sp)
                         }
                     }
                 }
@@ -1796,7 +1788,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { SectionLabel("Meldungs-Filter") }
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1821,12 +1813,12 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             "Noch keine häufigen Meldungen bekannt. Die App lernt automatisch welche " +
                             "Infomeldungen regelmäßig von der API kommen (ab $threshold Mal). " +
                             "Lade das Widget einige Male neu, um Meldungen hier anzuzeigen.",
-                            color = TextSub, fontSize = 12.sp
+                            color = UestraColors.TextSub, fontSize = 12.sp
                         )
                     } else {
                         Text(
                             "Wähle aus, welche häufig auftauchenden Meldungen ausgeblendet werden sollen:",
-                            color = TextSub, fontSize = 12.sp
+                            color = UestraColors.TextSub, fontSize = 12.sp
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         
@@ -1847,13 +1839,13 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                 Checkbox(
                                     checked = msgText in ignoredMessages,
                                     onCheckedChange = null,
-                                    colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                                    colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(msgText, color = TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                                    Text(msgText, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
                                     val countLabel = if (entry.count >= 10000) "10k+× gesehen" else "${entry.count}× gesehen"
-                                    Text(countLabel, color = TextSub, fontSize = 11.sp)
+                                    Text(countLabel, color = UestraColors.TextSub, fontSize = 11.sp)
                                 }
                                 IconButton(
                                     onClick = {
@@ -1870,7 +1862,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = "Meldung entfernen",
-                                        tint = Color(0xFF666688),
+                                        tint = UestraColors.IconMuted,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -1884,7 +1876,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             ) {
                                 Text(
                                     text = if (showAllMessages) "Weniger anzeigen" else "Alle ${filterableMessages.size} anzeigen",
-                                    color = Teal
+                                    color = UestraColors.Teal
                                 )
                             }
                         }
@@ -1896,13 +1888,13 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { SectionLabel("Favoriten") }
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Favoriten pro Zeile", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Anzahl der Schnellwahl-Tasten pro Zeile (0 bis 5)", color = TextSub, fontSize = 12.sp)
+                    Text("Favoriten pro Zeile", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Anzahl der Schnellwahl-Tasten pro Zeile (0 bis 5)", color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Slider(
                         value = localMaxFavs,
@@ -1911,16 +1903,16 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         valueRange = 0f..5f,
                         steps = 4,
                         colors = SliderDefaults.colors(
-                            thumbColor = Teal,
-                            activeTrackColor = Teal,
-                            inactiveTrackColor = Color(0xFF333344)
+                            thumbColor = UestraColors.Teal,
+                            activeTrackColor = UestraColors.Teal,
+                            inactiveTrackColor = UestraColors.Divider
                         )
                     )
-                    Text("${localMaxFavs.roundToInt()} Knöpfe pro Zeile", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
-                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                    Text("${localMaxFavs.roundToInt()} Knöpfe pro Zeile", color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                    HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
-                    Text("Zeilen für Favoriten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Anzahl der Zeilen für Schnellwahl-Tasten (1 bis 3)", color = TextSub, fontSize = 12.sp)
+                    Text("Zeilen für Favoriten", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Anzahl der Zeilen für Schnellwahl-Tasten (1 bis 3)", color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Slider(
                         value = localMaxFavRows,
@@ -1929,19 +1921,19 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         valueRange = 1f..3f,
                         steps = 1,
                         colors = SliderDefaults.colors(
-                            thumbColor = Teal,
-                            activeTrackColor = Teal,
-                            inactiveTrackColor = Color(0xFF333344)
+                            thumbColor = UestraColors.Teal,
+                            activeTrackColor = UestraColors.Teal,
+                            inactiveTrackColor = UestraColors.Divider
                         )
                     )
-                    Text("${localMaxFavRows.roundToInt()} Zeilen", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                    Text("${localMaxFavRows.roundToInt()} Zeilen", color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
 
-                    HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
 
 
-                    Text("Höhe der Favoriten-Buttons", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Wähle die visuelle Größe aus", color = TextSub, fontSize = 12.sp)
+                    Text("Höhe der Favoriten-Buttons", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Wähle die visuelle Größe aus", color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                         listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
@@ -1955,12 +1947,12 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) Teal else Color(0xFF333344))
+                                    .background(if (isSelected) UestraColors.Teal else UestraColors.Divider)
                                     .clickable { scope.launch { repo.setFavoritesHeight(mode) } }
                                     .padding(vertical = vPadding),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
+                                Text(mode, color = if (isSelected) Color.White else UestraColors.TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1972,13 +1964,13 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { SectionLabel("Filter") }
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Höhe der Filter-Buttons", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Wähle die visuelle Größe aus", color = TextSub, fontSize = 12.sp)
+                    Text("Höhe der Filter-Buttons", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Wähle die visuelle Größe aus", color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                         listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
@@ -1992,12 +1984,12 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) Teal else Color(0xFF333344))
+                                    .background(if (isSelected) UestraColors.Teal else UestraColors.Divider)
                                     .clickable { scope.launch { repo.setFilterHeight(mode) } }
                                     .padding(vertical = vPadding),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(mode, color = if (isSelected) Color.White else TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
+                                Text(mode, color = if (isSelected) Color.White else UestraColors.TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -2008,7 +2000,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { SectionLabel("API Refresh") }
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -2021,19 +2013,19 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             .padding(vertical = 4.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("API-Refresh bei Zeitumschaltung", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("API-Refresh bei Zeitumschaltung", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
                                 "Wenn aktiv: Beim Umschalten zwischen Minuten und Uhrzeit werden " +
                                 "neue Daten von der API geladen (falls älter als 60 Sek.). " +
                                 "Standard: AUS (nur Redraw, kein Netzwerkaufruf).",
-                                color = TextSub, fontSize = 12.sp, lineHeight = 18.sp
+                                color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                             )
                         }
                         Spacer(Modifier.width(12.dp))
                         Switch(
                             checked = autoRefreshOnInteraction,
                             onCheckedChange = { scope.launch { repo.setAutoRefreshOnInteraction(it) } },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = UestraColors.Teal)
                         )
                     }
                 }
@@ -2043,7 +2035,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { SectionLabel("Abfahrten gruppieren") }
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -2056,24 +2048,24 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             .padding(vertical = 4.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Abfahrten gruppieren", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Abfahrten gruppieren", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
                                 "Fasst nachfolgende Abfahrten derselben Linie und Richtung in einer Zeile zusammen.",
-                                color = TextSub, fontSize = 12.sp, lineHeight = 18.sp
+                                color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                             )
                         }
                         Spacer(Modifier.width(12.dp))
                         Switch(
                             checked = groupDepartures,
                             onCheckedChange = { scope.launch { repo.setGroupDepartures(it) } },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = UestraColors.Teal)
                         )
                     }
 
                         if (!groupDepartures) {
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Maximale Abfahrten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Zeilen im Widget (1 bis 15, 15 = unbegrenzt)", color = TextSub, fontSize = 12.sp)
+                            Text("Maximale Abfahrten", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Zeilen im Widget (1 bis 15, 15 = unbegrenzt)", color = UestraColors.TextSub, fontSize = 12.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Slider(
                                 value = localMaxRows,
@@ -2082,17 +2074,17 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                 valueRange = 1f..15f,
                                 steps = 13,
                                 colors = SliderDefaults.colors(
-                                    thumbColor = Teal,
-                                    activeTrackColor = Teal,
-                                    inactiveTrackColor = Color(0xFF333344)
+                                    thumbColor = UestraColors.Teal,
+                                    activeTrackColor = UestraColors.Teal,
+                                    inactiveTrackColor = UestraColors.Divider
                                 )
                             )
                             val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
-                            Text(rowLabel, color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                            Text(rowLabel, color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
                         } else {
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Zusätzliche Abfahrten pro Linie", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Anzahl weiterer Abfahrten, die klein neben der Hauptzeit angezeigt werden (0 bis 5)", color = TextSub, fontSize = 12.sp)
+                            Text("Zusätzliche Abfahrten pro Linie", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Anzahl weiterer Abfahrten, die klein neben der Hauptzeit angezeigt werden (0 bis 5)", color = UestraColors.TextSub, fontSize = 12.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Slider(
                                 value = localMaxGroupedDepartures,
@@ -2101,17 +2093,17 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                 valueRange = 0f..5f,
                                 steps = 4,
                                 colors = SliderDefaults.colors(
-                                    thumbColor = Teal,
-                                    activeTrackColor = Teal,
-                                    inactiveTrackColor = Color(0xFF333344)
+                                    thumbColor = UestraColors.Teal,
+                                    activeTrackColor = UestraColors.Teal,
+                                    inactiveTrackColor = UestraColors.Divider
                                 )
                             )
-                            Text("${localMaxGroupedDepartures.roundToInt()} weitere Abfahrten", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                            Text("${localMaxGroupedDepartures.roundToInt()} weitere Abfahrten", color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
 
-                            HorizontalDivider(color = Color(0xFF333344), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                            HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
-                            Text("Schriftgröße der Folge-Abfahrten", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Größe der kleinen Zeitangaben neben der Hauptabfahrt", color = TextSub, fontSize = 12.sp)
+                            Text("Schriftgröße der Folge-Abfahrten", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Größe der kleinen Zeitangaben neben der Hauptabfahrt", color = UestraColors.TextSub, fontSize = 12.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                                 listOf("KLEIN", "STANDARD", "GROSS").forEach { mode ->
@@ -2130,14 +2122,14 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) Teal else Color(0xFF333344))
+                                            .background(if (isSelected) UestraColors.Teal else UestraColors.Divider)
                                             .clickable { scope.launch { repo.setGroupedFontSize(mode) } }
                                             .padding(horizontal = 8.dp, vertical = vPadding),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             label,
-                                            color = if (isSelected) Color.White else TextSub,
+                                            color = if (isSelected) Color.White else UestraColors.TextSub,
                                             fontSize = fSize,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
@@ -2152,7 +2144,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { SectionLabel("Experimentelle Funktionen") }
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -2171,10 +2163,10 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                             .padding(vertical = 4.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Haltestellen duplizieren", color = Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Haltestellen duplizieren", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
                                 "Erlaubt es, dieselbe Haltestelle mehrfach anzulegen, um unterschiedliche Filter (z.B. Richtung Home / City) zu speichern.",
-                                color = TextSub, fontSize = 12.sp, lineHeight = 18.sp
+                                color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                             )
                         }
                         Spacer(Modifier.width(12.dp))
@@ -2187,7 +2179,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                                     scope.launch { repo.setAllowDuplicates(true) }
                                 }
                             },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Teal)
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = UestraColors.Teal)
                         )
                     }
                 }
@@ -2236,15 +2228,15 @@ fun LineFilterDialog(
         onDismissRequest = onDismiss,
         title = { 
             val titleName = fav.alias ?: fav.name.substringBefore(",")
-            Text("Linien filtern: $titleName", color = Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold) 
+            Text("Linien filtern: $titleName", color = UestraColors.Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold) 
         },
         text = {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Teal)
+                    CircularProgressIndicator(color = UestraColors.Teal)
                 }
             } else if (availableLines.isEmpty()) {
-                Text("Konnte aktuell keine Linien für diese Station finden.", color = TextSub)
+                Text("Konnte aktuell keine Linien für diese Station finden.", color = UestraColors.TextSub)
             } else {
                 LazyColumn {
                     items(availableLines) { line ->
@@ -2261,10 +2253,10 @@ fun LineFilterDialog(
                             Checkbox(
                                 checked = line in selectedLines,
                                 onCheckedChange = null,
-                                colors = CheckboxDefaults.colors(checkedColor = Teal, uncheckedColor = TextSub)
+                                colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                             )
                             Spacer(Modifier.width(12.dp))
-                            Text("Linie $line", color = TextMain, fontSize = 16.sp)
+                            Text("Linie $line", color = UestraColors.TextMain, fontSize = 16.sp)
                         }
                     }
                 }
@@ -2281,14 +2273,14 @@ fun LineFilterDialog(
                     }
                 },
                 enabled = hasLoaded
-            ) { Text("Speichern", color = Teal) }
+            ) { Text("Speichern", color = UestraColors.Teal) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Abbrechen", color = TextSub) }
+            TextButton(onClick = onDismiss) { Text("Abbrechen", color = UestraColors.TextSub) }
         },
-        containerColor = CardBg,
-        titleContentColor = Teal,
-        textContentColor = TextMain
+        containerColor = UestraColors.CardBg,
+        titleContentColor = UestraColors.Teal,
+        textContentColor = UestraColors.TextMain
     )
 }
 
