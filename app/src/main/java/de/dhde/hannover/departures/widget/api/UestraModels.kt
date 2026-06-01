@@ -4,6 +4,9 @@ import com.google.gson.annotations.SerializedName
 import java.time.Instant
 import java.time.Duration
 
+/** Verkehrsmittel-Kategorien für Filter und Badges. */
+enum class TransportType { TRAM, BUS, SBAHN, DB, FERNBUS }
+
 /**
  * Ersetzt das alte EFA-Modell durch das vom ÜSTRA-Proxy gelieferte Custom-JSON.
  */
@@ -22,58 +25,66 @@ data class DepartureItem(
     @SerializedName("infos") val infos: List<DepartureInfo>? = null,
     @SerializedName("hints") val hints: List<DepartureHint>? = null
 ) {
-    // Hilfsabfragen für das UI-Filtering
-    val isFernbus: Boolean get() {
+    /**
+     * Einzige Quelle der Verkehrsmittel-Klassifikation. Bewusst computed get()
+     * statt by lazy: Gson alloziert DepartureItem via Unsafe ohne Konstruktor,
+     * ein lazy-Delegate-Feld wäre null → NPE.
+     */
+    val transportTypes: Set<TransportType> get() {
         val s = lineShort.uppercase()
-        // Nur explizit als Fernbus identifizierbare Linien (FLX = FlixBus)
-        return s.startsWith("FLX") ||
-               line?.contains("Fernbus", ignoreCase = true) == true ||
-               lineId?.contains("flx%3A", ignoreCase = true) == true ||
-               lineId?.contains("flx:", ignoreCase = true) == true
-    }
-    
-    val isDB: Boolean get() {
-        val s = lineShort.uppercase()
-        // Wenn es explizit eine S-Bahn ist, ist es nicht "DB" im Sinne des Filters
-        if (s.startsWith("S") && s.length <= 2 && s.toIntOrNull() == null) return false
-        if (line?.contains("S-Bahn", ignoreCase = true) == true) return false
-        // Priorität: lineId-Präfix prüfen
-        val idMatch = lineId?.contains("ddb%3A", ignoreCase = true) == true ||
-               lineId?.contains("ddb:", ignoreCase = true) == true ||
-               lineId?.contains("db%3A", ignoreCase = true) == true ||
-               lineId?.contains("db:", ignoreCase = true) == true ||
-               lineId?.contains("met%3A", ignoreCase = true) == true ||
-               lineId?.contains("erx%3A", ignoreCase = true) == true
-        if (idMatch) return true
-        // Fallback: Linienbezeichner
-        return s.startsWith("RE") || s.startsWith("RB") ||
-               s.startsWith("IC") || s.startsWith("EC") || s.startsWith("EN") ||
-               s.startsWith("TGV") ||
-               line?.contains("Regionalbahn", ignoreCase = true) == true
+        val num = s.toIntOrNull()
+
+        val fernbus = s.startsWith("FLX") ||
+            line?.contains("Fernbus", ignoreCase = true) == true ||
+            lineId?.contains("flx%3A", ignoreCase = true) == true ||
+            lineId?.contains("flx:", ignoreCase = true) == true
+
+        val db = run {
+            if (s.startsWith("S") && s.length <= 2 && num == null) return@run false
+            if (line?.contains("S-Bahn", ignoreCase = true) == true) return@run false
+            val idMatch = lineId?.contains("ddb%3A", ignoreCase = true) == true ||
+                lineId?.contains("ddb:", ignoreCase = true) == true ||
+                lineId?.contains("db%3A", ignoreCase = true) == true ||
+                lineId?.contains("db:", ignoreCase = true) == true ||
+                lineId?.contains("met%3A", ignoreCase = true) == true ||
+                lineId?.contains("erx%3A", ignoreCase = true) == true
+            if (idMatch) return@run true
+            s.startsWith("RE") || s.startsWith("RB") ||
+                s.startsWith("IC") || s.startsWith("EC") || s.startsWith("EN") ||
+                s.startsWith("TGV") ||
+                line?.contains("Regionalbahn", ignoreCase = true) == true
+        }
+
+        val tram = line?.contains("Stadtbahn", ignoreCase = true) == true ||
+            (num != null && num in 1..17) ||
+            s == "E"
+
+        val bus = !fernbus && !db && (
+            line?.contains("Bus", ignoreCase = true) == true ||
+            (num != null && num >= 100) ||
+            s.startsWith("N")
+        )
+
+        val sbahn = !db && !fernbus && (
+            line?.contains("S-Bahn", ignoreCase = true) == true ||
+            (s.startsWith("S") && s.length <= 2)
+        )
+
+        return buildSet {
+            if (tram) add(TransportType.TRAM)
+            if (bus) add(TransportType.BUS)
+            if (sbahn) add(TransportType.SBAHN)
+            if (db) add(TransportType.DB)
+            if (fernbus) add(TransportType.FERNBUS)
+        }
     }
 
-    val isBus: Boolean get() {
-        if (isFernbus || isDB) return false
-        val s = lineShort.uppercase()
-        // Busse haben oft Nummern >= 100 oder fangen mit N an, oder enthalten explizit "Bus"
-        return line?.contains("Bus", ignoreCase = true) == true || 
-               (s.toIntOrNull() != null && s.toInt() >= 100) ||
-               s.startsWith("N")
-    }
-    val isTram: Boolean get() {
-        val s = lineShort.uppercase()
-        // Stadtbahnen in Hannover sind 1-17 oder E (Express/Einsatzwagen)
-        return line?.contains("Stadtbahn", ignoreCase = true) == true || 
-               (s.toIntOrNull() != null && s.toInt() in 1..17) ||
-               s == "E"
-    }
-    val isTrain: Boolean get() {
-        if (isDB || isFernbus) return false
-        val s = lineShort.uppercase()
-        // Nur noch reine S-Bahnen
-        return line?.contains("S-Bahn", ignoreCase = true) == true ||
-               (s.startsWith("S") && s.length <= 2)
-    }
+    // Abgeleitete Hilfsabfragen für das UI-Filtering (Namen/Verhalten unverändert)
+    val isFernbus: Boolean get() = TransportType.FERNBUS in transportTypes
+    val isDB: Boolean get() = TransportType.DB in transportTypes
+    val isBus: Boolean get() = TransportType.BUS in transportTypes
+    val isTram: Boolean get() = TransportType.TRAM in transportTypes
+    val isTrain: Boolean get() = TransportType.SBAHN in transportTypes
     
     // Die nächste verfügbare Abfahrtszeit (Echtzeit bevorzugt, abgelaufene Events überspringen)
     val nextDepartureTime: String?
@@ -92,10 +103,13 @@ data class DepartureItem(
     // Verspätung in Minuten
     val delayMinutes: Long? get() {
         val event = events?.firstOrNull() ?: return null
-        val planned = event.plannedTime?.let { Instant.parse(it) } ?: return null
-        val estimated = event.estimatedTime?.let { Instant.parse(it) } ?: return null
-        val diff = Duration.between(planned, estimated).toMinutes()
-        return if (diff > 0) diff else null
+        val planned = event.plannedTime ?: return null
+        val estimated = event.estimatedTime ?: return null
+        // Defensive: malformte Timestamps aus der API dürfen nicht crashen (vgl. nextDepartureTime/toFlatRows)
+        return runCatching {
+            val diff = Duration.between(Instant.parse(planned), Instant.parse(estimated)).toMinutes()
+            if (diff > 0) diff else null
+        }.getOrNull()
     }
 }
 
@@ -116,11 +130,7 @@ data class FlatDeparture(
     val lineId: String?,
     val destination: String?,
     val number: String?,
-    val isBus: Boolean,
-    val isTram: Boolean,
-    val isTrain: Boolean,
-    val isDB: Boolean,
-    val isFernbus: Boolean,
+    val transportTypes: Set<TransportType>,
     val departureTime: String,   // Echtzeit, falls vorhanden, sonst Planzeit
     val plannedTime: String?,
     val estimatedTime: String?,
@@ -128,11 +138,18 @@ data class FlatDeparture(
     val lineShort: String,
     val isCancelled: Boolean = false,
     val messages: List<String> = emptyList()
-)
+) {
+    val isBus: Boolean get() = TransportType.BUS in transportTypes
+    val isTram: Boolean get() = TransportType.TRAM in transportTypes
+    val isTrain: Boolean get() = TransportType.SBAHN in transportTypes   // S-Bahn only; DB-Fernverkehr ist isDB
+    val isDB: Boolean get() = TransportType.DB in transportTypes
+    val isFernbus: Boolean get() = TransportType.FERNBUS in transportTypes
+}
 
 /** Klappt alle zukünftigen Events eines DepartureItem zu einzelnen FlatDeparture-Zeilen auf. */
 fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
     val now = Instant.now().minusSeconds(cutoffSeconds)
+    val types = transportTypes
     return events.orEmpty()
         .filter { event ->
             val t = event.estimatedTime ?: event.plannedTime
@@ -140,13 +157,16 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
         }
         .map { event ->
             val dept = event.estimatedTime ?: event.plannedTime ?: return@map null
+            // Defensive: malformte Timestamps dürfen die Verspätungsberechnung nicht crashen lassen.
             val delay = if (event.plannedTime != null && event.estimatedTime != null) {
-                val d = Duration.between(Instant.parse(event.plannedTime), Instant.parse(event.estimatedTime)).toMinutes()
-                if (d > 0) d else null
+                runCatching {
+                    val d = Duration.between(Instant.parse(event.plannedTime), Instant.parse(event.estimatedTime)).toMinutes()
+                    if (d > 0) d else null
+                }.getOrNull()
             } else null
             FlatDeparture(
                 line = line, lineId = lineId, destination = destination?.removePrefix("Hannover/")?.trim(), number = number,
-                isBus = isBus, isTram = isTram, isTrain = isTrain, isDB = isDB, isFernbus = isFernbus,
+                transportTypes = types,
                 departureTime = dept,
                 plannedTime = event.plannedTime,
                 estimatedTime = event.estimatedTime,

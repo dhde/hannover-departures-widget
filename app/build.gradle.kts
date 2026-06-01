@@ -105,4 +105,7 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // Unit-Tests (JVM, kein Android-Context)
+    testImplementation("junit:junit:4.13.2")
 }

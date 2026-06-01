@@ -7,9 +7,10 @@ import org.junit.Assert.assertEquals
 
 class GsonTest {
     @Test
-    fun testIsCancelled() {
+    fun testIsCancelledMapsToApiCancelled() {
+        // Das API-Feld heißt "isCancelled" und wird auf DepartureItem.apiCancelled gemappt.
         val json = """{"line": "Stadtbahn 3", "isCancelled": true}"""
         val item = Gson().fromJson(json, DepartureItem::class.java)
-        assertEquals(true, item.isCancelled)
+        assertEquals(true, item.apiCancelled)
     }
 }
