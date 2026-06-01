@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.*
 
 val Context.cacheDataStore by preferencesDataStore(name = "departures_cache")
 
+/** Fallback-Haltestelle (Hannover Hauptbahnhof), wenn noch keine Station gewählt wurde. */
+const val DEFAULT_STATION_ID = "25000031"
+
 /** Caches departures and widget UI states locally per station. */
 class DeparturesCache(private val context: Context) {
 
@@ -41,7 +44,7 @@ class DeparturesCache(private val context: Context) {
     }
 
     suspend fun getStationId(): String = 
-        context.cacheDataStore.data.map { it[STATION_ID] }.first() ?: "25000031"
+        context.cacheDataStore.data.map { it[STATION_ID] }.first() ?: DEFAULT_STATION_ID
 
     suspend fun getDeparturesJson(stationId: String): String = 
         context.cacheDataStore.data.map { it[departuresKey(stationId)] }.first() ?: "[]"
@@ -65,7 +68,7 @@ class DeparturesCache(private val context: Context) {
         context.cacheDataStore.data.map { it[departuresKey(stationId)] ?: "[]" }
         
     fun getStationIdFlow(): Flow<String> = 
-        context.cacheDataStore.data.map { it[STATION_ID] ?: "25000031" }
+        context.cacheDataStore.data.map { it[STATION_ID] ?: DEFAULT_STATION_ID }
 
     fun getLastUpdatedFlow(stationId: String): Flow<String> = 
         context.cacheDataStore.data.map { it[updatedKey(stationId)] ?: "" }

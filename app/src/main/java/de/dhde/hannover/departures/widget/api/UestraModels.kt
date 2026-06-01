@@ -92,10 +92,13 @@ data class DepartureItem(
     // Verspätung in Minuten
     val delayMinutes: Long? get() {
         val event = events?.firstOrNull() ?: return null
-        val planned = event.plannedTime?.let { Instant.parse(it) } ?: return null
-        val estimated = event.estimatedTime?.let { Instant.parse(it) } ?: return null
-        val diff = Duration.between(planned, estimated).toMinutes()
-        return if (diff > 0) diff else null
+        val planned = event.plannedTime ?: return null
+        val estimated = event.estimatedTime ?: return null
+        // Defensive: malformte Timestamps aus der API dürfen nicht crashen (vgl. nextDepartureTime/toFlatRows)
+        return runCatching {
+            val diff = Duration.between(Instant.parse(planned), Instant.parse(estimated)).toMinutes()
+            if (diff > 0) diff else null
+        }.getOrNull()
     }
 }
 
@@ -140,9 +143,12 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
         }
         .map { event ->
             val dept = event.estimatedTime ?: event.plannedTime ?: return@map null
+            // Defensive: malformte Timestamps dürfen die Verspätungsberechnung nicht crashen lassen.
             val delay = if (event.plannedTime != null && event.estimatedTime != null) {
-                val d = Duration.between(Instant.parse(event.plannedTime), Instant.parse(event.estimatedTime)).toMinutes()
-                if (d > 0) d else null
+                runCatching {
+                    val d = Duration.between(Instant.parse(event.plannedTime), Instant.parse(event.estimatedTime)).toMinutes()
+                    if (d > 0) d else null
+                }.getOrNull()
             } else null
             FlatDeparture(
                 line = line, lineId = lineId, destination = destination?.removePrefix("Hannover/")?.trim(), number = number,

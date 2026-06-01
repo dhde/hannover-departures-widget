@@ -25,7 +25,13 @@ interface UestraApi {
     companion object {
         private const val WEB_BASE_URL = "https://abfahrten.uestra.de/"
 
-        fun create(): UestraApi {
+        // Geteilte Instanz: ein OkHttpClient/Retrofit bringt eigenen Connection- und Thread-Pool
+        // mit – pro Aufruf neu zu bauen ist teuer. Daher einmal lazy erzeugen.
+        private val instance: UestraApi by lazy { build() }
+
+        fun create(): UestraApi = instance
+
+        private fun build(): UestraApi {
             val client = OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.SECONDS)

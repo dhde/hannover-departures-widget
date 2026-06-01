@@ -10,7 +10,7 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
 /**
- * Läuft jede Minute und triggert ein Widget-Redraw.
+ * Läuft alle 15 Minuten (Minimum für periodische WorkManager-Arbeit) und triggert ein Widget-Redraw.
  * Kein API-Aufruf — die gecachten Abfahrtszeiten bleiben,
  * aber minutesUntil() wird mit der aktuellen Zeit neu berechnet.
  */

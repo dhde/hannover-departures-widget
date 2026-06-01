@@ -38,6 +38,7 @@ import de.dhde.hannover.departures.widget.data.FavoriteStation
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.DeparturesCache
 import de.dhde.hannover.departures.widget.data.filterMessages
+import de.dhde.hannover.departures.widget.data.DEFAULT_STATION_ID
 import de.dhde.hannover.departures.widget.widget.RefreshAction
 import de.dhde.hannover.departures.widget.widget.ChangeTabAction
 import de.dhde.hannover.departures.widget.widget.ChangeStationAction
@@ -95,8 +96,8 @@ class DeparturesWidget : GlanceAppWidget() {
         val repo = FavoritesRepository(context)
 
         provideContent {
-            val stationIdState by repo.activeStationId.collectAsState(initial = "25000031")
-            val stationId = stationIdState ?: "25000031"
+            val stationIdState by repo.activeStationId.collectAsState(initial = DEFAULT_STATION_ID)
+            val stationId = stationIdState ?: DEFAULT_STATION_ID
             
             val maxFavorites by repo.maxFavoritesFlow.collectAsState(initial = 3)
             val maxFavRows by repo.maxFavRowsFlow.collectAsState(initial = 1)

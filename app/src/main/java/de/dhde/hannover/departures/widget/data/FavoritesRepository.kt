@@ -87,10 +87,15 @@ class FavoritesRepository(private val context: Context) {
             }
         }
         
+        // Deterministisch deduplizieren: ein zufälliges UUID je Emission würde dazu führen,
+        // dass die aktive Auswahl (ACTIVE_FAVORITE_UNIQUE_ID) nach dem nächsten Read nicht mehr
+        // matcht. Stattdessen positionsstabiler Suffix → identischer Output bei gleicher Liste.
         val seen = mutableSetOf<String>()
-        list.map { fav ->
+        list.mapIndexed { index, fav ->
             if (!seen.add(fav.safeUniqueId)) {
-                fav.copy(uniqueId = java.util.UUID.randomUUID().toString())
+                val deduped = "${fav.safeUniqueId}#$index"
+                seen.add(deduped)
+                fav.copy(uniqueId = deduped)
             } else fav
         }
     }
@@ -117,29 +122,15 @@ class FavoritesRepository(private val context: Context) {
         cache.setDirectionState(realId, fav?.directionFilter ?: "ALL")
     }
 
-    suspend fun getActiveStationIdNow(): String {
-        var id = "25000031"
-        context.dataStore.data.map { prefs -> prefs[ACTIVE_STATION_ID] }.take(1).collect { saved ->
-            if (saved != null) id = saved
-        }
-        return id
-    }
+    suspend fun getActiveStationIdNow(): String =
+        context.dataStore.data.first()[ACTIVE_STATION_ID] ?: DEFAULT_STATION_ID
 
-    suspend fun getActiveFavoriteUniqueIdNow(): String? {
-        var uniqueId: String? = null
-        context.dataStore.data.map { prefs -> prefs[ACTIVE_FAVORITE_UNIQUE_ID] }.take(1).collect { saved ->
-            uniqueId = saved
-        }
-        return uniqueId
-    }
+    suspend fun getActiveFavoriteUniqueIdNow(): String? =
+        context.dataStore.data.first()[ACTIVE_FAVORITE_UNIQUE_ID]
 
     // ── Favoriten ────────────────────────────────────────────────────────────
 
-    suspend fun getFavoritesNow(): List<FavoriteStation> {
-        var list = emptyList<FavoriteStation>()
-        favoritesFlow.take(1).collect { list = it }
-        return list
-    }
+    suspend fun getFavoritesNow(): List<FavoriteStation> = favoritesFlow.first()
 
     suspend fun addFavorite(id: String, name: String) {
         val current = getFavoritesNow().toMutableList()
@@ -412,11 +403,7 @@ class FavoritesRepository(private val context: Context) {
         }
     }
 
-    suspend fun getAutoRefreshOnInteractionNow(): Boolean {
-        var value = false
-        autoRefreshOnInteractionFlow.take(1).collect { value = it }
-        return value
-    }
+    suspend fun getAutoRefreshOnInteractionNow(): Boolean = autoRefreshOnInteractionFlow.first()
 
     // ── Grouped Departure Font Size ──────────────────────────────────────────
 
