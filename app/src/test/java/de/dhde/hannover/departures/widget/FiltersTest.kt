@@ -24,6 +24,17 @@ class FiltersTest {
     }
 
     @Test
+    fun storageValues_areLegacyValues() {
+        // Sichert die Back-Compat-Speicherform gegen versehentliches Umbenennen ab.
+        assertEquals("ALL", TransportFilter.ALL.storageValue)
+        assertEquals("BUS", TransportFilter.BUS.storageValue)
+        assertEquals("TRAIN", TransportFilter.TRAM.storageValue) // Legacy: Tram wird als "TRAIN" gespeichert
+        assertEquals("ALL", DirectionFilter.ALL.storageValue)
+        assertEquals("H", DirectionFilter.INBOUND.storageValue)
+        assertEquals("R", DirectionFilter.OUTBOUND.storageValue)
+    }
+
+    @Test
     fun directionFilter_roundTrip() {
         for (f in DirectionFilter.entries) {
             assertEquals(f, DirectionFilter.fromStorage(f.storageValue))
