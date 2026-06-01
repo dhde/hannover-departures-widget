@@ -77,7 +77,7 @@ class RefreshAction : ActionCallback {
                                     val types = mutableSetOf<String>()
                                     if (dep.isBus) types.add("Bus")
                                     if (dep.isTram) types.add("Stadtbahn")
-                                    if (dep.isTrain) types.add("S-Bahn")
+                                    if (dep.isSBahn) types.add("S-Bahn")
                                     if (dep.isDB) types.add("DB")
                                     if (dep.isFernbus) types.add("Fernbus")
                                     

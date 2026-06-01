@@ -84,8 +84,8 @@ data class DepartureItem(
     val isDB: Boolean get() = TransportType.DB in transportTypes
     val isBus: Boolean get() = TransportType.BUS in transportTypes
     val isTram: Boolean get() = TransportType.TRAM in transportTypes
-    val isTrain: Boolean get() = TransportType.SBAHN in transportTypes
-    
+    val isSBahn: Boolean get() = TransportType.SBAHN in transportTypes
+
     // Die nächste verfügbare Abfahrtszeit (Echtzeit bevorzugt, abgelaufene Events überspringen)
     val nextDepartureTime: String?
         get() {
@@ -141,7 +141,7 @@ data class FlatDeparture(
 ) {
     val isBus: Boolean get() = TransportType.BUS in transportTypes
     val isTram: Boolean get() = TransportType.TRAM in transportTypes
-    val isTrain: Boolean get() = TransportType.SBAHN in transportTypes   // S-Bahn only; DB-Fernverkehr ist isDB
+    val isSBahn: Boolean get() = TransportType.SBAHN in transportTypes   // S-Bahn; DB-Fernverkehr ist isDB
     val isDB: Boolean get() = TransportType.DB in transportTypes
     val isFernbus: Boolean get() = TransportType.FERNBUS in transportTypes
 }

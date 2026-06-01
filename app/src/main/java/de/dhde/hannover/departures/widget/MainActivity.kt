@@ -396,7 +396,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             it.isDB -> "DB" in transportFilters
             it.isBus -> "Bus" in transportFilters
             it.isTram -> "Stadtbahn" in transportFilters
-            it.isTrain -> "S-Bahn" in transportFilters
+            it.isSBahn -> "S-Bahn" in transportFilters
             // Unbekannter Typ (z.B. unbekannte Züge): nur anzeigen wenn kein Filter aktiv
             else -> !isAnyTypeExcluded
         }

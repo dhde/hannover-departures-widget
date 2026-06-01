@@ -122,7 +122,7 @@ class UestraModelsTest {
         assertEquals(setOf(TransportType.TRAM), rows.first().transportTypes)
         assertTrue(rows.first().isTram)
         assertFalse(rows.first().isBus)
-        assertFalse(rows.first().isTrain)
+        assertFalse(rows.first().isSBahn)
     }
 
     @Test
