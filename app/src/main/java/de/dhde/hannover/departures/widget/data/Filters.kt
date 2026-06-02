@@ -23,3 +23,14 @@ enum class DirectionFilter(val storageValue: String) {
             entries.firstOrNull { it.storageValue == value } ?: ALL
     }
 }
+
+/**
+ * Leitet die Fahrtrichtung aus dem EFA-lineId-Suffix ab:
+ * Endung „H" = stadteinwärts (INBOUND), „R" = stadtauswärts (OUTBOUND), sonst null.
+ */
+fun lineDirection(lineId: String?): DirectionFilter? = when {
+    lineId == null -> null
+    lineId.endsWith("H", ignoreCase = true) -> DirectionFilter.INBOUND
+    lineId.endsWith("R", ignoreCase = true) -> DirectionFilter.OUTBOUND
+    else -> null
+}

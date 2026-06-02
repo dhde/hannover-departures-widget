@@ -35,10 +35,6 @@ object UestraColors {
     val BorderSubtle     = Color(0xFF3A3A5A) // unfokussierter Feldrand
     val DarkGreenTint    = Color(0xFF141F14) // dezenter Dunkelgrün-Tint
 
-    // ── Alpha-Overlays ───────────────────────────────────────────────────────
-    val Shadow           = Color(0x4D000000) // Schatten
-    val SubtleWhite      = Color(0x14FFFFFF) // dezentes Weiß-Overlay
-
     // ── GVH-Linienfarben (Stadtbahn-Strecken + Bus) ──────────────────────────
     val LineRed       = Color(0xFFE3001B) // ÜSTRA-Rot: B-Strecke (1,2,8) + Standard-Bus
     val LineBlue      = Color(0xFF005A9B) // A-Strecke (3,7,9,13) + Tram-Tab
