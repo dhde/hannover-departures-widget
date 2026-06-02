@@ -415,14 +415,28 @@ class FavoritesRepository(private val context: Context) {
     }
 }
 
+/** Kritische Meldungen, die nie ausgeblendet werden dürfen (Schlüsselwort-basiert, klein-geschrieben). */
+val NON_FILTERABLE_MESSAGE_KEYWORDS = listOf(
+    "entfällt", "entfallen",
+    "ersatzverkehr", "schienenersatz", "sev",
+    "streik", "warnstreik",
+    "sperrung", "gesperrt", "vollsperrung",
+    "notarzt"
+)
+
+fun isProtectedMessage(message: String): Boolean {
+    val lower = message.lowercase()
+    return NON_FILTERABLE_MESSAGE_KEYWORDS.any { lower.contains(it) }
+}
+
 /**
- * Filtert Meldungen anhand der vom Benutzer ausgewählten ignorierten Texte.
- * Direkter Textvergleich (case-insensitive contains) – keine hardcodierten Keywords.
+ * Filtert Meldungen anhand der ignorierten Texte (case-insensitive contains).
+ * Geschützte (kritische) Meldungen werden NIE ausgeblendet (isProtectedMessage).
  */
 fun filterMessages(messages: List<String>, ignoredCategories: Set<String>): List<String> {
-    if (ignoredCategories.isEmpty()) return messages
     return messages.filter { msg ->
-        val lowerMsg = msg.trim().lowercase()
-        ignoredCategories.none { ignored -> lowerMsg.contains(ignored.trim().lowercase()) }
+        isProtectedMessage(msg) || ignoredCategories.none { ignored ->
+            msg.trim().lowercase().contains(ignored.trim().lowercase())
+        }
     }
 }
