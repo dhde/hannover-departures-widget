@@ -1,5 +1,7 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
     android:viewportWidth="24.0" android:viewportHeight="24.0">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M15,11V5l-3,-3 -3,3v2H3v14h18V11h-3zm-8,8H5v-2h2v2zm0,-4H5v-2h2v2zm0,-4H5V9h2v2zm6,8h-2v-2h2v2zm0,-4h-2v-2h2v2zm0,-4h-2V9h2v2zm0,-4h-2V5h2v2zm6,12h-2v-2h2v2zm0,-4h-2v-2h2v2z"/>
+    <!-- Stadteinwärts: Skyline (drei Häuser) als Aussparung im Kreis-Badge. Einfarbig/tönbar via evenOdd. -->
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M1,12 A11,11 0 1 0 23,12 A11,11 0 1 0 1,12 Z M6,11.5 H9 V16.5 H6 Z M9.8,8.5 H12.8 V16.5 H9.8 Z M13.6,10.5 H17 V16.5 H13.6 Z"/>
 </vector>
