@@ -673,30 +673,38 @@ fun WidgetFilterRow(
     }
 }
 
-@Composable
-fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, filterHeight: String = "STANDARD", onClick: () -> Unit) {
-    val bgColor = if (isActive) activeColor else UestraColors.ChipInactive
-    
-    val (width, height, iconSize) = when (filterHeight) {
-        "KOMPAKT" -> Triple(28.dp, 20.dp, 12.dp)
-        "GROSS" -> Triple(40.dp, 30.dp, 20.dp)
-        else -> Triple(34.dp, 24.dp, 16.dp)
-    }
+fun filterSegmentSize(mode: String): Triple<androidx.compose.ui.unit.Dp, androidx.compose.ui.unit.Dp, androidx.compose.ui.unit.Dp> = when (mode) {
+    "KOMPAKT" -> Triple(28.dp, 20.dp, 12.dp)
+    "GROSS"   -> Triple(40.dp, 30.dp, 20.dp)
+    else      -> Triple(34.dp, 24.dp, 16.dp)
+}
+fun favoritesButtonSize(mode: String): Pair<androidx.compose.ui.unit.Dp, androidx.compose.ui.unit.TextUnit> = when (mode) {
+    "KOMPAKT" -> 2.dp to 10.sp
+    "GROSS"   -> 10.dp to 13.sp
+    else      -> 6.dp to 11.sp
+}
+fun groupedSubFontSize(mode: String): androidx.compose.ui.unit.TextUnit = when (mode) {
+    "KLEIN" -> 9.sp
+    "GROSS" -> 13.sp
+    else    -> 10.sp
+}
 
+@Composable
+fun SegmentButtonVisual(iconRes: Int, isActive: Boolean, activeColor: Color, mode: String) {
+    val bgColor = if (isActive) activeColor else UestraColors.ChipInactive
+    val (width, height, iconSize) = filterSegmentSize(mode)
     Box(
-        modifier = Modifier
-            .size(width, height)
-            .clip(RoundedCornerShape(6.dp))
-            .background(bgColor)
-            .clickable { onClick() },
+        modifier = Modifier.size(width, height).clip(RoundedCornerShape(6.dp)).background(bgColor),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            androidx.compose.ui.res.painterResource(iconRes),
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(iconSize)
-        )
+        Icon(androidx.compose.ui.res.painterResource(iconRes), contentDescription = null, tint = Color.White, modifier = Modifier.size(iconSize))
+    }
+}
+
+@Composable
+fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, filterHeight: String = "STANDARD", onClick: () -> Unit) {
+    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onClick() }) {
+        SegmentButtonVisual(iconRes, isActive, activeColor, filterHeight)
     }
 }
 
@@ -782,11 +790,7 @@ fun WidgetFlatDepartureRow(
                 )
 
                 if (subsequentDepartures.isNotEmpty()) {
-                    val subFontSize = when (groupedFontSize) {
-                        "KLEIN"  -> 9.sp
-                        "GROSS"  -> 13.sp
-                        else     -> 10.sp
-                    }
+                    val subFontSize = groupedSubFontSize(groupedFontSize)
                     val subText = subsequentDepartures.joinToString(", ") { subDep ->
                         var t = if (timeDisplayMode == "CLOCK") {
                             try {
@@ -953,23 +957,29 @@ fun WidgetLineBadge(line: String, isBus: Boolean) {
 }
 
 @Composable
+fun FavoriteButtonVisual(label: String, isSelected: Boolean, mode: String, modifier: Modifier = Modifier) {
+    val (vertPadding, fontSize) = favoritesButtonSize(mode)
+    val bgColor = if (isSelected) UestraColors.LineBlue else UestraColors.ChipInactive
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(6.dp)).background(bgColor).padding(vertical = vertPadding),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = label, color = Color.White, fontSize = fontSize, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+    }
+}
+
+@Composable
 fun WidgetFavoritesRow(
-    favorites: List<de.dhde.hannover.departures.widget.data.FavoriteStation>, 
-    currentStationId: String?, 
+    favorites: List<de.dhde.hannover.departures.widget.data.FavoriteStation>,
+    currentStationId: String?,
     maxFavorites: Int,
     maxFavRows: Int,
     favoritesHeight: String = "STANDARD",
     onSelect: (de.dhde.hannover.departures.widget.data.FavoriteStation) -> Unit
 ) {
     if (favorites.isEmpty() || maxFavorites <= 0 || maxFavRows <= 0) return
-    
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
-        val (vertPadding, fontSize) = when (favoritesHeight) {
-            "KOMPAKT" -> 2.dp to 10.sp
-            "GROSS" -> 10.dp to 13.sp
-            else -> 6.dp to 11.sp
-        }
 
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
         val visibleFavs = favorites.take(maxFavorites * maxFavRows)
         visibleFavs.chunked(maxFavorites).forEach { chunk ->
             Row(
@@ -980,27 +990,12 @@ fun WidgetFavoritesRow(
                     val label = fav.alias ?: fav.name.replace(Regex("\\bHannover\\b", RegexOption.IGNORE_CASE), "").replace(Regex("[,/()]+"), " ").trim().split(" ").firstOrNull() ?: fav.name
                     val shortLabel = if (label.length > 8) label.take(7) + "." else label
                     val isSelected = fav.safeUniqueId == currentStationId
-                    val bgColor = if (isSelected) UestraColors.LineBlue else UestraColors.ChipInactive
 
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(bgColor)
-                            .clickable { onSelect(fav) }
-                            .padding(vertical = vertPadding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = shortLabel,
-                            color = Color.White,
-                            fontSize = fontSize,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            maxLines = 1
-                        )
+                    Box(modifier = Modifier.weight(1f).clickable { onSelect(fav) }) {
+                        FavoriteButtonVisual(shortLabel, isSelected, favoritesHeight, Modifier.fillMaxWidth())
                     }
                 }
-                
+
                 // Fill remaining space if chunk is smaller than maxFavorites
                 val missing = maxFavorites - chunk.size
                 repeat(missing) {
