@@ -42,6 +42,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import de.dhde.hannover.departures.widget.api.StationSearchResult
 import de.dhde.hannover.departures.widget.api.UestraApi
 import de.dhde.hannover.departures.widget.api.FlatDeparture
@@ -603,8 +605,14 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        // Framework-Drawables (wie im Widget) über Drawable->Bitmap laden:
+        // Compose painterResource() unterstützt android.R.drawable.* NICHT.
+        val headerCtx = LocalContext.current
+        val gpsBitmap = remember {
+            ContextCompat.getDrawable(headerCtx, android.R.drawable.ic_menu_mylocation)!!.toBitmap().asImageBitmap()
+        }
         Icon(
-            androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_mylocation),
+            bitmap = gpsBitmap,
             contentDescription = null,
             tint = Color.Gray,
             modifier = Modifier.padding(end = 8.dp).size(20.dp)
@@ -612,8 +620,11 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
         if (isRefreshing) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), color = UestraColors.GpsBlue, strokeWidth = 2.dp)
         } else {
+            val syncBitmap = remember {
+                ContextCompat.getDrawable(headerCtx, android.R.drawable.ic_popup_sync)!!.toBitmap().asImageBitmap()
+            }
             Icon(
-                androidx.compose.ui.res.painterResource(android.R.drawable.ic_popup_sync),
+                bitmap = syncBitmap,
                 contentDescription = "Refresh",
                 tint = Color.Gray,
                 modifier = Modifier.size(20.dp).clickable { onRefresh() }
