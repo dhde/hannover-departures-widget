@@ -42,6 +42,7 @@ import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.filterMessages
+import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.data.DEFAULT_STATION_ID
 import de.dhde.hannover.departures.widget.widget.RefreshAction
 import de.dhde.hannover.departures.widget.widget.ChangeTabAction
@@ -217,7 +218,7 @@ class DeparturesWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .fillMaxSize()
                 .appWidgetBackground()
-                .background(ColorProvider(Color(0xFF121212)))
+                .background(ColorProvider(UestraColors.WidgetBackground))
         ) {
             // --- Hintergrund-Icon (Subtil) ---
             BackgroundIcon(tabState)
@@ -276,7 +277,7 @@ class DeparturesWidget : GlanceAppWidget() {
             FilterSegmentedRow(departures, tabState, directionState, filterHeight)
 
             if (status == "error" && errorMsg.isNotEmpty()) {
-                Text("⚠️ $errorMsg", style = TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 12.sp, fontWeight = FontWeight.Medium), modifier = GlanceModifier.padding(vertical = 4.dp))
+                Text("⚠️ $errorMsg", style = TextStyle(color = ColorProvider(UestraColors.Warning), fontSize = 12.sp, fontWeight = FontWeight.Medium), modifier = GlanceModifier.padding(vertical = 4.dp))
             }
 
             val minutesSinceUpdate = if (lastUpdated.isNotEmpty()) {
@@ -355,7 +356,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 provider = ImageProvider(iconRes),
                 contentDescription = null,
                 modifier = GlanceModifier.size(130.dp), 
-                colorFilter = ColorFilter.tint(ColorProvider(Color(0xFF141F14))) // Ganz dezentes Dunkelgrün
+                colorFilter = ColorFilter.tint(ColorProvider(UestraColors.DarkGreenTint)) // Ganz dezentes Dunkelgrün
             )
         }
     }
@@ -384,7 +385,7 @@ class DeparturesWidget : GlanceAppWidget() {
                         provider = ImageProvider(android.R.drawable.ic_dialog_info),
                         contentDescription = "Meldungen",
                         modifier = GlanceModifier.size(20.dp),
-                        colorFilter = ColorFilter.tint(ColorProvider(Color(0xFFFFB300)))
+                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.Amber))
                     )
                 }
             }
@@ -407,7 +408,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<ChangeStationAction>())
             )
             
-            val gpsIconColor = if (gpsModeActive) Color(0xFF4285F4) else Color.Gray
+            val gpsIconColor = if (gpsModeActive) UestraColors.GpsBlue else Color.Gray
 
             Image(
                 provider = ImageProvider(android.R.drawable.ic_menu_mylocation),
@@ -418,7 +419,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
             if (isRefreshing) {
                 CircularProgressIndicator(
-                    color = ColorProvider(Color(0xFF4285F4)),
+                    color = ColorProvider(UestraColors.GpsBlue),
                     modifier = GlanceModifier.size(24.dp)
                 )
             } else {
@@ -470,7 +471,7 @@ class DeparturesWidget : GlanceAppWidget() {
                                 .firstOrNull() ?: fav.name
                         val shortLabel = if (label.length > 8) label.take(7) + "." else label
                         val isActive = fav.safeUniqueId == currentStationId
-                        val bgColor = if (isActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
+                        val bgColor = if (isActive) UestraColors.LineBlue else UestraColors.ChipInactive
 
                         Box(
                             modifier = GlanceModifier
@@ -499,7 +500,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     val isLastRow = rowIndex == maxFavRows - 1
                     if (isLastRow && needsCycle) {
                         val isRemainingActive = favorites.drop(maxVisible).any { it.safeUniqueId == currentStationId }
-                        val bgColor = if (isRemainingActive) Color(0xFF005A9B) else Color(0xFF2A2A2A)
+                        val bgColor = if (isRemainingActive) UestraColors.LineBlue else UestraColors.ChipInactive
                         Box(
                             modifier = GlanceModifier
                                 .defaultWeight()
@@ -532,9 +533,9 @@ class DeparturesWidget : GlanceAppWidget() {
     @Composable
     private fun FilterToggleButton(tabState: TransportFilter) {
         val (label, bgColor) = when (tabState) {
-            TransportFilter.BUS -> "Nur Bus" to Color(0xFFE94560)
-            TransportFilter.TRAM -> "Nur Bahn" to Color(0xFF0F7173)
-            else -> "Alle Typen" to Color(0xFF333333)
+            TransportFilter.BUS -> "Nur Bus" to UestraColors.AccentRed
+            TransportFilter.TRAM -> "Nur Bahn" to UestraColors.Teal
+            else -> "Alle Typen" to UestraColors.ChipNeutral
         }
         
         Box(
@@ -559,8 +560,8 @@ class DeparturesWidget : GlanceAppWidget() {
     @Composable
     private fun FlatDepartureRow(departure: FlatDeparture, subsequentDepartures: List<FlatDeparture>, timeDisplayMode: String, isWarning: Boolean, groupedFontSize: String = "STANDARD") {
         val rowBgColor = when {
-            departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF)
-            departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000)
+            departure.lineId?.endsWith("H", ignoreCase = true) == true -> UestraColors.SubtleWhite
+            departure.lineId?.endsWith("R", ignoreCase = true) == true -> UestraColors.Shadow
             else -> Color.Transparent
         }
 
@@ -601,9 +602,9 @@ class DeparturesWidget : GlanceAppWidget() {
 
             val timeStyle = when {
                 isWarning -> TextStyle(color = ColorProvider(Color.Gray), fontSize = 14.sp, fontStyle = FontStyle.Italic)
-                departure.isCancelled -> TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                hasDelay -> TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                else -> TextStyle(color = ColorProvider(Color(0xFF4CAF50)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                departure.isCancelled -> TextStyle(color = ColorProvider(UestraColors.AccentRed), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                hasDelay -> TextStyle(color = ColorProvider(UestraColors.Warning), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                else -> TextStyle(color = ColorProvider(UestraColors.OkGreen), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
 
             Column(horizontalAlignment = Alignment.End) {
@@ -638,7 +639,7 @@ class DeparturesWidget : GlanceAppWidget() {
             ) {
                 Text(
                     text = "Fahrt entfällt",
-                    style = TextStyle(color = ColorProvider(Color(0xFFE94560)), fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(color = ColorProvider(UestraColors.AccentRed), fontSize = 12.sp, fontWeight = FontWeight.Bold),
                     modifier = GlanceModifier.padding(end = 8.dp)
                 )
             }
@@ -650,9 +651,9 @@ class DeparturesWidget : GlanceAppWidget() {
     private fun DepartureRow(departure: DepartureItem, timeDisplayMode: String, isWarning: Boolean) {
         val rowBgColor = when {
             // "City" (H) aufhellen: Sehr sanftes, transluzentes Weiß (ca. 8% Deckkraft)
-            departure.lineId?.endsWith("H", ignoreCase = true) == true -> Color(0x14FFFFFF) 
+            departure.lineId?.endsWith("H", ignoreCase = true) == true -> UestraColors.SubtleWhite
             // "Home" (R) abdunkeln: Zartes, dunkles Schwarz (ca. 30% Deckkraft macht das Dunkelgrau zu Tiefschwarz)
-            departure.lineId?.endsWith("R", ignoreCase = true) == true -> Color(0x4D000000) 
+            departure.lineId?.endsWith("R", ignoreCase = true) == true -> UestraColors.Shadow
             else -> Color.Transparent
         }
 
@@ -684,8 +685,8 @@ class DeparturesWidget : GlanceAppWidget() {
             // Wenn ab 2 Min veraltet: Grau und Kursiv. Wenn Verspätung: Orange. Sonst Gruen und Fett
             val timeStyle = when {
                 isWarning -> TextStyle(color = ColorProvider(Color.Gray), fontSize = 14.sp, fontStyle = FontStyle.Italic)
-                hasDelay -> TextStyle(color = ColorProvider(Color(0xFFFF9800)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                else -> TextStyle(color = ColorProvider(Color(0xFF4CAF50)), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                hasDelay -> TextStyle(color = ColorProvider(UestraColors.Warning), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                else -> TextStyle(color = ColorProvider(UestraColors.OkGreen), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
 
             Text(
@@ -701,16 +702,16 @@ class DeparturesWidget : GlanceAppWidget() {
             val isSprintH = line.length == 3 && line[0] in '3'..'9' && line.substring(1) == "00"
             // sprintH Linien (300, 400, 500, 600, 700, 800, 900) sind Magenta
             if (isSprintH) {
-                Color(0xFFB42082) to Color.White
+                UestraColors.SprintMagenta to Color.White
             } else {
-                Color(0xFFE3001B) to Color.White // Standard ÜSTRA-Rot für andere Busse
+                UestraColors.LineRed to Color.White // Standard ÜSTRA-Rot für andere Busse
             }
         } else {
             when (line) {
-                "1", "2", "8" -> Color(0xFFE3001B) to Color.White     // B-Strecke (Rot)
-                "3", "7", "9", "13" -> Color(0xFF005A9B) to Color.White // A-Strecke (Blau)
-                "4", "5", "6", "11" -> Color(0xFFFFCC00) to Color.Black // C-Strecke (Gelb)
-                "10", "17" -> Color(0xFF009A44) to Color.White    // D-Strecke (Grün)
+                "1", "2", "8" -> UestraColors.LineRed to Color.White     // B-Strecke (Rot)
+                "3", "7", "9", "13" -> UestraColors.LineBlue to Color.White // A-Strecke (Blau)
+                "4", "5", "6", "11" -> UestraColors.LineYellow to Color.Black // C-Strecke (Gelb)
+                "10", "17" -> UestraColors.LineGreen to Color.White    // D-Strecke (Grün)
                 else -> Color.Gray to Color.White
             }
         }
@@ -747,11 +748,11 @@ class DeparturesWidget : GlanceAppWidget() {
         ) {
             // --- Gruppe VEHICLE (Links-bündig) ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SegmentButton(R.drawable.ic_widget_bus, null, tabState == TransportFilter.BUS, Color(0xFFE94560), filterHeight) {
+                SegmentButton(R.drawable.ic_widget_bus, null, tabState == TransportFilter.BUS, UestraColors.AccentRed, filterHeight) {
                      actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to TransportFilter.BUS.storageValue))
                 }
                 Spacer(modifier = GlanceModifier.width(2.dp))
-                SegmentButton(R.drawable.ic_widget_tram, null, tabState == TransportFilter.TRAM, Color(0xFF005A9B), filterHeight) {
+                SegmentButton(R.drawable.ic_widget_tram, null, tabState == TransportFilter.TRAM, UestraColors.LineBlue, filterHeight) {
                      actionRunCallback<ChangeTabAction>(actionParametersOf(ChangeTabAction.KEY_TAB to TransportFilter.TRAM.storageValue))
                 }
             }
@@ -763,13 +764,13 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showDirectionGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasH) {
-                        SegmentButton(R.drawable.ic_widget_city, null, directionState == DirectionFilter.INBOUND, Color(0xFF0F7173), filterHeight) {
+                        SegmentButton(R.drawable.ic_widget_city, null, directionState == DirectionFilter.INBOUND, UestraColors.Teal, filterHeight) {
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to DirectionFilter.INBOUND.storageValue))
                         }
                         if (hasR) Spacer(modifier = GlanceModifier.width(2.dp))
                     }
                     if (hasR) {
-                        SegmentButton(R.drawable.ic_widget_home, null, directionState == DirectionFilter.OUTBOUND, Color(0xFFE94560), filterHeight) {
+                        SegmentButton(R.drawable.ic_widget_home, null, directionState == DirectionFilter.OUTBOUND, UestraColors.AccentRed, filterHeight) {
                             actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to DirectionFilter.OUTBOUND.storageValue))
                         }
                     }
@@ -787,7 +788,7 @@ class DeparturesWidget : GlanceAppWidget() {
         filterHeight: String = "STANDARD",
         onClick: () -> androidx.glance.action.Action
     ) {
-        val bgColor = if (isActive) activeColor else Color(0xFF252525)
+        val bgColor = if (isActive) activeColor else UestraColors.SegmentInactive
         val contentColor = if (isActive) Color.White else Color.Gray
 
         val (vertPadding, iconSize) = when (filterHeight) {
@@ -833,7 +834,7 @@ class DeparturesWidget : GlanceAppWidget() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             val footerText = if (isStale) "Stand: $timeStr (Veraltet ⚠️)" else "Stand: $timeStr"
-            val footerColor = if (isStale) Color(0xFFFF9800) else Color.Gray
+            val footerColor = if (isStale) UestraColors.Warning else Color.Gray
 
             Text(
                 text = footerText,
