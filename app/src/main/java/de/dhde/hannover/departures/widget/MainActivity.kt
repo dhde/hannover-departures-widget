@@ -604,7 +604,7 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
             modifier = Modifier.weight(1f)
         )
         Icon(
-            Icons.Default.LocationOn,
+            androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_mylocation),
             contentDescription = null,
             tint = Color.Gray,
             modifier = Modifier.padding(end = 8.dp).size(20.dp)
@@ -613,7 +613,7 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
             CircularProgressIndicator(modifier = Modifier.size(20.dp), color = UestraColors.GpsBlue, strokeWidth = 2.dp)
         } else {
             Icon(
-                Icons.Default.Refresh,
+                androidx.compose.ui.res.painterResource(android.R.drawable.ic_popup_sync),
                 contentDescription = "Refresh",
                 tint = Color.Gray,
                 modifier = Modifier.size(20.dp).clickable { onRefresh() }
