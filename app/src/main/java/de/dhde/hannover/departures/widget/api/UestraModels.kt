@@ -208,11 +208,16 @@ data class Platform(
  * gängige HTML-Entities dekodiert, Whitespace normalisiert. Link-URLs (in <a href>) entfallen,
  * der sichtbare Linktext bleibt. Reiner Text-Helfer (JVM-testbar, kein Android-API).
  */
+private val HTML_BR_REGEX = Regex("(?i)<\\s*br\\s*/?>")
+private val HTML_BLOCK_CLOSE_REGEX = Regex("(?i)<\\s*/\\s*(p|div|li)\\s*>")
+private val HTML_TAG_REGEX = Regex("<[^>]+>")
+private val EXCESS_BLANK_LINES_REGEX = Regex("\n{3,}")
+
 fun stripHtml(raw: String): String {
     var s = raw
-    s = s.replace(Regex("(?i)<\\s*br\\s*/?>"), "\n")
-    s = s.replace(Regex("(?i)<\\s*/\\s*(p|div|li)\\s*>"), "\n")
-    s = s.replace(Regex("<[^>]+>"), "")
+    s = s.replace(HTML_BR_REGEX, "\n")
+    s = s.replace(HTML_BLOCK_CLOSE_REGEX, "\n")
+    s = s.replace(HTML_TAG_REGEX, "")
     s = s.replace("&nbsp;", " ")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
@@ -221,7 +226,7 @@ fun stripHtml(raw: String): String {
         .replace("&#39;", "'")
         .replace("&apos;", "'")
     s = s.lines().joinToString("\n") { it.trim() }
-    s = s.replace(Regex("\n{3,}"), "\n\n")
+    s = s.replace(EXCESS_BLANK_LINES_REGEX, "\n\n")
     return s.trim()
 }
 

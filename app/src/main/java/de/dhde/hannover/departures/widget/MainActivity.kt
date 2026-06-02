@@ -154,7 +154,7 @@ class MainActivity : ComponentActivity() {
                                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                                             )
                                             lineMsgs.forEach { msg ->
-                                                val protected = isProtectedMessage(msg)
+                                                val isProtected = isProtectedMessage(msg)
                                                 val isIgnored = msg in ignoredMessages
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -162,12 +162,12 @@ class MainActivity : ComponentActivity() {
                                                 ) {
                                                     Text(
                                                         text = msg,
-                                                        color = if (isIgnored && !protected) Color.Gray else UestraColors.TextMain,
+                                                        color = if (isIgnored && !isProtected) Color.Gray else UestraColors.TextMain,
                                                         fontSize = 14.sp,
                                                         lineHeight = 20.sp,
                                                         modifier = Modifier.weight(1f).padding(top = 10.dp)
                                                     )
-                                                    if (protected) {
+                                                    if (isProtected) {
                                                         Icon(
                                                             Icons.Default.Lock,
                                                             contentDescription = "immer sichtbar",
