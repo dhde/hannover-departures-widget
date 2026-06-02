@@ -49,6 +49,7 @@ import de.dhde.hannover.departures.widget.api.UestraApi
 import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.toFlatRows
 import de.dhde.hannover.departures.widget.data.DirectionFilter
+import de.dhde.hannover.departures.widget.data.isProtectedMessage
 import de.dhde.hannover.departures.widget.data.lineDirection
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
@@ -153,6 +154,7 @@ class MainActivity : ComponentActivity() {
                                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                                             )
                                             lineMsgs.forEach { msg ->
+                                                val isProtected = isProtectedMessage(msg)
                                                 val isIgnored = msg in ignoredMessages
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -160,21 +162,30 @@ class MainActivity : ComponentActivity() {
                                                 ) {
                                                     Text(
                                                         text = msg,
-                                                        color = if (isIgnored) Color.Gray else UestraColors.TextMain,
+                                                        color = if (isIgnored && !isProtected) Color.Gray else UestraColors.TextMain,
                                                         fontSize = 14.sp,
                                                         lineHeight = 20.sp,
                                                         modifier = Modifier.weight(1f).padding(top = 10.dp)
                                                     )
-                                                    Checkbox(
-                                                        checked = isIgnored,
-                                                        onCheckedChange = { checked ->
-                                                            scope.launch {
-                                                                val newSet = if (checked) ignoredMessages + msg else ignoredMessages - msg
-                                                                repo.setIgnoredMessages(newSet)
-                                                            }
-                                                        },
-                                                        colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
-                                                    )
+                                                    if (isProtected) {
+                                                        Icon(
+                                                            Icons.Default.Lock,
+                                                            contentDescription = "immer sichtbar",
+                                                            tint = UestraColors.TextSub,
+                                                            modifier = Modifier.padding(top = 10.dp, start = 4.dp).size(18.dp)
+                                                        )
+                                                    } else {
+                                                        Checkbox(
+                                                            checked = isIgnored,
+                                                            onCheckedChange = { checked ->
+                                                                scope.launch {
+                                                                    val newSet = if (checked) ignoredMessages + msg else ignoredMessages - msg
+                                                                    repo.setIgnoredMessages(newSet)
+                                                                }
+                                                            },
+                                                            colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
