@@ -174,8 +174,8 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
                 lineShort = lineShort,
                 isCancelled = (this@toFlatRows.apiCancelled == true) || (event.apiCancelled == true) || (event.realtimeState == "CANCELED"),
                 messages = buildList {
-                    infos?.forEach { info -> info.content?.let { add(it) } }
-                    hints?.forEach { hint -> hint.content?.let { add(it) } }
+                    infos?.forEach { info -> info.content?.let { c -> stripHtml(c).takeIf { it.isNotBlank() }?.let { add(it) } } }
+                    hints?.forEach { hint -> hint.content?.let { c -> stripHtml(c).takeIf { it.isNotBlank() }?.let { add(it) } } }
                 }
             )
         }
@@ -201,6 +201,28 @@ data class Platform(
     // GVH Produktklassen: 0=Zug, 1=S-Bahn, 2=U-Bahn, 3=Stadtbahn, 4=Straßenbahn, 5/6=Bus
     val isBus: Boolean get() = productClasses?.any { it in 5..11 } == true
     val isTram: Boolean get() = productClasses?.any { it in 2..4 } == true
+}
+
+/**
+ * Bereinigt Meldungstexte von HTML: <br>/<p>/<div>/<li> → Zeilenumbruch, übrige Tags raus,
+ * gängige HTML-Entities dekodiert, Whitespace normalisiert. Link-URLs (in <a href>) entfallen,
+ * der sichtbare Linktext bleibt. Reiner Text-Helfer (JVM-testbar, kein Android-API).
+ */
+fun stripHtml(raw: String): String {
+    var s = raw
+    s = s.replace(Regex("(?i)<\\s*br\\s*/?>"), "\n")
+    s = s.replace(Regex("(?i)<\\s*/\\s*(p|div|li)\\s*>"), "\n")
+    s = s.replace(Regex("<[^>]+>"), "")
+    s = s.replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+    s = s.lines().joinToString("\n") { it.trim() }
+    s = s.replace(Regex("\n{3,}"), "\n\n")
+    return s.trim()
 }
 
 data class DepartureInfo(

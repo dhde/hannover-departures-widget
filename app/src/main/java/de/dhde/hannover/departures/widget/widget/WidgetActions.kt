@@ -87,8 +87,8 @@ class RefreshAction : ActionCallback {
                                     if (dep.isDB) types.add("DB")
                                     if (dep.isFernbus) types.add("Fernbus")
 
-                                    dep.infos?.forEach { it.content?.let { c -> msgsWithTypes.getOrPut(c) { mutableSetOf() }.addAll(types) } }
-                                    dep.hints?.forEach { it.content?.let { c -> msgsWithTypes.getOrPut(c) { mutableSetOf() }.addAll(types) } }
+                                    dep.infos?.forEach { it.content?.let { c -> stripHtml(c).takeIf { s -> s.isNotBlank() }?.let { cc -> msgsWithTypes.getOrPut(cc) { mutableSetOf() }.addAll(types) } } }
+                                    dep.hints?.forEach { it.content?.let { c -> stripHtml(c).takeIf { s -> s.isNotBlank() }?.let { cc -> msgsWithTypes.getOrPut(cc) { mutableSetOf() }.addAll(types) } } }
                                 }
                                 if (msgsWithTypes.isNotEmpty()) {
                                     repo.trackMessages(msgsWithTypes)
