@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.R
+import de.dhde.hannover.departures.widget.data.isProtectedMessage
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
@@ -346,6 +347,7 @@ private fun MessageFilterSheetContent(
         val allTypesActive = transportTypes.containsAll(setOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus"))
         val filterableMessages = seenMessages
             .filter { entry ->
+                !isProtectedMessage(entry.key) &&
                 entry.value.count >= threshold &&
                 if (entry.value.transportTypes.isEmpty()) {
                     // Alte Einträge ohne Typ-Info: nur zeigen wenn alle Typen aktiv
