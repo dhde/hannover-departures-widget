@@ -2,9 +2,13 @@ package de.dhde.hannover.departures.widget
 
 import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.TransportFilter
+import de.dhde.hannover.departures.widget.data.filterMessages
+import de.dhde.hannover.departures.widget.data.isProtectedMessage
 import de.dhde.hannover.departures.widget.data.lineDirection
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FiltersTest {
@@ -65,5 +69,28 @@ class FiltersTest {
         assertNull(lineDirection(null))
         assertNull(lineDirection(""))
         assertNull(lineDirection("de:rnv:3:X"))
+    }
+
+    @Test
+    fun isProtectedMessage_keywordsCaseInsensitive() {
+        assertTrue(isProtectedMessage("Fahrt entfällt heute"))
+        assertTrue(isProtectedMessage("SCHIENENERSATZVERKEHR Linie 3"))
+        assertTrue(isProtectedMessage("Notarzteinsatz am Kröpcke"))
+        assertFalse(isProtectedMessage("Wir bitten um Verständnis."))
+        assertFalse(isProtectedMessage("Aufzug defekt"))
+    }
+
+    @Test
+    fun filterMessages_keepsProtectedEvenWhenIgnored() {
+        val msgs = listOf("Fahrt entfällt heute", "Aufzug defekt")
+        val result = filterMessages(msgs, setOf("entfällt", "aufzug"))
+        assertTrue("Fahrt entfällt heute" in result)
+        assertFalse("Aufzug defekt" in result)
+    }
+
+    @Test
+    fun filterMessages_emptyIgnored_keepsAll() {
+        val msgs = listOf("Aufzug defekt", "Fahrt entfällt")
+        assertEquals(msgs, filterMessages(msgs, emptySet()))
     }
 }
