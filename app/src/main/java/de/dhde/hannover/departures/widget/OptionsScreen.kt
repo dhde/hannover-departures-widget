@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val allowDuplicates by repo.allowDuplicatesFlow.collectAsState(initial = false)
 
     var showDuplicatesWarning by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
     var showMessageSheet by remember { mutableStateOf(false) }
 
     if (showDuplicatesWarning) {
@@ -66,6 +68,34 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
             },
             containerColor = UestraColors.CardBg,
             titleContentColor = UestraColors.Teal
+        )
+    }
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("Zurücksetzen", color = UestraColors.AccentRed) },
+            text = { Text("Setzt alle Einstellungen auf die Standardwerte zurück. Mehrfach angelegte Haltestellen werden dabei entfernt. Ausgeblendete Meldungen bleiben erhalten.", color = UestraColors.TextMain) },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        repo.setTransportTypes(setOf("Stadtbahn", "Bus"))
+                        repo.setGroupDepartures(true)
+                        repo.setMaxGroupedDepartures(2)
+                        repo.setGroupedFontSize("STANDARD")
+                        repo.setMaxFavorites(3)
+                        repo.setMaxFavRows(1)
+                        repo.setFavoritesHeight("STANDARD")
+                        repo.setFilterHeight("STANDARD")
+                        repo.setMaxRows(10)
+                        repo.setAutoRefreshOnInteraction(false)
+                        repo.setAllowDuplicates(false)
+                    }
+                    showResetConfirm = false
+                }) { Text("Zurücksetzen", color = UestraColors.AccentRed) }
+            },
+            dismissButton = { TextButton(onClick = { showResetConfirm = false }) { Text("Abbrechen", color = UestraColors.TextSub) } },
+            containerColor = UestraColors.CardBg, titleContentColor = UestraColors.AccentRed
         )
     }
 
@@ -143,6 +173,17 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 repo = repo,
                 scope = scope
             )
+        }
+        item {
+            OutlinedButton(
+                onClick = { showResetConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UestraColors.AccentRed)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Auf Standard zurücksetzen")
+            }
         }
     }
 
@@ -290,6 +331,14 @@ private fun MessageFilterSheetContent(
     ) {
         Text("Meldungen ausblenden", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         Text("Wiederkehrende Meldungen, die du nicht mehr sehen willst.", color = UestraColors.TextSub, fontSize = 12.sp)
+        if (ignoredMessages.isNotEmpty()) {
+            TextButton(
+                onClick = { scope.launch { repo.setIgnoredMessages(emptySet()) } },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Alle wieder einblenden (${ignoredMessages.size})", color = UestraColors.Teal)
+            }
+        }
         Spacer(Modifier.height(12.dp))
 
         // Schwellenwert: Meldungen die >= 5x aufgetaucht sind, können gefiltert werden
