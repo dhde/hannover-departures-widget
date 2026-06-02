@@ -3,10 +3,13 @@ package de.dhde.hannover.departures.widget
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -24,6 +27,7 @@ import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesRepository) {
     val scope = rememberCoroutineScope()
@@ -43,6 +47,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val allowDuplicates by repo.allowDuplicatesFlow.collectAsState(initial = false)
 
     var showDuplicatesWarning by remember { mutableStateOf(false) }
+    var showMessageSheet by remember { mutableStateOf(false) }
 
     if (showDuplicatesWarning) {
         AlertDialog(
@@ -63,6 +68,25 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         )
     }
 
+    if (showMessageSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showMessageSheet = false },
+            sheetState = sheetState,
+            containerColor = UestraColors.CardBg
+        ) {
+            MessageFilterSheetContent(
+                seenMessages = seenMessages,
+                ignoredMessages = ignoredMessages,
+                transportTypes = transportTypes,
+                showAll = showAllMessages,
+                onToggleShowAll = { showAllMessages = !showAllMessages },
+                repo = repo,
+                scope = scope
+            )
+        }
+    }
+
     var localMaxFavs by remember(maxFavsFlow) { mutableStateOf(maxFavsFlow.toFloat()) }
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
     var localMaxRows by remember(maxRowsFlow) { mutableStateOf(maxRowsFlow.toFloat()) }
@@ -78,17 +102,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { AddWidgetButton(context) }
         item { OptionsGroupHeader("Anzeige") }
         item { TransportTypesCard(transportTypes, repo, scope) }
-        item {
-            MessageFilterCard(
-                seenMessages = seenMessages,
-                ignoredMessages = ignoredMessages,
-                transportTypes = transportTypes,
-                showAllMessages = showAllMessages,
-                onToggleShowAll = { showAllMessages = !showAllMessages },
-                repo = repo,
-                scope = scope
-            )
-        }
+        item { MessageFilterRow(ignoredCount = ignoredMessages.size) { showMessageSheet = true } }
         item {
             GroupDeparturesCard(
                 groupDepartures = groupDepartures,
@@ -207,107 +221,134 @@ private fun TransportTypesCard(
 }
 
 @Composable
-private fun MessageFilterCard(
+private fun MessageFilterRow(ignoredCount: Int, onClick: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Meldungen ausblenden", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    if (ignoredCount > 0) "$ignoredCount ausgeblendet" else "Wiederkehrende Meldungen verwalten",
+                    color = UestraColors.TextSub, fontSize = 12.sp
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = UestraColors.TextSub)
+        }
+    }
+}
+
+@Composable
+private fun MessageFilterSheetContent(
     seenMessages: Map<String, de.dhde.hannover.departures.widget.data.SeenMessageEntry>,
     ignoredMessages: Set<String>,
     transportTypes: Set<String>,
-    showAllMessages: Boolean,
+    showAll: Boolean,
     onToggleShowAll: () -> Unit,
     repo: de.dhde.hannover.departures.widget.data.FavoritesRepository,
     scope: kotlinx.coroutines.CoroutineScope
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 520.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Schwellenwert: Meldungen die >= 5x aufgetaucht sind, können gefiltert werden
-            val threshold = 5
-            val allTypesActive = transportTypes.containsAll(setOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus"))
-            val filterableMessages = seenMessages
-                .filter { entry ->
-                    entry.value.count >= threshold &&
-                    if (entry.value.transportTypes.isEmpty()) {
-                        // Alte Einträge ohne Typ-Info: nur zeigen wenn alle Typen aktiv
-                        allTypesActive
-                    } else {
-                        entry.value.transportTypes.any { it in transportTypes }
-                    }
-                }
-                .entries
-                .sortedByDescending { it.value.count }
-            if (filterableMessages.isEmpty()) {
-                Text(
-                    "Noch keine häufigen Meldungen bekannt. Die App lernt automatisch welche " +
-                    "Infomeldungen regelmäßig von der API kommen (ab $threshold Mal). " +
-                    "Lade das Widget einige Male neu, um Meldungen hier anzuzeigen.",
-                    color = UestraColors.TextSub, fontSize = 12.sp
-                )
-            } else {
-                Text(
-                    "Wähle aus, welche häufig auftauchenden Meldungen ausgeblendet werden sollen:",
-                    color = UestraColors.TextSub, fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+        Text("Meldungen ausblenden", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("Wiederkehrende Meldungen, die du nicht mehr sehen willst.", color = UestraColors.TextSub, fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
 
-                val displayMessages = if (showAllMessages || filterableMessages.size <= 5) {
-                    filterableMessages
+        // Schwellenwert: Meldungen die >= 5x aufgetaucht sind, können gefiltert werden
+        val threshold = 5
+        val allTypesActive = transportTypes.containsAll(setOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus"))
+        val filterableMessages = seenMessages
+            .filter { entry ->
+                entry.value.count >= threshold &&
+                if (entry.value.transportTypes.isEmpty()) {
+                    // Alte Einträge ohne Typ-Info: nur zeigen wenn alle Typen aktiv
+                    allTypesActive
                 } else {
-                    filterableMessages.take(5)
+                    entry.value.transportTypes.any { it in transportTypes }
                 }
+            }
+            .entries
+            .sortedByDescending { it.value.count }
+        if (filterableMessages.isEmpty()) {
+            Text(
+                "Noch keine häufigen Meldungen bekannt. Die App lernt automatisch welche " +
+                "Infomeldungen regelmäßig von der API kommen (ab $threshold Mal). " +
+                "Lade das Widget einige Male neu, um Meldungen hier anzuzeigen.",
+                color = UestraColors.TextSub, fontSize = 12.sp
+            )
+        } else {
+            Text(
+                "Wähle aus, welche häufig auftauchenden Meldungen ausgeblendet werden sollen:",
+                color = UestraColors.TextSub, fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
 
-                displayMessages.forEach { (msgText, entry) ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            val newSet = if (msgText in ignoredMessages) ignoredMessages - msgText else ignoredMessages + msgText
-                            scope.launch { repo.setIgnoredMessages(newSet) }
-                        }.padding(vertical = 6.dp)
-                    ) {
-                        Checkbox(
-                            checked = msgText in ignoredMessages,
-                            onCheckedChange = null,
-                            colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(msgText, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                            val countLabel = if (entry.count >= 10000) "10k+× gesehen" else "${entry.count}× gesehen"
-                            Text(countLabel, color = UestraColors.TextSub, fontSize = 11.sp)
-                        }
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    repo.removeSeenMessage(msgText)
-                                    // Auch aus ignoredMessages entfernen falls aktiv
-                                    if (msgText in ignoredMessages) {
-                                        repo.setIgnoredMessages(ignoredMessages - msgText)
-                                    }
+            val displayMessages = if (showAll || filterableMessages.size <= 5) {
+                filterableMessages
+            } else {
+                filterableMessages.take(5)
+            }
+
+            displayMessages.forEach { (msgText, entry) ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        val newSet = if (msgText in ignoredMessages) ignoredMessages - msgText else ignoredMessages + msgText
+                        scope.launch { repo.setIgnoredMessages(newSet) }
+                    }.padding(vertical = 6.dp)
+                ) {
+                    Checkbox(
+                        checked = msgText in ignoredMessages,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(msgText, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                        val countLabel = if (entry.count >= 10000) "10k+× gesehen" else "${entry.count}× gesehen"
+                        Text(countLabel, color = UestraColors.TextSub, fontSize = 11.sp)
+                    }
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                repo.removeSeenMessage(msgText)
+                                // Auch aus ignoredMessages entfernen falls aktiv
+                                if (msgText in ignoredMessages) {
+                                    repo.setIgnoredMessages(ignoredMessages - msgText)
                                 }
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Meldung entfernen",
-                                tint = UestraColors.IconMuted,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-
-                if (filterableMessages.size > 5) {
-                    TextButton(
-                        onClick = onToggleShowAll,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
                     ) {
-                        Text(
-                            text = if (showAllMessages) "Weniger anzeigen" else "Alle ${filterableMessages.size} anzeigen",
-                            color = UestraColors.Teal
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Meldung entfernen",
+                            tint = UestraColors.IconMuted,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
+                }
+            }
+
+            if (filterableMessages.size > 5) {
+                TextButton(
+                    onClick = onToggleShowAll,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                ) {
+                    Text(
+                        text = if (showAll) "Weniger anzeigen" else "Alle ${filterableMessages.size} anzeigen",
+                        color = UestraColors.Teal
+                    )
                 }
             }
         }
