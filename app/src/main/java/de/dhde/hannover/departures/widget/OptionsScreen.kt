@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.dhde.hannover.departures.widget.ui.UestraColors
+import de.dhde.hannover.departures.widget.R
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
@@ -160,6 +161,33 @@ private fun OptionsGroupHeader(title: String) {
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
     )
+}
+
+@Composable
+private fun SizeOptionList(
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    preview: @Composable (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        options.forEach { (value, label) ->
+            val isSel = value == selected
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSel) UestraColors.TealSurface else Color.Transparent)
+                    .clickable { onSelect(value) }
+                    .padding(10.dp)
+            ) {
+                Text(label, color = if (isSel) UestraColors.Teal else UestraColors.TextSub,
+                    fontSize = 12.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.width(80.dp))
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) { preview(value) }
+            }
+        }
+    }
 }
 
 @Composable
@@ -415,26 +443,12 @@ private fun FavoritesLayoutCard(
             Text("Höhe der Favoriten-Buttons", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Text("Wähle die visuelle Größe aus", color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
-                    val isSelected = mode == favoritesHeight
-                    val (vPadding, fSize) = when (mode) {
-                        "KOMPAKT" -> 2.dp to 10.sp
-                        "GROSS" -> 14.dp to 13.sp
-                        else -> 6.dp to 11.sp
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) UestraColors.Teal else UestraColors.Divider)
-                            .clickable { scope.launch { repo.setFavoritesHeight(mode) } }
-                            .padding(vertical = vPadding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(mode, color = if (isSelected) Color.White else UestraColors.TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
-                    }
-                }
+            SizeOptionList(
+                options = listOf("KOMPAKT" to "Kompakt", "STANDARD" to "Standard", "GROSS" to "Groß"),
+                selected = favoritesHeight,
+                onSelect = { scope.launch { repo.setFavoritesHeight(it) } }
+            ) { mode ->
+                FavoriteButtonVisual("Klingerstr.", isSelected = true, mode = mode, modifier = Modifier.widthIn(max = 120.dp))
             }
         }
     }
@@ -455,26 +469,12 @@ private fun FilterHeightCard(
             Text("Höhe der Filter-Buttons", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Text("Wähle die visuelle Größe aus", color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                listOf("KOMPAKT", "STANDARD", "GROSS").forEach { mode ->
-                    val isSelected = mode == filterHeight
-                    val (vPadding, fSize) = when (mode) {
-                        "KOMPAKT" -> 2.dp to 10.sp
-                        "GROSS" -> 14.dp to 13.sp
-                        else -> 6.dp to 11.sp
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) UestraColors.Teal else UestraColors.Divider)
-                            .clickable { scope.launch { repo.setFilterHeight(mode) } }
-                            .padding(vertical = vPadding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(mode, color = if (isSelected) Color.White else UestraColors.TextSub, fontSize = fSize, fontWeight = FontWeight.Bold)
-                    }
-                }
+            SizeOptionList(
+                options = listOf("KOMPAKT" to "Kompakt", "STANDARD" to "Standard", "GROSS" to "Groß"),
+                selected = filterHeight,
+                onSelect = { scope.launch { repo.setFilterHeight(it) } }
+            ) { mode ->
+                SegmentButtonVisual(R.drawable.ic_widget_bus, isActive = true, activeColor = UestraColors.AccentRed, mode = mode)
             }
         }
     }
@@ -603,36 +603,24 @@ private fun GroupDeparturesCard(
                     Text("Schriftgröße der Folge-Abfahrten", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text("Größe der kleinen Zeitangaben neben der Hauptabfahrt", color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                        listOf("KLEIN", "STANDARD", "GROSS").forEach { mode ->
-                            val isSelected = mode == groupedFontSize
-                            val (vPadding, fSize) = when (mode) {
-                                "KLEIN" -> 2.dp to 9.sp
-                                "GROSS" -> 10.dp to 13.sp
-                                else    -> 5.dp to 11.sp
-                            }
-                            val label = when (mode) {
-                                "KLEIN" -> "Klein"
-                                "GROSS" -> "Groß"
-                                else    -> "Standard"
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) UestraColors.Teal else UestraColors.Divider)
-                                    .clickable { scope.launch { repo.setGroupedFontSize(mode) } }
-                                    .padding(horizontal = 8.dp, vertical = vPadding),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    label,
-                                    color = if (isSelected) Color.White else UestraColors.TextSub,
-                                    fontSize = fSize,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
+                    val sampleMain = remember {
+                        de.dhde.hannover.departures.widget.api.FlatDeparture(
+                            line = "Stadtbahn 3", lineId = "de:rnv:3:H", destination = "Wettbergen", number = "3",
+                            transportTypes = setOf(de.dhde.hannover.departures.widget.api.TransportType.TRAM),
+                            departureTime = java.time.Instant.now().plusSeconds(240).toString(),
+                            plannedTime = null, estimatedTime = null, delayMinutes = null, lineShort = "3",
+                            isCancelled = false, messages = emptyList()
+                        )
+                    }
+                    val sampleSubs = remember {
+                        listOf(9L, 14L, 21L, 28L).map { m -> sampleMain.copy(departureTime = java.time.Instant.now().plusSeconds(m * 60).toString()) }
+                    }
+                    SizeOptionList(
+                        options = listOf("KLEIN" to "Klein", "STANDARD" to "Standard", "GROSS" to "Groß"),
+                        selected = groupedFontSize,
+                        onSelect = { scope.launch { repo.setGroupedFontSize(it) } }
+                    ) { mode ->
+                        WidgetFlatDepartureRow(sampleMain, sampleSubs, "MIN", false, mode, onInfoClick = {})
                     }
                 }
         }
