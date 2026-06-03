@@ -29,6 +29,11 @@ import kotlinx.coroutines.flow.collect
 import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 class RefreshAction : ActionCallback {
     companion object {
@@ -272,12 +277,47 @@ class LocateNearestStationAction : ActionCallback {
     }
 }
 
-suspend fun findAndSetActiveNearestStation(context: Context) {
-    val hasL = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    if (!hasL) return
+/**
+ * Bestmögliche Position: fordert AKTIV einen frischen Fix via FusedLocationProviderClient an
+ * (mit Timeout), fällt sonst auf den zuletzt bekannten Standort über mehrere Provider zurück.
+ * Der bisherige getLastKnownLocation(PASSIVE_PROVIDER) lieferte oft null (PASSIVE ortet nie selbst).
+ */
+suspend fun getBestLocation(context: Context): Location? {
+    val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    if (!fine && !coarse) return null
 
-    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val lastLoc = try { locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) } catch (e: SecurityException) { null } ?: return
+    // 1. Aktiver Fix via Fused (Play Services). BALANCED reicht für "nächste Haltestelle"
+    // im Stadtgebiet und schont den Akku (kein GPS-Chip-Hochfahren wie bei HIGH_ACCURACY).
+    val priority = if (fine) Priority.PRIORITY_BALANCED_POWER_ACCURACY else Priority.PRIORITY_LOW_POWER
+    val active = try {
+        withTimeoutOrNull(8000) {
+            val fused = LocationServices.getFusedLocationProviderClient(context)
+            val cts = CancellationTokenSource()
+            suspendCancellableCoroutine<Location?> { cont ->
+                fused.getCurrentLocation(priority, cts.token)
+                    .addOnSuccessListener { loc -> if (cont.isActive) cont.resume(loc) }
+                    .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+                cont.invokeOnCancellation { cts.cancel() }
+            }
+        }
+    } catch (e: SecurityException) {
+        null
+    } catch (e: Exception) {
+        null
+    }
+    if (active != null) return active
+
+    // 2. Fallback: zuletzt bekannter Standort, frischester über alle Provider.
+    val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+    return providers.mapNotNull { p ->
+        try { lm.getLastKnownLocation(p) } catch (e: SecurityException) { null }
+    }.maxByOrNull { it.time }
+}
+
+suspend fun findAndSetActiveNearestStation(context: Context) {
+    val lastLoc = getBestLocation(context) ?: return
 
     val stopsRepo = StopsRepository(context)
     val allStops = stopsRepo.getAllStops()
@@ -287,6 +327,7 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     val currentStationId = repo.getActiveStationIdNow()
     val filters = FilterStateStore(context)
     val currentTabState = filters.getTabState(currentStationId)
+    val currentDirectionState = filters.getDirectionState(currentStationId)
 
     val stopsWithCoords = allStops.filter { stop ->
         if (stop.lat == null || stop.lon == null) return@filter false
@@ -310,9 +351,14 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
         }
     }
 
-    if (nearestStop != null) {
+    // Nur wechseln, wenn sich die nächste Haltestelle tatsächlich geändert hat.
+    // setActiveStation() setzt die Filter auf die Favoriten-Defaults zurück (für eine
+    // GPS-Station = kein Favorit also auf ALL). Würde das bei jedem Refresh laufen,
+    // kippten Tab und Richtung dauernd auf ALL. Bei echtem Wechsel Tab UND Richtung
+    // der bisherigen Auswahl auf die neue Haltestelle übernehmen.
+    if (nearestStop != null && nearestStop.id != currentStationId) {
         repo.setActiveStation(nearestStop.id, nearestStop.name)
-        // Den Filter (Bus/Bahn) für die neue Haltestelle übernehmen, damit das Erlebnis konsistent bleibt
         filters.setTabState(nearestStop.id, currentTabState)
+        filters.setDirectionState(nearestStop.id, currentDirectionState)
     }
 }
