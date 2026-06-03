@@ -317,7 +317,10 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
 @Composable
 fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     val scope = rememberCoroutineScope()
-    
+    val context = LocalContext.current
+    val session = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
+    val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
+
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
     val activeFavoriteUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
     val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
@@ -471,7 +474,19 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 stationName = activeStationName,
                 isRefreshing = isLoading,
                 hasMessages = hasMessages,
+                gpsActive = gpsModeActive,
                 onInfoClick = { onInfoClick(InfoDialogData(title = "Meldungen: $activeStationName", groupedMsgs = groupedMessagesList)) },
+                onGps = {
+                    scope.launch {
+                        val newState = !gpsModeActive
+                        session.setGpsMode(newState)
+                        // Wie im Widget: bei Aktivierung sofort die nächste Haltestelle suchen.
+                        // Der Wechsel von activeStationId löst über den Flow das Neuladen aus.
+                        if (newState) {
+                            de.dhde.hannover.departures.widget.widget.findAndSetActiveNearestStation(context)
+                        }
+                    }
+                },
                 onRefresh = { activeStationId?.let { loadData(it) } }
             )
             
@@ -570,7 +585,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
 // ---------------- UI COMPONENTS ----------------
 
 @Composable
-fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolean = false, onInfoClick: () -> Unit = {}, onRefresh: () -> Unit) {
+fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolean = false, gpsActive: Boolean = false, onInfoClick: () -> Unit = {}, onGps: () -> Unit = {}, onRefresh: () -> Unit) {
     val cleanName = stationName
         .replace(Regex("\\b(Hannover|Landeshauptstadt)\\b", RegexOption.IGNORE_CASE), "")
         .replace(Regex("[,/()]+"), " ")
@@ -613,9 +628,9 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
         }
         Icon(
             bitmap = gpsBitmap,
-            contentDescription = null,
-            tint = Color.Gray,
-            modifier = Modifier.padding(end = 8.dp).size(20.dp)
+            contentDescription = "GPS – nächste Haltestelle",
+            tint = if (gpsActive) UestraColors.GpsBlue else Color.Gray,
+            modifier = Modifier.padding(end = 8.dp).size(20.dp).clickable { onGps() }
         )
         if (isRefreshing) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), color = UestraColors.GpsBlue, strokeWidth = 2.dp)
