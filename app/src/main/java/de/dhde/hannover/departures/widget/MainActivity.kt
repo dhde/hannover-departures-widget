@@ -1735,22 +1735,40 @@ fun LineFilterDialog(
 ) {
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
-    var availableLines by remember { mutableStateOf<List<String>>(emptyList()) }
+    // Linien gruppiert nach Verkehrsmittel: (Typ-Name -> sortierte Linien). Nur global aktive Typen.
+    var groups by remember { mutableStateOf<List<Pair<String, List<String>>>>(emptyList()) }
     var selectedLines by remember { mutableStateOf<Set<String>>(fav.filteredLines ?: emptySet()) }
     var hasLoaded by remember { mutableStateOf(false) }
+    // Nur Linien anbieten, deren Verkehrsmittel global aktiv ist (Optionen-Häkchen).
+    val activeTypes by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn", "DB"))
 
-    LaunchedEffect(fav.id) {
+    LaunchedEffect(fav.id, activeTypes) {
         isLoading = true
         try {
             val response = de.dhde.hannover.departures.widget.api.UestraApi.create().getDepartures(fav.id)
-            val lines = response.departures?.mapNotNull { it.lineShort }?.distinct()?.sorted() ?: emptyList()
-            if (fav.filteredLines == null) {
-                availableLines = lines
-                selectedLines = lines.toSet()
-            } else {
-                availableLines = (lines + fav.filteredLines).distinct().sorted()
-                selectedLines = fav.filteredLines!!
+            val deps = response.departures ?: emptyList()
+            // Jede Linie genau einem Verkehrsmittel zuordnen (gleiche Klassifikation wie sonst).
+            val lineType = mutableMapOf<String, String>()
+            deps.forEach { d ->
+                val t = when {
+                    d.isFernbus -> "Fernbus"
+                    d.isDB -> "DB"
+                    d.isSBahn -> "S-Bahn"
+                    d.isTram -> "Stadtbahn"
+                    d.isBus -> "Bus"
+                    else -> null
+                }
+                if (t != null) lineType.putIfAbsent(d.lineShort, t)
             }
+            // Anzeige-Reihenfolge der Gruppen; nur global aktive Typen, nur nicht-leere Gruppen.
+            val typeOrder = listOf("Stadtbahn", "S-Bahn", "Bus", "DB", "Fernbus")
+            val lineSort = compareBy<String>({ it.toIntOrNull() ?: Int.MAX_VALUE }, { it })
+            groups = typeOrder
+                .filter { it in activeTypes }
+                .map { type -> type to lineType.filterValues { it == type }.keys.sortedWith(lineSort) }
+                .filter { it.second.isNotEmpty() }
+            val available = groups.flatMap { it.second }.toSet()
+            selectedLines = fav.filteredLines ?: available
         } catch (e: Exception) {
             // Ignoriere Fehler, zeige leere Liste
         } finally {
@@ -1770,28 +1788,44 @@ fun LineFilterDialog(
                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = UestraColors.Teal)
                 }
-            } else if (availableLines.isEmpty()) {
+            } else if (groups.isEmpty()) {
                 Text("Konnte aktuell keine Linien für diese Station finden.", color = UestraColors.TextSub)
             } else {
                 LazyColumn {
-                    items(availableLines) { line ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                selectedLines = if (line in selectedLines) {
-                                    selectedLines - line
-                                } else {
-                                    selectedLines + line
-                                }
-                            }.padding(vertical = 8.dp)
-                        ) {
-                            Checkbox(
-                                checked = line in selectedLines,
-                                onCheckedChange = null,
-                                colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text("Linie $line", color = UestraColors.TextMain, fontSize = 16.sp)
+                    groups.forEach { (type, lines) ->
+                        // Gruppen-Kopf pro Verkehrsmittel = „Alle an/ab" für genau diese Gruppe.
+                        item(key = "header_$type") {
+                            val allInGroup = lines.all { it in selectedLines }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    selectedLines = if (allInGroup) selectedLines - lines.toSet() else selectedLines + lines
+                                }.padding(top = 12.dp, bottom = 4.dp)
+                            ) {
+                                Checkbox(
+                                    checked = allInGroup,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(type, color = UestraColors.Teal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        items(lines, key = { "line_$it" }) { line ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    selectedLines = if (line in selectedLines) selectedLines - line else selectedLines + line
+                                }.padding(start = 24.dp, top = 6.dp, bottom = 6.dp)
+                            ) {
+                                Checkbox(
+                                    checked = line in selectedLines,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text("Linie $line", color = UestraColors.TextMain, fontSize = 16.sp)
+                            }
                         }
                     }
                 }
@@ -1802,7 +1836,8 @@ fun LineFilterDialog(
                 onClick = {
                     scope.launch {
                         // Speichere null, falls alle verfügbaren Linien markiert sind (kein Filter)
-                        val filterToSave = if (selectedLines.containsAll(availableLines)) null else selectedLines
+                        val available = groups.flatMap { it.second }.toSet()
+                        val filterToSave = if (selectedLines.containsAll(available)) null else selectedLines
                         repo.setFavoriteLineFilter(fav.safeUniqueId, filterToSave)
                         onDismiss()
                     }
