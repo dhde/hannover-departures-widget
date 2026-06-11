@@ -242,8 +242,10 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
                 if (!globalTypeMatch) return@filter false
 
-                // Stations-spezifischer Linien-Filter (nach uniqueId des aktiven Duplikats)
-                val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavUniqueId }
+                // Stations-spezifischer Linien-Filter (nach uniqueId des aktiven Duplikats).
+                // Im GPS-Modus bewusst ignorieren: der nächste Halt wird ungefiltert gezeigt,
+                // auch wenn er zufällig als Favorit mit Linienfilter gespeichert ist.
+                val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavUniqueId }
                 val linesFilter = currentFav?.filteredLines
                 if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
 

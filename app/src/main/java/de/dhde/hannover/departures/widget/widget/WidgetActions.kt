@@ -272,7 +272,16 @@ class LocateNearestStationAction : ActionCallback {
         val session = WidgetSessionStore(context)
         val next = !session.isGpsModeActive()
         session.setGpsMode(next)
-        if (next) findAndSetActiveNearestStation(context)
+        if (next) {
+            findAndSetActiveNearestStation(context)
+            // GPS-Aktivierung = aktuellen Halt ungefiltert zeigen (alle Linien/Richtungen),
+            // auch wenn die nächste Haltestelle bereits die aktive war (kein Wechsel in findAndSet).
+            val repo = FavoritesRepository(context)
+            val filters = FilterStateStore(context)
+            val sid = repo.getActiveStationIdNow()
+            filters.setTabState(sid, TransportFilter.ALL)
+            filters.setDirectionState(sid, DirectionFilter.ALL)
+        }
         RefreshAction.triggerUpdate(context)
     }
 }
@@ -327,7 +336,6 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     val currentStationId = repo.getActiveStationIdNow()
     val filters = FilterStateStore(context)
     val currentTabState = filters.getTabState(currentStationId)
-    val currentDirectionState = filters.getDirectionState(currentStationId)
 
     val stopsWithCoords = allStops.filter { stop ->
         if (stop.lat == null || stop.lon == null) return@filter false
@@ -351,14 +359,14 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
         }
     }
 
-    // Nur wechseln, wenn sich die nächste Haltestelle tatsächlich geändert hat.
-    // setActiveStation() setzt die Filter auf die Favoriten-Defaults zurück (für eine
-    // GPS-Station = kein Favorit also auf ALL). Würde das bei jedem Refresh laufen,
-    // kippten Tab und Richtung dauernd auf ALL. Bei echtem Wechsel Tab UND Richtung
-    // der bisherigen Auswahl auf die neue Haltestelle übernehmen.
+    // Nur bei echtem Stationswechsel umschalten (sonst setzt setActiveStation die
+    // Filter bei jedem Refresh zurück). Im GPS-Modus wird der nächste Halt bewusst
+    // UNGEFILTERT gezeigt – alle Linien, alle Richtungen –, auch wenn der Halt zufällig
+    // als Favorit (mit Filtern) gespeichert ist. Den Favoriten-Linienfilter blendet
+    // die Anzeige im GPS-Modus zusätzlich aus (siehe gpsModeActive im Render).
     if (nearestStop != null && nearestStop.id != currentStationId) {
         repo.setActiveStation(nearestStop.id, nearestStop.name)
-        filters.setTabState(nearestStop.id, currentTabState)
-        filters.setDirectionState(nearestStop.id, currentDirectionState)
+        filters.setTabState(nearestStop.id, TransportFilter.ALL)
+        filters.setDirectionState(nearestStop.id, DirectionFilter.ALL)
     }
 }
