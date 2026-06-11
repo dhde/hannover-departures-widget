@@ -359,12 +359,20 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     var directionState by remember { mutableStateOf(DirectionFilter.ALL) }
     var timeDisplayMode by remember { mutableStateOf("MIN") }
 
-    val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
-    
+    // Im GPS-Modus zählt der Halt nicht als Favorit → keine Favoriten-Filter (alle Linien/Richtungen).
+    val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
+
     LaunchedEffect(currentFav) {
         if (currentFav != null) {
             tabState = TransportFilter.fromStorage(currentFav.transportFilter)
             directionState = DirectionFilter.fromStorage(currentFav.directionFilter)
+        }
+    }
+    // GPS aktiviert → ungefiltert zeigen (alle Linien/Richtungen), nicht die Favoriten-Filter übernehmen.
+    LaunchedEffect(gpsModeActive) {
+        if (gpsModeActive) {
+            tabState = TransportFilter.ALL
+            directionState = DirectionFilter.ALL
         }
     }
 
@@ -413,8 +421,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         }
         if (!tabOverride && !globalTypeMatch) return@filter false
 
-        // Finde den aktuellen Favoriten-Eintrag (falls existent) für den Stern-Status in der Toolbar
-        val currentFav = favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
+        // Favoriten-Linienfilter – im GPS-Modus ignorieren (ungefilterter nächster Halt).
+        val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
         val linesFilter = currentFav?.filteredLines
         if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
 
