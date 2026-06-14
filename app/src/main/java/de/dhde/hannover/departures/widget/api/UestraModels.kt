@@ -111,6 +111,25 @@ data class DepartureItem(
             if (diff > 0) diff else null
         }.getOrNull()
     }
+
+    /**
+     * Anzeigbare Meldungen mit stabiler ID und Startdatum.
+     * infos tragen i.d.R. eine API-ID ("ems-…") und ein incidentStart; hints (Fahrzeug-Attribute)
+     * haben beides nicht und bekommen eine aus dem Inhalt abgeleitete ID.
+     */
+    val messageItems: List<MsgItem> get() = buildList {
+        infos?.forEach { info ->
+            val c = info.content?.let { stripHtml(it) }?.takeIf { it.isNotBlank() } ?: return@forEach
+            val id = info.id?.takeIf { it.isNotBlank() } ?: "c:${c.hashCode()}"
+            val start = info.incidentStart
+                ?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0L
+            add(MsgItem(id = id, content = c, startMillis = start))
+        }
+        hints?.forEach { hint ->
+            val c = hint.content?.let { stripHtml(it) }?.takeIf { it.isNotBlank() } ?: return@forEach
+            add(MsgItem(id = "h:${c.hashCode()}", content = c, startMillis = 0L))
+        }
+    }
 }
 
 data class DepartureEvent(
@@ -137,7 +156,7 @@ data class FlatDeparture(
     val delayMinutes: Long?,
     val lineShort: String,
     val isCancelled: Boolean = false,
-    val messages: List<String> = emptyList()
+    val messages: List<MsgItem> = emptyList()
 ) {
     val isBus: Boolean get() = TransportType.BUS in transportTypes
     val isTram: Boolean get() = TransportType.TRAM in transportTypes
@@ -173,10 +192,7 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
                 delayMinutes = delay,
                 lineShort = lineShort,
                 isCancelled = (this@toFlatRows.apiCancelled == true) || (event.apiCancelled == true) || (event.realtimeState == "CANCELED"),
-                messages = buildList {
-                    infos?.forEach { info -> info.content?.let { c -> stripHtml(c).takeIf { it.isNotBlank() }?.let { add(it) } } }
-                    hints?.forEach { hint -> hint.content?.let { c -> stripHtml(c).takeIf { it.isNotBlank() }?.let { add(it) } } }
-                }
+                messages = messageItems
             )
         }
         .filterNotNull()
@@ -231,10 +247,33 @@ fun stripHtml(raw: String): String {
 }
 
 data class DepartureInfo(
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("priority") val priority: String? = null,
+    @SerializedName("incidentStart") val incidentStart: String? = null,
+    @SerializedName("incidentEnd") val incidentEnd: String? = null,
     @SerializedName("titel") val titel: String?,
     @SerializedName("content") val content: String?
 )
 
 data class DepartureHint(
     @SerializedName("content") val content: String?
+)
+
+/**
+ * Eine einzelne, anzeigbare Meldung mit stabiler Identität.
+ * - [id]: stabile ID der API (z.B. "ems-11956"); für ID-lose Quellen (hints) synthetisch
+ *   aus dem Inhalt ("h:<hash>"), für infos ohne ID "c:<hash>".
+ * - [content]: HTML-bereinigter Anzeigetext.
+ * - [startMillis]: incidentStart als Epoch-Millis (0, falls unbekannt – z.B. bei hints).
+ */
+data class MsgItem(
+    val id: String,
+    val content: String,
+    val startMillis: Long = 0L
+)
+
+/** Meldungen einer Linie – Übergabeformat für den (i)-Meldungsdialog im App-UI. */
+data class LineMessages(
+    val line: String,
+    val messages: List<MsgItem> = emptyList()
 )

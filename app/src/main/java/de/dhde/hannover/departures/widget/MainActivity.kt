@@ -48,8 +48,9 @@ import de.dhde.hannover.departures.widget.api.StationSearchResult
 import de.dhde.hannover.departures.widget.api.UestraApi
 import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.toFlatRows
+import de.dhde.hannover.departures.widget.api.LineMessages
+import de.dhde.hannover.departures.widget.api.MsgItem
 import de.dhde.hannover.departures.widget.data.DirectionFilter
-import de.dhde.hannover.departures.widget.data.isProtectedMessage
 import de.dhde.hannover.departures.widget.data.lineDirection
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
@@ -62,7 +63,7 @@ import kotlin.math.roundToInt
 
 import android.content.Intent
 
-data class InfoDialogData(val title: String, val msgs: String? = null, val groupedMsgs: List<Pair<String, List<String>>>? = null)
+data class InfoDialogData(val title: String, val msgs: String? = null, val groupedMsgs: List<LineMessages>? = null)
 
 class MainActivity : ComponentActivity() {
 
@@ -146,6 +147,8 @@ class MainActivity : ComponentActivity() {
                                             lineHeight = 24.sp
                                         )
                                     } else if (data.groupedMsgs != null) {
+                                        val oneDayMillis = 24L * 60 * 60 * 1000
+                                        val nowMillis = System.currentTimeMillis()
                                         data.groupedMsgs.forEach { (line, lineMsgs) ->
                                             Text(
                                                 text = "Linie $line:",
@@ -154,23 +157,24 @@ class MainActivity : ComponentActivity() {
                                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                                             )
                                             lineMsgs.forEach { msg ->
-                                                val isProtected = isProtectedMessage(msg)
-                                                val isIgnored = msg in ignoredMessages
+                                                val isIgnored = msg.id in ignoredMessages
+                                                // Erst ab 1 Tag (nach incidentStart) ausblendbar; frische Meldungen bleiben fix.
+                                                val isFresh = msg.startMillis > 0 && (nowMillis - msg.startMillis) < oneDayMillis
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                                                     verticalAlignment = Alignment.Top
                                                 ) {
                                                     Text(
-                                                        text = msg,
-                                                        color = if (isIgnored && !isProtected) Color.Gray else UestraColors.TextMain,
+                                                        text = msg.content,
+                                                        color = if (isIgnored) Color.Gray else UestraColors.TextMain,
                                                         fontSize = 14.sp,
                                                         lineHeight = 20.sp,
                                                         modifier = Modifier.weight(1f).padding(top = 10.dp)
                                                     )
-                                                    if (isProtected) {
+                                                    if (isFresh) {
                                                         Icon(
                                                             Icons.Default.Lock,
-                                                            contentDescription = "immer sichtbar",
+                                                            contentDescription = "erst ab morgen ausblendbar",
                                                             tint = UestraColors.TextSub,
                                                             modifier = Modifier.padding(top = 10.dp, start = 4.dp).size(18.dp)
                                                         )
@@ -179,7 +183,7 @@ class MainActivity : ComponentActivity() {
                                                             checked = isIgnored,
                                                             onCheckedChange = { checked ->
                                                                 scope.launch {
-                                                                    val newSet = if (checked) ignoredMessages + msg else ignoredMessages - msg
+                                                                    val newSet = if (checked) ignoredMessages + msg.id else ignoredMessages - msg.id
                                                                     repo.setIgnoredMessages(newSet)
                                                                 }
                                                             },
@@ -229,17 +233,11 @@ class MainActivity : ComponentActivity() {
             val title = intent.getStringExtra("info_title") ?: "Meldungen"
             val msgsJson = intent.getStringExtra("info_msgs_json")
             if (msgsJson != null) {
-                // Structured JSON: List<List<Any>> = [[line, [msg1, msg2]], ...]
+                // Structured JSON: List<LineMessages> = [{line, messages:[{id,content,startMillis}]}, ...]
                 try {
-                    val type = object : com.google.gson.reflect.TypeToken<List<List<Any>>>() {}.type
-                    val parsed: List<List<Any>> = com.google.gson.Gson().fromJson(msgsJson, type)
-                    val grouped = parsed.map { item ->
-                        val line = item[0] as? String ?: ""
-                        @Suppress("UNCHECKED_CAST")
-                        val msgs = (item[1] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                        line to msgs
-                    }
-                    infoDialogState = InfoDialogData(title = title, groupedMsgs = grouped)
+                    val type = object : com.google.gson.reflect.TypeToken<List<LineMessages>>() {}.type
+                    val parsed: List<LineMessages> = com.google.gson.Gson().fromJson(msgsJson, type)
+                    infoDialogState = InfoDialogData(title = title, groupedMsgs = parsed)
                 } catch (e: Exception) {
                     val fallback = intent.getStringExtra("info_msgs") ?: ""
                     infoDialogState = InfoDialogData(title = title, msgs = fallback)
@@ -446,7 +444,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     
     val groupedMessagesList = if (hasMessages) {
         messagesDeps.groupBy { it.lineShort }
-            .map { (line, deps) -> line to deps.flatMap { it.messages }.distinct() }
+            .map { (line, deps) -> LineMessages(line, deps.flatMap { it.messages }.distinctBy { it.id }) }
     } else emptyList()
 
     Column(
@@ -1351,7 +1349,7 @@ private fun WidgetFeaturesCard() {
                     Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info), null, tint = UestraColors.Amber, modifier = Modifier.size(20.dp))
                 },
                 title = "Info-Meldungen & Filter",
-                description = "Tippe auf das goldene 'i' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen. Dauerhafte Meldungen (z.B. Rollstuhl, WLAN) lassen sich in den Optionen ausblenden."
+                description = "Tippe auf das goldene 'i' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen. Meldungen, die länger als einen Tag bestehen (z.B. dauerhafte Baustellen oder Fahrzeug-Hinweise), lassen sich in den Optionen ausblenden."
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
@@ -1414,7 +1412,7 @@ private fun InteractionCard() {
                     Icon(Icons.Default.LocationOn, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "GPS-Suche",
-                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
+                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt. Bei jedem Aktualisieren wird die Position neu bestimmt, sodass die Anzeige dir folgt, während du unterwegs bist."
             )
         }
     }
@@ -1720,7 +1718,7 @@ private fun HelpCard() {
                     Icon(Icons.Default.LocationOn, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
                 title = "GPS-Suche",
-                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt."
+                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt. Bei jedem Aktualisieren wird die Position neu bestimmt, sodass die Anzeige dir folgt, während du unterwegs bist."
             )
         }
     }

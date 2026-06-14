@@ -17,6 +17,7 @@ import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.StopsRepository
+import de.dhde.hannover.departures.widget.data.TrackedMessage
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import java.time.Instant
@@ -82,8 +83,8 @@ class RefreshAction : ActionCallback {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
                                 session.setErrorState("")
 
-                                // Extract and track messages
-                                val msgsWithTypes = mutableMapOf<String, MutableSet<String>>()
+                                // Extract and track messages (keyed by stable id)
+                                val msgMap = mutableMapOf<String, TrackedMessage>()
                                 departures.forEach { dep ->
                                     val types = mutableSetOf<String>()
                                     if (dep.isBus) types.add("Bus")
@@ -92,11 +93,18 @@ class RefreshAction : ActionCallback {
                                     if (dep.isDB) types.add("DB")
                                     if (dep.isFernbus) types.add("Fernbus")
 
-                                    dep.infos?.forEach { it.content?.let { c -> stripHtml(c).takeIf { s -> s.isNotBlank() }?.let { cc -> msgsWithTypes.getOrPut(cc) { mutableSetOf() }.addAll(types) } } }
-                                    dep.hints?.forEach { it.content?.let { c -> stripHtml(c).takeIf { s -> s.isNotBlank() }?.let { cc -> msgsWithTypes.getOrPut(cc) { mutableSetOf() }.addAll(types) } } }
+                                    dep.messageItems.forEach { mi ->
+                                        val existing = msgMap[mi.id]
+                                        msgMap[mi.id] = TrackedMessage(
+                                            id = mi.id,
+                                            content = mi.content,
+                                            startMillis = mi.startMillis,
+                                            transportTypes = (existing?.transportTypes ?: emptySet()) + types
+                                        )
+                                    }
                                 }
-                                if (msgsWithTypes.isNotEmpty()) {
-                                    repo.trackMessages(msgsWithTypes)
+                                if (msgMap.isNotEmpty()) {
+                                    repo.trackMessages(msgMap.values.toList())
                                 }
 
                                 true // Signal success
