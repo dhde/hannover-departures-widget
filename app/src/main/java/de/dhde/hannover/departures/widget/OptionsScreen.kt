@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.R
-import de.dhde.hannover.departures.widget.data.isProtectedMessage
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
@@ -342,13 +341,15 @@ private fun MessageFilterSheetContent(
         }
         Spacer(Modifier.height(12.dp))
 
-        // Schwellenwert: Meldungen die >= 5x aufgetaucht sind, können gefiltert werden
-        val threshold = 5
+        // Eine Meldung wird ausblendbar, sobald sie >= 1 Tag bekannt ist
+        // (Alter aus incidentStart der API, sonst aus dem ersten Sehen).
+        val oneDayMillis = 24L * 60 * 60 * 1000
+        val nowMillis = System.currentTimeMillis()
         val allTypesActive = transportTypes.containsAll(setOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus"))
         val filterableMessages = seenMessages
             .filter { entry ->
-                !isProtectedMessage(entry.key) &&
-                entry.value.count >= threshold &&
+                entry.value.content.isNotBlank() &&
+                (nowMillis - entry.value.effectiveStartMillis) >= oneDayMillis &&
                 if (entry.value.transportTypes.isEmpty()) {
                     // Alte Einträge ohne Typ-Info: nur zeigen wenn alle Typen aktiv
                     allTypesActive
@@ -357,17 +358,16 @@ private fun MessageFilterSheetContent(
                 }
             }
             .entries
-            .sortedByDescending { it.value.count }
+            .sortedByDescending { it.value.effectiveStartMillis }
         if (filterableMessages.isEmpty()) {
             Text(
-                "Noch keine häufigen Meldungen bekannt. Die App lernt automatisch welche " +
-                "Infomeldungen regelmäßig von der API kommen (ab $threshold Mal). " +
-                "Lade das Widget einige Male neu, um Meldungen hier anzuzeigen.",
+                "Noch keine ausblendbaren Meldungen. Meldungen lassen sich ausblenden, sobald sie " +
+                "länger als einen Tag bestehen. Lade das Widget einige Male neu.",
                 color = UestraColors.TextSub, fontSize = 12.sp
             )
         } else {
             Text(
-                "Wähle aus, welche häufig auftauchenden Meldungen ausgeblendet werden sollen:",
+                "Wähle aus, welche länger bestehenden Meldungen ausgeblendet werden sollen:",
                 color = UestraColors.TextSub, fontSize = 12.sp
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -378,32 +378,32 @@ private fun MessageFilterSheetContent(
                 filterableMessages.take(5)
             }
 
-            displayMessages.forEach { (msgText, entry) ->
+            displayMessages.forEach { (msgId, entry) ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().clickable {
-                        val newSet = if (msgText in ignoredMessages) ignoredMessages - msgText else ignoredMessages + msgText
+                        val newSet = if (msgId in ignoredMessages) ignoredMessages - msgId else ignoredMessages + msgId
                         scope.launch { repo.setIgnoredMessages(newSet) }
                     }.padding(vertical = 6.dp)
                 ) {
                     Checkbox(
-                        checked = msgText in ignoredMessages,
+                        checked = msgId in ignoredMessages,
                         onCheckedChange = null,
                         colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(msgText, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                        val countLabel = if (entry.count >= 10000) "10k+× gesehen" else "${entry.count}× gesehen"
-                        Text(countLabel, color = UestraColors.TextSub, fontSize = 11.sp)
+                        Text(entry.content, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                        val ageDays = ((nowMillis - entry.effectiveStartMillis) / oneDayMillis).coerceAtLeast(1)
+                        Text("seit $ageDays Tag(en)", color = UestraColors.TextSub, fontSize = 11.sp)
                     }
                     IconButton(
                         onClick = {
                             scope.launch {
-                                repo.removeSeenMessage(msgText)
+                                repo.removeSeenMessage(msgId)
                                 // Auch aus ignoredMessages entfernen falls aktiv
-                                if (msgText in ignoredMessages) {
-                                    repo.setIgnoredMessages(ignoredMessages - msgText)
+                                if (msgId in ignoredMessages) {
+                                    repo.setIgnoredMessages(ignoredMessages - msgId)
                                 }
                             }
                         },

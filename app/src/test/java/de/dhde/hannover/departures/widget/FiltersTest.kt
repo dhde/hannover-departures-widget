@@ -2,8 +2,8 @@ package de.dhde.hannover.departures.widget
 
 import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.TransportFilter
+import de.dhde.hannover.departures.widget.api.MsgItem
 import de.dhde.hannover.departures.widget.data.filterMessages
-import de.dhde.hannover.departures.widget.data.isProtectedMessage
 import de.dhde.hannover.departures.widget.data.lineDirection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -72,25 +72,34 @@ class FiltersTest {
     }
 
     @Test
-    fun isProtectedMessage_keywordsCaseInsensitive() {
-        assertTrue(isProtectedMessage("Fahrt entfällt heute"))
-        assertTrue(isProtectedMessage("SCHIENENERSATZVERKEHR Linie 3"))
-        assertTrue(isProtectedMessage("Notarzteinsatz am Kröpcke"))
-        assertFalse(isProtectedMessage("Wir bitten um Verständnis."))
-        assertFalse(isProtectedMessage("Aufzug defekt"))
-    }
-
-    @Test
-    fun filterMessages_keepsProtectedEvenWhenIgnored() {
-        val msgs = listOf("Fahrt entfällt heute", "Aufzug defekt")
-        val result = filterMessages(msgs, setOf("entfällt", "aufzug"))
-        assertTrue("Fahrt entfällt heute" in result)
-        assertFalse("Aufzug defekt" in result)
+    fun filterMessages_hidesById() {
+        val msgs = listOf(
+            MsgItem(id = "ems-1", content = "Fahrt entfällt heute"),
+            MsgItem(id = "ems-2", content = "Aufzug defekt")
+        )
+        val result = filterMessages(msgs, setOf("ems-2"))
+        assertTrue(result.any { it.id == "ems-1" })
+        assertFalse(result.any { it.id == "ems-2" })
     }
 
     @Test
     fun filterMessages_emptyIgnored_keepsAll() {
-        val msgs = listOf("Aufzug defekt", "Fahrt entfällt")
+        val msgs = listOf(
+            MsgItem(id = "ems-1", content = "Aufzug defekt"),
+            MsgItem(id = "ems-2", content = "Fahrt entfällt")
+        )
         assertEquals(msgs, filterMessages(msgs, emptySet()))
+    }
+
+    @Test
+    fun filterMessages_legacyTextStillMatchesByContent() {
+        // Abwärtskompatibilität: alte text-basierte Ausblendungen (kein ID-Präfix) greifen weiter.
+        val msgs = listOf(
+            MsgItem(id = "ems-1", content = "Aufzug defekt am Bahnhof"),
+            MsgItem(id = "ems-2", content = "Linie 3 fährt planmäßig")
+        )
+        val result = filterMessages(msgs, setOf("aufzug defekt"))
+        assertFalse(result.any { it.id == "ems-1" })
+        assertTrue(result.any { it.id == "ems-2" })
     }
 }
