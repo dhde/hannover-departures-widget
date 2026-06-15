@@ -17,6 +17,7 @@ import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.StopsRepository
+import de.dhde.hannover.departures.widget.data.TrackedMessage
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import java.time.Instant
@@ -30,8 +31,11 @@ import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
+import android.os.Looper
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -82,8 +86,8 @@ class RefreshAction : ActionCallback {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
                                 session.setErrorState("")
 
-                                // Extract and track messages
-                                val msgsWithTypes = mutableMapOf<String, MutableSet<String>>()
+                                // Extract and track messages (keyed by stable id)
+                                val msgMap = mutableMapOf<String, TrackedMessage>()
                                 departures.forEach { dep ->
                                     val types = mutableSetOf<String>()
                                     if (dep.isBus) types.add("Bus")
@@ -92,11 +96,18 @@ class RefreshAction : ActionCallback {
                                     if (dep.isDB) types.add("DB")
                                     if (dep.isFernbus) types.add("Fernbus")
 
-                                    dep.infos?.forEach { it.content?.let { c -> stripHtml(c).takeIf { s -> s.isNotBlank() }?.let { cc -> msgsWithTypes.getOrPut(cc) { mutableSetOf() }.addAll(types) } } }
-                                    dep.hints?.forEach { it.content?.let { c -> stripHtml(c).takeIf { s -> s.isNotBlank() }?.let { cc -> msgsWithTypes.getOrPut(cc) { mutableSetOf() }.addAll(types) } } }
+                                    dep.messageItems.forEach { mi ->
+                                        val existing = msgMap[mi.id]
+                                        msgMap[mi.id] = TrackedMessage(
+                                            id = mi.id,
+                                            content = mi.content,
+                                            startMillis = mi.startMillis,
+                                            transportTypes = (existing?.transportTypes ?: emptySet()) + types
+                                        )
+                                    }
                                 }
-                                if (msgsWithTypes.isNotEmpty()) {
-                                    repo.trackMessages(msgsWithTypes)
+                                if (msgMap.isNotEmpty()) {
+                                    repo.trackMessages(msgMap.values.toList())
                                 }
 
                                 true // Signal success
@@ -296,18 +307,36 @@ suspend fun getBestLocation(context: Context): Location? {
     val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     if (!fine && !coarse) return null
 
-    // 1. Aktiver Fix via Fused (Play Services). BALANCED reicht für "nächste Haltestelle"
-    // im Stadtgebiet und schont den Akku (kein GPS-Chip-Hochfahren wie bei HIGH_ACCURACY).
-    val priority = if (fine) Priority.PRIORITY_BALANCED_POWER_ACCURACY else Priority.PRIORITY_LOW_POWER
+    // Wir wollen eine WIRKLICH aktuelle Position. getCurrentLocation/BALANCED lieferte auf echten
+    // Geräten teils minutenalte, grobe (100m) Cache-Fixes → die "nächste Station" wurde aus einer
+    // Position von vorhin berechnet ("hängt auf letzter Station"). Daher:
+    //  - HIGH_ACCURACY (bei FINE) für einen präzisen GPS-Fix,
+    //  - requestLocationUpdates mit kleinem maxUpdateAgeMillis (verwirft alte Cache-Fixes),
+    //  - einen gelieferten Fix nur verwenden, wenn er nicht älter als maxAgeMs ist,
+    //  - sonst den frischesten verfügbaren (aktiv vs. zuletzt bekannt) zurückgeben.
+    val maxAgeMs = 60_000L
+    val priority = if (fine) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY
     val active = try {
-        withTimeoutOrNull(8000) {
+        withTimeoutOrNull(7000) {
             val fused = LocationServices.getFusedLocationProviderClient(context)
-            val cts = CancellationTokenSource()
             suspendCancellableCoroutine<Location?> { cont ->
-                fused.getCurrentLocation(priority, cts.token)
-                    .addOnSuccessListener { loc -> if (cont.isActive) cont.resume(loc) }
-                    .addOnFailureListener { if (cont.isActive) cont.resume(null) }
-                cont.invokeOnCancellation { cts.cancel() }
+                val req = LocationRequest.Builder(priority, 1000L)
+                    .setMaxUpdates(1)
+                    .setMaxUpdateAgeMillis(10_000L)
+                    .setDurationMillis(6000L)
+                    .build()
+                val cb = object : LocationCallback() {
+                    override fun onLocationResult(result: LocationResult) {
+                        fused.removeLocationUpdates(this)
+                        if (cont.isActive) cont.resume(result.lastLocation)
+                    }
+                }
+                try {
+                    fused.requestLocationUpdates(req, cb, Looper.getMainLooper())
+                } catch (e: SecurityException) {
+                    if (cont.isActive) cont.resume(null)
+                }
+                cont.invokeOnCancellation { fused.removeLocationUpdates(cb) }
             }
         }
     } catch (e: SecurityException) {
@@ -315,14 +344,18 @@ suspend fun getBestLocation(context: Context): Location? {
     } catch (e: Exception) {
         null
     }
-    if (active != null) return active
+    val now = System.currentTimeMillis()
+    // Frischen aktiven Fix sofort verwenden.
+    if (active != null && now - active.time <= maxAgeMs) return active
 
-    // 2. Fallback: zuletzt bekannter Standort, frischester über alle Provider.
+    // Sonst Fallback: frischester zuletzt bekannter Standort über alle Provider;
+    // den (älteren) aktiven Fix nur nehmen, wenn er neuer ist als alle Last-Known.
     val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
-    return providers.mapNotNull { p ->
+    val lastKnown = providers.mapNotNull { p ->
         try { lm.getLastKnownLocation(p) } catch (e: SecurityException) { null }
     }.maxByOrNull { it.time }
+    return listOfNotNull(active, lastKnown).maxByOrNull { it.time }
 }
 
 suspend fun findAndSetActiveNearestStation(context: Context) {

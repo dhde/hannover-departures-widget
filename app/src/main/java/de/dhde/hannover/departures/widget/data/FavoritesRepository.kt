@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import de.dhde.hannover.departures.widget.api.MsgItem
 import kotlinx.coroutines.flow.*
 
 val Context.dataStore by preferencesDataStore(name = "favorites_prefs")
@@ -26,10 +27,30 @@ data class FavoriteStation(
         get() = uniqueId ?: id
 }
 
+/**
+ * Katalog-Eintrag einer gesehenen Meldung, abgelegt unter ihrer stabilen ID.
+ * - [content]: Anzeigetext (für die Ausblendliste).
+ * - [startMillis]: incidentStart der API (0, falls unbekannt – z.B. bei hints).
+ * - [firstSeenMillis]: erstes Auftreten in der App – Fallback fürs Alter, wenn kein startMillis vorliegt.
+ */
 data class SeenMessageEntry(
     val count: Int,
     val lastSeenMillis: Long,
-    val transportTypes: Set<String> = emptySet()
+    val transportTypes: Set<String> = emptySet(),
+    val content: String = "",
+    val startMillis: Long = 0L,
+    val firstSeenMillis: Long = 0L
+) {
+    /** Maßgeblicher Zeitpunkt fürs Alter: echtes Startdatum, sonst erstes Sehen. */
+    val effectiveStartMillis: Long get() = if (startMillis > 0) startMillis else firstSeenMillis
+}
+
+/** Zu trackende Meldung (aus den API-Daten gebildet). */
+data class TrackedMessage(
+    val id: String,
+    val content: String,
+    val startMillis: Long,
+    val transportTypes: Set<String>
 )
 
 /** Persistiert Favoriten-Haltestellen und die aktive Widget-Station. */
@@ -326,7 +347,8 @@ class FavoritesRepository(private val context: Context) {
         }
     }
 
-    suspend fun trackMessages(messagesWithTypes: Map<String, Set<String>>) {
+    suspend fun trackMessages(messages: List<TrackedMessage>) {
+        if (messages.isEmpty()) return
         val now = System.currentTimeMillis()
         val twoDaysMillis = 2 * 24 * 60 * 60 * 1000L
 
@@ -361,27 +383,27 @@ class FavoritesRepository(private val context: Context) {
                 }
             }
 
-            // Add new messages
-            for ((msg, types) in messagesWithTypes) {
-                val cleanMsg = msg.trim()
-                if (cleanMsg.isNotEmpty()) {
-                    val currentEntry = entries[cleanMsg]
-                    val currentCount = currentEntry?.count ?: 0
-                    val currentTypes = currentEntry?.transportTypes ?: emptySet()
-                    
-                    // Cap the count at 10000
-                    entries[cleanMsg] = SeenMessageEntry(
-                        count = minOf(currentCount + 1, 10000),
-                        lastSeenMillis = now,
-                        transportTypes = currentTypes + types
-                    )
-                    changed = true
-                }
+            // Add new messages (keyed by stable id)
+            for (m in messages) {
+                if (m.id.isBlank() || m.content.isBlank()) continue
+                val currentEntry = entries[m.id]
+                val firstSeen = currentEntry?.firstSeenMillis?.takeIf { it > 0 } ?: now
+
+                // Cap the count at 10000
+                entries[m.id] = SeenMessageEntry(
+                    count = minOf((currentEntry?.count ?: 0) + 1, 10000),
+                    lastSeenMillis = now,
+                    transportTypes = (currentEntry?.transportTypes ?: emptySet()) + m.transportTypes,
+                    content = m.content,
+                    startMillis = if (m.startMillis > 0) m.startMillis else (currentEntry?.startMillis ?: 0L),
+                    firstSeenMillis = firstSeen
+                )
+                changed = true
             }
 
             if (changed) {
-                // Keep only top 50 messages to prevent unbounded growth
-                val sortedEntries = entries.entries.sortedByDescending { it.value.count }.take(50).associate { it.key to it.value }
+                // Keep only the 50 most recently seen messages to prevent unbounded growth
+                val sortedEntries = entries.entries.sortedByDescending { it.value.lastSeenMillis }.take(50).associate { it.key to it.value }
                 prefs[SEEN_MESSAGES_KEY] = gson.toJson(sortedEntries)
             }
         }
@@ -415,28 +437,21 @@ class FavoritesRepository(private val context: Context) {
     }
 }
 
-/** Kritische Meldungen, die nie ausgeblendet werden dürfen (Schlüsselwort-basiert, klein-geschrieben). */
-val NON_FILTERABLE_MESSAGE_KEYWORDS = listOf(
-    "entfällt", "entfallen",
-    "ersatzverkehr", "schienenersatz", "sev",
-    "streik", "warnstreik",
-    "sperrung", "gesperrt", "vollsperrung",
-    "notarzt"
-)
-
-fun isProtectedMessage(message: String): Boolean {
-    val lower = message.lowercase()
-    return NON_FILTERABLE_MESSAGE_KEYWORDS.any { lower.contains(it) }
-}
+/** Präfixe der von uns vergebenen Meldungs-IDs (API-ID "ems-…" bzw. synthetisch "c:"/"h:"). */
+private fun isMessageId(s: String): Boolean =
+    s.startsWith("ems-") || s.startsWith("c:") || s.startsWith("h:")
 
 /**
- * Filtert Meldungen anhand der ignorierten Texte (case-insensitive contains).
- * Geschützte (kritische) Meldungen werden NIE ausgeblendet (isProtectedMessage).
+ * Blendet ausgeblendete Meldungen aus. [ignored] enthält primär stabile IDs;
+ * aus Abwärtskompatibilität können noch alte text-basierte Einträge enthalten sein,
+ * die weiterhin per (case-insensitive) Teilstring-Vergleich greifen.
  */
-fun filterMessages(messages: List<String>, ignoredCategories: Set<String>): List<String> {
+fun filterMessages(messages: List<MsgItem>, ignored: Set<String>): List<MsgItem> {
+    if (ignored.isEmpty()) return messages
+    val legacyTexts = ignored.filterNot { isMessageId(it) }.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
     return messages.filter { msg ->
-        isProtectedMessage(msg) || ignoredCategories.none { ignored ->
-            msg.trim().lowercase().contains(ignored.trim().lowercase())
-        }
+        if (msg.id in ignored) return@filter false
+        val lc = msg.content.trim().lowercase()
+        legacyTexts.none { lc.contains(it) }
     }
 }

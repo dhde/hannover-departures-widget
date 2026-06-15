@@ -42,7 +42,7 @@ import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.filterMessages
-import de.dhde.hannover.departures.widget.data.isProtectedMessage
+import de.dhde.hannover.departures.widget.api.LineMessages
 import de.dhde.hannover.departures.widget.data.lineDirection
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.data.DEFAULT_STATION_ID
@@ -262,24 +262,20 @@ class DeparturesWidget : GlanceAppWidget() {
                 typeMatch && dirMatch
             }
 
-            val messagesDeps = (
-                filtered.map { dep ->
-                    dep.copy(messages = filterMessages(dep.messages, ignoredMessages))
-                } +
-                flatDepartures.map { dep ->
-                    dep.copy(messages = dep.messages.filter { isProtectedMessage(it) })
-                }
-            ).filter { it.messages.isNotEmpty() }
+            // Meldungen nur aus den (per Tab/Richtung) sichtbaren Abfahrten, ausgeblendete entfernt.
+            val messagesDeps = filtered.map { dep ->
+                dep.copy(messages = filterMessages(dep.messages, ignoredMessages))
+            }.filter { it.messages.isNotEmpty() }
             val hasMessages = messagesDeps.isNotEmpty()
-            val groupedMessagesMap = if (hasMessages) {
+            val groupedMessagesList: List<LineMessages> = if (hasMessages) {
                 messagesDeps.groupBy { it.lineShort }
-                    .map { (line, deps) -> listOf(line, deps.flatMap { it.messages }.distinct()) }
+                    .map { (line, deps) -> LineMessages(line, deps.flatMap { it.messages }.distinctBy { it.id }) }
             } else emptyList()
-            val groupedMessages = groupedMessagesMap
-                .joinToString("\n\n") { item ->
-                    "Linie ${item[0]}:\n" + (item[1] as List<*>).joinToString("\n")
+            val groupedMessages = groupedMessagesList
+                .joinToString("\n\n") { lm ->
+                    "Linie ${lm.line}:\n" + lm.messages.joinToString("\n") { it.content }
                 }
-            val groupedMessagesJson = com.google.gson.Gson().toJson(groupedMessagesMap)
+            val groupedMessagesJson = com.google.gson.Gson().toJson(groupedMessagesList)
 
             Header(stationName, gpsModeActive, isRefreshing, hasMessages, groupedMessages, groupedMessagesJson)
             
