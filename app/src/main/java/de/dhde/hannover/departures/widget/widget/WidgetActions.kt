@@ -284,14 +284,13 @@ class LocateNearestStationAction : ActionCallback {
         val next = !session.isGpsModeActive()
         session.setGpsMode(next)
         if (next) {
+            // Im GPS-Modus steuert der Verkehrsmittel-Filter, welcher Halt gewählt wird:
+            // Filter Bahn → nächste Bahn-Haltestelle, Filter Bus → nächster Bus-Halt,
+            // Filter ALL → nächster Halt insgesamt. findAndSet übernimmt den aktiven
+            // Filter auch auf den neuen Halt, damit er nicht bei jedem Refresh rausspringt.
+            // Beim Einschalten daher KEIN forciertes Reset auf ALL mehr (siehe Bug-Video
+            // Claudiusstraße: Tram-Filter sprang sonst beim GPS-Toggle automatisch raus).
             findAndSetActiveNearestStation(context)
-            // GPS-Aktivierung = aktuellen Halt ungefiltert zeigen (alle Linien/Richtungen),
-            // auch wenn die nächste Haltestelle bereits die aktive war (kein Wechsel in findAndSet).
-            val repo = FavoritesRepository(context)
-            val filters = FilterStateStore(context)
-            val sid = repo.getActiveStationIdNow()
-            filters.setTabState(sid, TransportFilter.ALL)
-            filters.setDirectionState(sid, DirectionFilter.ALL)
         }
         RefreshAction.triggerUpdate(context)
     }
@@ -393,13 +392,17 @@ suspend fun findAndSetActiveNearestStation(context: Context) {
     }
 
     // Nur bei echtem Stationswechsel umschalten (sonst setzt setActiveStation die
-    // Filter bei jedem Refresh zurück). Im GPS-Modus wird der nächste Halt bewusst
-    // UNGEFILTERT gezeigt – alle Linien, alle Richtungen –, auch wenn der Halt zufällig
-    // als Favorit (mit Filtern) gespeichert ist. Den Favoriten-Linienfilter blendet
-    // die Anzeige im GPS-Modus zusätzlich aus (siehe gpsModeActive im Render).
+    // Filter bei jedem Refresh zurück). Den aktiven Verkehrsmittel-Filter aus dem
+    // GPS-Modus auf den neuen Halt übernehmen: er hat ja gerade bestimmt, welcher
+    // Halt überhaupt gewählt wurde (z.B. „Bahn" → nächste Bahn-Haltestelle).
+    // setActiveStation hätte den Filter sonst auf den Favoriten-Default (meist ALL)
+    // zurückgesetzt → Filter wäre bei jedem Refresh wieder rausgesprungen.
+    // Richtung wird beim Stationswechsel zurückgesetzt (linien-/halt-spezifisch).
+    // Den Favoriten-Linienfilter blendet die Anzeige im GPS-Modus aus (siehe
+    // gpsModeActive im Render).
     if (nearestStop != null && nearestStop.id != currentStationId) {
         repo.setActiveStation(nearestStop.id, nearestStop.name)
-        filters.setTabState(nearestStop.id, TransportFilter.ALL)
+        filters.setTabState(nearestStop.id, currentTabState)
         filters.setDirectionState(nearestStop.id, DirectionFilter.ALL)
     }
 }

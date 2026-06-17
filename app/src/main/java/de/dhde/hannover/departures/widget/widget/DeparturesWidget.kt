@@ -318,7 +318,32 @@ class DeparturesWidget : GlanceAppWidget() {
                 val limitedFiltered = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
                 
                 if (limitedFiltered.isEmpty()) {
-                    Text("Keine Abfahrten", style = TextStyle(color = ColorProvider(Color.Gray)))
+                    Box(
+                        modifier = GlanceModifier
+                            .fillMaxSize()
+                            .clickable(actionRunCallback<RefreshAction>(
+                                actionParametersOf(RefreshAction.KEY_FORCE to true)
+                            )),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Image(
+                                provider = ImageProvider(android.R.drawable.ic_popup_sync),
+                                contentDescription = "Neu laden",
+                                modifier = GlanceModifier.size(72.dp),
+                                colorFilter = ColorFilter.tint(ColorProvider(Color.Gray))
+                            )
+                            Spacer(modifier = GlanceModifier.height(8.dp))
+                            Text(
+                                text = "Keine Abfahrten",
+                                style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 14.sp)
+                            )
+                            Text(
+                                text = "Tippen zum Neuladen",
+                                style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 11.sp)
+                            )
+                        }
+                    }
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                         items(limitedFiltered) { (departure, subsequent) ->
