@@ -2,21 +2,18 @@
 set -e
 
 # Konfiguration
-TAG="v1.7.0"                    # Release-Tag (z. B. v1.0.0)
+TAG="v1.7.1"                    # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.7.0" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.7.1" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.7.0
+## Üstra Widget 1.7.1
 
-🛰️ GPS-Modus verbessert
-- Holt jetzt bei jeder Aktualisierung eine frische Position – die Anzeige folgt dir unterwegs und bleibt nicht mehr auf der letzten Station hängen.
-- Im GPS-Modus alle 30 Sekunden aktualisiert.
+🛰️ GPS-Modus: Filter steuert Haltestellenwahl
+- Mit aktivem Bahn-Filter springt das Widget auf die nächste Bahn-Haltestelle, mit Bus-Filter auf den nächsten Bushalt – der Filter bleibt erhalten und wandert beim Halt-Wechsel mit.
+- Behoben: Der gewählte Verkehrsmittel-Filter sprang im GPS-Modus an reinen Bus- oder Bahn-Haltestellen automatisch wieder raus.
 
-🔔 Meldungen aufgeräumt
-- Meldungen lassen sich ausblenden, sobald sie länger als einen Tag bestehen (auch dauerhafte Baustellen) – einmal ausgeblendet, linienübergreifend weg.
-- Meldungen erscheinen nur noch passend zum gewählten Filter (Bus/Bahn).
-
-✨ Außerdem: neue Bus-/Bahn-Icons, aktualisierte Screenshots & Hilfe.
+🔄 „Keine Abfahrten"-Hinweis aufgeräumt
+- Großes Refresh-Icon mit „Tippen zum Neuladen" statt unscheinbarer grauer Text – ein Tap lädt direkt neu.
 NOTES
 )  # Optional: Release-Notizen
 
