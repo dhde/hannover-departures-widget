@@ -80,7 +80,7 @@ class RefreshAction : ActionCallback {
                     val success = kotlinx.coroutines.withTimeoutOrNull(10000) {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             val api = UestraApi.create()
-                            val response = api.getDepartures(stationId)
+                            val response = api.getDepartures(stationId, UestraApi.DEFAULT_DEP_SEQUENCE)
                             val departures = response.departures
                             if (departures != null) {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))

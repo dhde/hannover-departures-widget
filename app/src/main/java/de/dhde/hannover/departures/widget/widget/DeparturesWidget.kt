@@ -127,6 +127,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
 
             val errorState by session.getErrorStateFlow().collectAsState(initial = "")
+            val isRefreshing by session.isRefreshingFlow().collectAsState(initial = false)
             val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
             val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
             val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
@@ -151,14 +152,15 @@ class DeparturesWidget : GlanceAppWidget() {
 
             val context = LocalContext.current
             SideEffect {
-                if (hasFutureDepartures) {
+                // Ticker läuft auch bei Refresh/Error, damit die 15-s-TTL des
+                // isRefreshing-Flags greifen kann und ein hängender Zustand
+                // beim nächsten Tick zurückgesetzt wird.
+                if (hasFutureDepartures || isRefreshing || errorState.isNotEmpty()) {
                     WidgetTicker.scheduleNextTick(context)
                 } else {
                     WidgetTicker.cancelTick(context)
                 }
             }
-
-            val isRefreshing by session.isRefreshingFlow().collectAsState(initial = false)
 
             WidgetContent(
                 stationName     = stationName,
@@ -448,10 +450,23 @@ class DeparturesWidget : GlanceAppWidget() {
             )
 
             if (isRefreshing) {
-                CircularProgressIndicator(
-                    color = ColorProvider(UestraColors.GpsBlue),
-                    modifier = GlanceModifier.size(24.dp)
-                )
+                // Klickbare Umhüllung: falls der isRefreshing-Flag aus irgendeinem
+                // Grund hängen bleibt (z.B. Coroutine-Kill), bleibt ein Force-Refresh
+                // per Fingertipp erreichbar. Die 15-s-TTL in RefreshState greift dann
+                // beim nächsten triggerUpdate.
+                Box(
+                    modifier = GlanceModifier
+                        .size(40.dp)
+                        .clickable(actionRunCallback<RefreshAction>(
+                            actionParametersOf(RefreshAction.KEY_FORCE to true)
+                        )),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = ColorProvider(UestraColors.GpsBlue),
+                        modifier = GlanceModifier.size(24.dp)
+                    )
+                }
             } else {
                 Image(
                     provider = ImageProvider(android.R.drawable.ic_popup_sync),

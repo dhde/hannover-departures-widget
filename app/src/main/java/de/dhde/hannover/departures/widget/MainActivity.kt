@@ -379,7 +379,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         scope.launch {
             isLoading = true
             try {
-                val apiResponse = UestraApi.create().getDepartures(stationId)
+                val apiResponse = UestraApi.create().getDepartures(stationId, UestraApi.DEFAULT_DEP_SEQUENCE)
                 rawDepartures = apiResponse.departures ?: emptyList()
                 departures = rawDepartures.flatMap { it.toFlatRows() }.sortedBy { it.departureTime }
                 lastUpdate = java.time.Instant.now()
@@ -1743,7 +1743,7 @@ fun LineFilterDialog(
     LaunchedEffect(fav.id, activeTypes) {
         isLoading = true
         try {
-            val response = de.dhde.hannover.departures.widget.api.UestraApi.create().getDepartures(fav.id)
+            val response = de.dhde.hannover.departures.widget.api.UestraApi.create().getDepartures(fav.id, de.dhde.hannover.departures.widget.api.UestraApi.DEFAULT_DEP_SEQUENCE)
             val deps = response.departures ?: emptyList()
             // Jede Linie genau einem Verkehrsmittel zuordnen (gleiche Klassifikation wie sonst).
             val lineType = mutableMapOf<String, String>()

@@ -72,6 +72,7 @@ class FavoritesRepository(private val context: Context) {
         val FAVORITES_HEIGHT_KEY = stringPreferencesKey("favorites_buttons_height")
         val FILTER_HEIGHT_KEY    = stringPreferencesKey("filter_buttons_height")
         val AUTO_REFRESH_ON_INTERACTION_KEY = booleanPreferencesKey("auto_refresh_on_interaction")
+        val REFRESH_ON_SCREEN_ON_KEY        = booleanPreferencesKey("refresh_on_screen_on")
         val GROUP_DEPARTURES_KEY = booleanPreferencesKey("group_departures")
         val GROUP_DEPARTURES_MAX_KEY = intPreferencesKey("group_departures_max")
         val SEEN_MESSAGES_KEY    = stringPreferencesKey("seen_messages_json")
@@ -324,6 +325,10 @@ class FavoritesRepository(private val context: Context) {
 
     val autoRefreshOnInteractionFlow: Flow<Boolean> = context.dataStore.data.map { it[AUTO_REFRESH_ON_INTERACTION_KEY] ?: false }
     suspend fun setAutoRefreshOnInteraction(autoRefresh: Boolean) { context.dataStore.edit { it[AUTO_REFRESH_ON_INTERACTION_KEY] = autoRefresh } }
+
+    val refreshOnScreenOnFlow: Flow<Boolean> = context.dataStore.data.map { it[REFRESH_ON_SCREEN_ON_KEY] ?: false }
+    suspend fun setRefreshOnScreenOn(enabled: Boolean) { context.dataStore.edit { it[REFRESH_ON_SCREEN_ON_KEY] = enabled } }
+    suspend fun getRefreshOnScreenOnNow(): Boolean = refreshOnScreenOnFlow.first()
 
     val groupDeparturesFlow: Flow<Boolean> = context.dataStore.data.map { it[GROUP_DEPARTURES_KEY] ?: true }
     suspend fun setGroupDepartures(group: Boolean) { context.dataStore.edit { it[GROUP_DEPARTURES_KEY] = group } }
