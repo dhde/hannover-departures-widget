@@ -43,6 +43,8 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
     val filterHeight by repo.filterHeightFlow.collectAsState(initial = "STANDARD")
     val autoRefreshOnInteraction by repo.autoRefreshOnInteractionFlow.collectAsState(initial = false)
+    val refreshOnScreenOn by repo.refreshOnScreenOnFlow.collectAsState(initial = false)
+    val context = LocalContext.current
     val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
     val maxGroupedDeparturesFlow by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
     val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
@@ -89,6 +91,8 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         repo.setFilterHeight("STANDARD")
                         repo.setMaxRows(10)
                         repo.setAutoRefreshOnInteraction(false)
+                        repo.setRefreshOnScreenOn(false)
+                        de.dhde.hannover.departures.widget.widget.ScreenOnRefreshManager.ensureState(context, false)
                         repo.setAllowDuplicates(false)
                     }
                     showResetConfirm = false
@@ -122,8 +126,6 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
     var localMaxRows by remember(maxRowsFlow) { mutableStateOf(maxRowsFlow.toFloat()) }
     var localMaxGroupedDepartures by remember(maxGroupedDeparturesFlow) { mutableStateOf(maxGroupedDeparturesFlow.toFloat()) }
-
-    val context = LocalContext.current
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg),
@@ -165,6 +167,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { FilterHeightCard(filterHeight, repo, scope) }
         item { OptionsGroupHeader("Verhalten") }
         item { ApiRefreshCard(autoRefreshOnInteraction, repo, scope) }
+        item { RefreshOnScreenOnCard(refreshOnScreenOn, repo, scope) }
         item { OptionsGroupHeader("Erweitert") }
         item {
             AdvancedCard(
@@ -187,7 +190,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         }
     }
 
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, groupDepartures, maxGroupedDeparturesFlow, groupedFontSize, allowDuplicates) {
+    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, refreshOnScreenOn, groupDepartures, maxGroupedDeparturesFlow, groupedFontSize, allowDuplicates) {
         de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }
@@ -526,6 +529,51 @@ private fun FilterHeightCard(
                 onSelect = { scope.launch { repo.setFilterHeight(it) } }
             ) { mode ->
                 SegmentButtonVisual(R.drawable.ic_widget_bus, isActive = true, activeColor = UestraColors.AccentRed, mode = mode)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefreshOnScreenOnCard(
+    refreshOnScreenOn: Boolean,
+    repo: de.dhde.hannover.departures.widget.data.FavoritesRepository,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val context = LocalContext.current
+    val toggle: (Boolean) -> Unit = { enabled ->
+        scope.launch {
+            repo.setRefreshOnScreenOn(enabled)
+            de.dhde.hannover.departures.widget.widget.ScreenOnRefreshManager.ensureState(context, enabled)
+        }
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { toggle(!refreshOnScreenOn) }
+                    .padding(vertical = 4.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Refresh beim Entsperren", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(
+                        "Wenn aktiv: Sobald du das Handy entsperrst, holt das Widget " +
+                        "neue Daten von der API (gedrosselt: max. alle 60 Sek.).",
+                        color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = refreshOnScreenOn,
+                    onCheckedChange = { toggle(it) },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = UestraColors.Teal)
+                )
             }
         }
     }

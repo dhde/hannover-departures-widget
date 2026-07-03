@@ -1,5 +1,6 @@
 package de.dhde.hannover.departures.widget.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.os.PowerManager
@@ -29,5 +30,27 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
                 }
             }
         }
+    }
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        // Live-Receiver überlebt keinen Process-Death → nach jedem Widget-Update
+        // Registrierung idempotent nachziehen (der Manager prüft den Flag selbst).
+        ScreenOnRefreshManager.syncFromRepo(context)
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        ScreenOnRefreshManager.syncFromRepo(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        // Letztes Widget entfernt → Receiver in jedem Fall abmelden.
+        ScreenOnRefreshManager.ensureState(context, enabled = false)
     }
 }

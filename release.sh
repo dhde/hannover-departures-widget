@@ -2,18 +2,20 @@
 set -e
 
 # Konfiguration
-TAG="v1.7.1"                    # Release-Tag (z. B. v1.0.0)
+TAG="v1.8.0"                    # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.7.1" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.8.0" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.7.1
+## Üstra Widget 1.8.0
 
-🛰️ GPS-Modus: Filter steuert Haltestellenwahl
-- Mit aktivem Bahn-Filter springt das Widget auf die nächste Bahn-Haltestelle, mit Bus-Filter auf den nächsten Bushalt – der Filter bleibt erhalten und wandert beim Halt-Wechsel mit.
-- Behoben: Der gewählte Verkehrsmittel-Filter sprang im GPS-Modus an reinen Bus- oder Bahn-Haltestellen automatisch wieder raus.
+🔄 Automatischer Refresh beim Entsperren
+- Neuer Toggle in den Einstellungen: Sobald du das Handy entsperrst, holt sich das Widget frische Abfahrtsdaten (gedrosselt: max. alle 60 Sek.). Standard: AUS.
 
-🔄 „Keine Abfahrten"-Hinweis aufgeräumt
-- Großes Refresh-Icon mit „Tippen zum Neuladen" statt unscheinbarer grauer Text – ein Tap lädt direkt neu.
+🛠️ Fix: Widget hakt nach Verbindungsfehler
+- Wenn unterwegs ein Verbindungsfehler auftrat, war der Refresh-Button teilweise nicht mehr erreichbar. Der Ladeindikator ist jetzt selbst klickbar und der Minuten-Ticker läuft auch im Fehlerzustand weiter – das Widget kann sich selbst wieder befreien.
+
+🛠️ Fix: Fixe Event-Grenze bei stark frequentierten Haltestellen
+- Bei Peak-Haltestellen (z.B. Hauptbahnhof) mit vielen Linien wird jetzt konsistent das API-Maximum abgefragt. Mehr ist server-seitig strukturell nicht möglich – die Anzeige zusätzlicher Abfahrten pro Linie ist bei dicht befahrenen Haltestellen dadurch begrenzt.
 NOTES
 )  # Optional: Release-Notizen
 
