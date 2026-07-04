@@ -561,9 +561,9 @@ private fun RefreshOnScreenOnCard(
                     .padding(vertical = 4.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Refresh beim Entsperren", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Refresh beim Display-An", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
-                        "Wenn aktiv: Sobald du das Handy entsperrst, holt das Widget " +
+                        "Wenn aktiv: Sobald das Display angeht, holt das Widget " +
                         "neue Daten von der API (gedrosselt: max. alle 60 Sek.).",
                         color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                     )

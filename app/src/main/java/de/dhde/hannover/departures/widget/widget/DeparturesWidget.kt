@@ -832,6 +832,10 @@ class DeparturesWidget : GlanceAppWidget() {
             java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss").withZone(java.time.ZoneId.systemDefault()).format(instant)
         } else "--:--:--"
 
+        val openAppIntent = Intent(LocalContext.current, de.dhde.hannover.departures.widget.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -844,11 +848,19 @@ class DeparturesWidget : GlanceAppWidget() {
                 style = TextStyle(color = ColorProvider(footerColor), fontSize = 10.sp),
                 modifier = GlanceModifier.defaultWeight()
             )
-            
+
             Text(
                 text = "Inoffiziell",
                 style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 10.sp),
                 modifier = GlanceModifier.padding(start = 4.dp)
+            )
+
+            Text(
+                text = "↗",
+                style = TextStyle(color = ColorProvider(UestraColors.Teal), fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier
+                    .padding(start = 8.dp, end = 2.dp)
+                    .clickable(actionStartActivity(openAppIntent))
             )
         }
     }
