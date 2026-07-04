@@ -2,20 +2,17 @@
 set -e
 
 # Konfiguration
-TAG="v1.8.0"                    # Release-Tag (z. B. v1.0.0)
+TAG="v1.8.1"                    # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.8.0" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.8.1" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.8.0
+## Üstra Widget 1.8.1
 
-🔄 Automatischer Refresh beim Entsperren
-- Neuer Toggle in den Einstellungen: Sobald du das Handy entsperrst, holt sich das Widget frische Abfahrtsdaten (gedrosselt: max. alle 60 Sek.). Standard: AUS.
+🛠️ Fix: „Refresh beim Entsperren" funktioniert jetzt zuverlässig
+- Das Feature aus 1.8.0 hat auf vielen Geräten nicht ausgelöst (ACTION_USER_PRESENT ist gerätespezifisch unzuverlässig, u.a. bei Fingerprint/Face-Unlock). Jetzt reagiert das Widget auf das Einschalten des Displays (ACTION_SCREEN_ON). Toggle-Bezeichnung entsprechend angepasst zu „Refresh beim Display-An". Die 60-s-Drossel verhindert Traffic-Spam bei Notification-Peek.
 
-🛠️ Fix: Widget hakt nach Verbindungsfehler
-- Wenn unterwegs ein Verbindungsfehler auftrat, war der Refresh-Button teilweise nicht mehr erreichbar. Der Ladeindikator ist jetzt selbst klickbar und der Minuten-Ticker läuft auch im Fehlerzustand weiter – das Widget kann sich selbst wieder befreien.
-
-🛠️ Fix: Fixe Event-Grenze bei stark frequentierten Haltestellen
-- Bei Peak-Haltestellen (z.B. Hauptbahnhof) mit vielen Linien wird jetzt konsistent das API-Maximum abgefragt. Mehr ist server-seitig strukturell nicht möglich – die Anzeige zusätzlicher Abfahrten pro Linie ist bei dicht befahrenen Haltestellen dadurch begrenzt.
+🔗 App direkt aus dem Widget öffnen
+- Neues kleines Icon (↗) rechts im Footer. Ein Tap öffnet die App – praktisch für Einstellungen, Favoriten oder Meldungen.
 NOTES
 )  # Optional: Release-Notizen
 

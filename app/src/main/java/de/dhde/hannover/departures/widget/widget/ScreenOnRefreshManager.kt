@@ -11,12 +11,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Registriert einen live-BroadcastReceiver für ACTION_USER_PRESENT (Nutzer entsperrt das
- * Gerät), der einen Widget-Refresh anstößt. Idempotent: mehrfaches ensureState ist safe.
+ * Registriert einen live-BroadcastReceiver für ACTION_SCREEN_ON (Display wird eingeschaltet),
+ * der einen Widget-Refresh anstößt. Idempotent: mehrfaches ensureState ist safe.
  *
- * Live-Registrierung ist nötig, weil ACTION_USER_PRESENT ab O nicht mehr im Manifest
+ * Live-Registrierung ist nötig, weil ACTION_SCREEN_ON ab O nicht mehr im Manifest
  * empfangen werden darf. Der Receiver überlebt keinen Process-Death — deshalb ruft der
  * DeparturesWidgetReceiver bei jedem Widget-Event ensureState() erneut auf.
+ *
+ * Hinweis: ACTION_SCREEN_ON feuert auch bei Notification-Peek / Ambient-Wake-Ups. Das
+ * wird bewusst in Kauf genommen, weil ACTION_USER_PRESENT auf vielen Geräten (auch mit
+ * Fingerprint/Face-Unlock) unzuverlässig ist. Die 60-s-Drossel in RefreshAction verhindert
+ * dass daraus Traffic-Spam wird.
  */
 object ScreenOnRefreshManager {
     @Volatile private var registered = false
@@ -42,14 +47,15 @@ object ScreenOnRefreshManager {
         if (registered) return
         val r = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                if (intent.action != Intent.ACTION_USER_PRESENT) return
-                // Bestehende 60-s-Drossel und isRefreshing-Check in RefreshAction verhindern Spam.
+                if (intent.action != Intent.ACTION_SCREEN_ON) return
+                // Bestehende 60-s-Drossel und isRefreshing-Check in RefreshAction verhindern Spam
+                // (auch bei Notification-Peek / Ambient-Wake-Ups).
                 CoroutineScope(Dispatchers.IO).launch {
                     RefreshAction.triggerUpdate(ctx.applicationContext)
                 }
             }
         }
-        val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
+        val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
         ContextCompat.registerReceiver(context, r, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         receiver = r
         registered = true
