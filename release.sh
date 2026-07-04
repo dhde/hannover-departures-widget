@@ -2,17 +2,14 @@
 set -e
 
 # Konfiguration
-TAG="v1.8.1"                    # Release-Tag (z. B. v1.0.0)
+TAG="v1.8.2"                    # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.8.1" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.8.2" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.8.1
+## Üstra Widget 1.8.2
 
-🛠️ Fix: „Refresh beim Entsperren" funktioniert jetzt zuverlässig
-- Das Feature aus 1.8.0 hat auf vielen Geräten nicht ausgelöst (ACTION_USER_PRESENT ist gerätespezifisch unzuverlässig, u.a. bei Fingerprint/Face-Unlock). Jetzt reagiert das Widget auf das Einschalten des Displays (ACTION_SCREEN_ON). Toggle-Bezeichnung entsprechend angepasst zu „Refresh beim Display-An". Die 60-s-Drossel verhindert Traffic-Spam bei Notification-Peek.
-
-🔗 App direkt aus dem Widget öffnen
-- Neues kleines Icon (↗) rechts im Footer. Ein Tap öffnet die App – praktisch für Einstellungen, Favoriten oder Meldungen.
+🧰 Interne Aufräumarbeiten
+- AndroidX-Core-Bibliothek aktualisiert (1.12.0 → 1.15.0). Adressiert einen Hinweis aus dem Play-Store-Pre-Launch-Report zum Speicherverbrauch beim Bitmap-Laden im Framework-Code. Keine Auswirkung auf die Bedienung – reine Wartung.
 NOTES
 )  # Optional: Release-Notizen
 
