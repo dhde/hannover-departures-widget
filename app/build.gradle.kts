@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "de.dhde.hannover.departures.widget"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "de.dhde.hannover.departures.widget"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 27
-        versionName = "1.8.2"
+        targetSdk = 36
+        versionCode = 28
+        versionName = "1.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
