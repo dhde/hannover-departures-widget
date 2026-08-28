@@ -72,6 +72,10 @@ class RefreshAction : ActionCallback {
             // Drosselung: Nur alle 60s anfragen, außer bei manuellem Force
             if (isForce || secondsOld >= 60) {
                 session.setRefreshing(true)
+                // Alten Fehler sofort löschen: er wird nur gesetzt, wenn DIESER neue
+                // Versuch tatsächlich scheitert. Verhindert, dass ein stale
+                // "Verbindung fehlgeschlagen" neben frischen Daten stehen bleibt.
+                session.setErrorState("")
                 cache.updateRefreshTime(stationId)
                 DeparturesWidget().updateAll(context)
 
@@ -119,6 +123,11 @@ class RefreshAction : ActionCallback {
                     if (success == null) {
                         session.setErrorState("Zeitüberschreitung") // Timeout
                     }
+                } catch (e: CancellationException) {
+                    // Glance kann den ActionCallback-Scope bei Widget-Rerender killen.
+                    // Das ist KEIN Netzwerkfehler — nicht als solcher anzeigen, nur
+                    // Cancellation-Kontrakt einhalten und weiterreichen.
+                    throw e
                 } catch (e: Exception) {
                     e.printStackTrace()
                     session.setErrorState("Verbindung fehlgeschlagen")

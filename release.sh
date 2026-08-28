@@ -2,14 +2,15 @@
 set -e
 
 # Konfiguration
-TAG="v1.8.2"                    # Release-Tag (z. B. v1.0.0)
+TAG="v1.9.1"                    # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.8.2" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.9.1" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.8.2
+## Üstra Widget 1.9.1
 
-🧰 Interne Aufräumarbeiten
-- AndroidX-Core-Bibliothek aktualisiert (1.12.0 → 1.15.0). Adressiert einen Hinweis aus dem Play-Store-Pre-Launch-Report zum Speicherverbrauch beim Bitmap-Laden im Framework-Code. Keine Auswirkung auf die Bedienung – reine Wartung.
+🐛 Fix: „Verbindung fehlgeschlagen" hing im Widget fest
+- Wenn das Android-System den Refresh-Coroutine-Scope während eines Widget-Rerenders abgebrochen hat, wurde die Cancellation fälschlicherweise als Netzwerkfehler angezeigt. Ab jetzt wird sie sauber durchgereicht.
+- Der Fehler-Zustand wird beim Start eines neuen Refresh-Versuchs sofort geleert, damit keine stale „Verbindung fehlgeschlagen"-Meldung mehr neben frischen Daten stehen bleibt.
 NOTES
 )  # Optional: Release-Notizen
 
