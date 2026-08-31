@@ -20,7 +20,7 @@ class StopsRepository(context: Context) {
         if (file.exists() && (System.currentTimeMillis() - file.lastModified() < CACHE_DURATION_MS)) {
             try {
                 val json = file.readText()
-                val type = object : TypeToken<List<StationSearchResult>>() {}.type
+                val type = TypeToken.getParameterized(List::class.java, StationSearchResult::class.java).type
                 val stops: List<StationSearchResult> = gson.fromJson(json, type)
                 if (stops.isNotEmpty()) {
                     return@withContext stops
