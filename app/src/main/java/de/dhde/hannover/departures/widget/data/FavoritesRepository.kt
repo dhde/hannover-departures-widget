@@ -98,7 +98,7 @@ class FavoritesRepository(private val context: Context) {
     val favoritesFlow: Flow<List<FavoriteStation>> = context.dataStore.data.map { prefs ->
         val json = prefs[FAVORITES_JSON_KEY]
         val list = if (json != null) {
-            val type = object : TypeToken<List<FavoriteStation>>() {}.type
+            val type = TypeToken.getParameterized(List::class.java, FavoriteStation::class.java).type
             gson.fromJson<List<FavoriteStation>>(json, type) ?: emptyList()
         } else {
             // Migration vom alten StringSet
@@ -341,7 +341,7 @@ class FavoritesRepository(private val context: Context) {
     val seenMessagesFlow: Flow<Map<String, SeenMessageEntry>> = context.dataStore.data.map { prefs ->
         val json = prefs[SEEN_MESSAGES_KEY]
         if (json != null) {
-            val type = object : TypeToken<Map<String, SeenMessageEntry>>() {}.type
+            val type = TypeToken.getParameterized(Map::class.java, String::class.java, SeenMessageEntry::class.java).type
             try {
                 gson.fromJson(json, type) ?: emptyMap()
             } catch (e: Exception) {
@@ -359,7 +359,7 @@ class FavoritesRepository(private val context: Context) {
 
         context.dataStore.edit { prefs ->
             val currentJson = prefs[SEEN_MESSAGES_KEY]
-            val type = object : TypeToken<MutableMap<String, SeenMessageEntry>>() {}.type
+            val type = TypeToken.getParameterized(Map::class.java, String::class.java, SeenMessageEntry::class.java).type
             val entries: MutableMap<String, SeenMessageEntry> = if (currentJson != null) {
                 try {
                     gson.fromJson(currentJson, type) ?: mutableMapOf()
@@ -417,7 +417,7 @@ class FavoritesRepository(private val context: Context) {
     suspend fun removeSeenMessage(message: String) {
         context.dataStore.edit { prefs ->
             val currentJson = prefs[SEEN_MESSAGES_KEY]
-            val type = object : TypeToken<MutableMap<String, SeenMessageEntry>>() {}.type
+            val type = TypeToken.getParameterized(Map::class.java, String::class.java, SeenMessageEntry::class.java).type
             val entries: MutableMap<String, SeenMessageEntry> = if (currentJson != null) {
                 try {
                     gson.fromJson(currentJson, type) ?: mutableMapOf()
