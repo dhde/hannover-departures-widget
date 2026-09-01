@@ -101,6 +101,7 @@ private fun DebugLine(entry: DebugLog.Entry) {
         val fmt = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.GERMAN)
         fmt.format(d)
     }
+    val formatted = remember(entry.message) { DebugLogFormatter.format(entry.message) }
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row {
             Text(
@@ -111,7 +112,7 @@ private fun DebugLine(entry: DebugLog.Entry) {
                 modifier = Modifier.padding(end = 8.dp),
             )
             Text(
-                text = entry.message,
+                text = formatted,
                 color = UestraColors.TextMain,
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
