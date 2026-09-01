@@ -70,6 +70,7 @@ class RefreshAction : ActionCallback {
             } else 999L
 
             // Drosselung: Nur alle 60s anfragen, außer bei manuellem Force
+            de.dhde.hannover.departures.widget.debug.DebugLog.log("stationId=$stationId secondsOld=$secondsOld willFetch=${isForce || secondsOld >= 60}")
             if (isForce || secondsOld >= 60) {
                 session.setRefreshing(true)
                 // Alten Fehler sofort löschen: er wird nur gesetzt, wenn DIESER neue
@@ -84,7 +85,10 @@ class RefreshAction : ActionCallback {
                     val success = kotlinx.coroutines.withTimeoutOrNull(10000) {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             val api = UestraApi.create()
+                            de.dhde.hannover.departures.widget.debug.DebugLog.log("calling api.getDepartures for stationId=$stationId")
                             val response = api.getDepartures(stationId, UestraApi.DEFAULT_DEP_SEQUENCE)
+                            de.dhde.hannover.departures.widget.debug.DebugLog.log("response received: stop=${response.stop}, departuresSize=${response.departures?.size}")
+                            de.dhde.hannover.departures.widget.debug.DebugLog.log("first departure JSON: ${Gson().toJson(response.departures?.firstOrNull())}")
                             val departures = response.departures
                             if (departures != null) {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))

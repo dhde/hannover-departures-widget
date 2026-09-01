@@ -137,7 +137,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
 
             val departures: List<DepartureItem> = try {
-                val list: List<DepartureItem> = gson.fromJson(cachedJson, object : TypeToken<List<DepartureItem>>() {}.type)
+                val list: List<DepartureItem> = gson.fromJson(cachedJson, TypeToken.getParameterized(List::class.java, DepartureItem::class.java).type)
                 list
             } catch (e: Exception) {
                 emptyList()
