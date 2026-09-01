@@ -13,6 +13,17 @@ class WidgetSessionStore(private val context: Context) {
         private val IS_REFRESHING = booleanPreferencesKey("is_refreshing")
         private val REFRESH_TS = longPreferencesKey("refresh_ts")
         private val ERROR_STATE = stringPreferencesKey("error_state")
+        private val DEBUG_MODE = booleanPreferencesKey("debug_mode")
+    }
+
+    fun debugModeFlow(): Flow<Boolean> =
+        context.cacheDataStore.data.map { it[DEBUG_MODE] ?: false }
+
+    suspend fun isDebugMode(): Boolean =
+        context.cacheDataStore.data.map { it[DEBUG_MODE] }.first() ?: false
+
+    suspend fun setDebugMode(enabled: Boolean) {
+        context.cacheDataStore.edit { it[DEBUG_MODE] = enabled }
     }
 
     fun getTimeDisplayModeFlow(): Flow<String> =

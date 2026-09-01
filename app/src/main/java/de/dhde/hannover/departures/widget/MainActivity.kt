@@ -235,7 +235,7 @@ class MainActivity : ComponentActivity() {
             if (msgsJson != null) {
                 // Structured JSON: List<LineMessages> = [{line, messages:[{id,content,startMillis}]}, ...]
                 try {
-                    val type = object : com.google.gson.reflect.TypeToken<List<LineMessages>>() {}.type
+                    val type = com.google.gson.reflect.TypeToken.getParameterized(List::class.java, LineMessages::class.java).type
                     val parsed: List<LineMessages> = com.google.gson.Gson().fromJson(msgsJson, type)
                     infoDialogState = InfoDialogData(title = title, groupedMsgs = parsed)
                 } catch (e: Exception) {
@@ -259,7 +259,8 @@ enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.v
     SEARCH("Suchen", Icons.Default.Search),
     FAVORITES("Favoriten", Icons.Default.Star),
     OPTIONS("Optionen", Icons.Default.Settings),
-    HELP("Hilfe", Icons.Default.Info)
+    HELP("Hilfe", Icons.Default.Info),
+    DEBUG("Debug", Icons.Default.BugReport)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -267,6 +268,11 @@ enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.v
 fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
     val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
+    val context = LocalContext.current
+    val sessionStore = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
+    val debugMode by sessionStore.debugModeFlow().collectAsState(initial = false)
+    val visibleScreens = AppScreen.values().filter { it != AppScreen.DEBUG || debugMode }
+    if (currentScreen == AppScreen.DEBUG && !debugMode) currentScreen = AppScreen.HELP
 
     Scaffold(
         containerColor = UestraColors.DarkBg,
@@ -293,7 +299,7 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
         },
         bottomBar = {
             NavigationBar(containerColor = UestraColors.CardBg) {
-                AppScreen.values().forEach { screen ->
+                visibleScreens.forEach { screen ->
                     NavigationBarItem(
                         icon = { Icon(screen.icon, contentDescription = screen.label) },
                         label = { Text(screen.label) },
@@ -318,6 +324,7 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
                 AppScreen.OPTIONS -> OptionsScreen(repo)
                 AppScreen.FAVORITES -> FavoritesScreen(repo)
                 AppScreen.HELP -> HelpScreen()
+                AppScreen.DEBUG -> de.dhde.hannover.departures.widget.debug.DebugScreen()
             }
         }
     }
@@ -1253,6 +1260,16 @@ fun FavoritesScreen(repo: FavoritesRepository) {
 
 @Composable
 fun HelpScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sessionStore = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
+    val debugMode by sessionStore.debugModeFlow().collectAsState(initial = false)
+    val versionName = remember {
+        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" }
+        catch (_: Exception) { "?" }
+    }
+    var tapCount by remember { mutableStateOf(0) }
+    var lastTapMs by remember { mutableStateOf(0L) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg),
         contentPadding = PaddingValues(16.dp),
@@ -1318,6 +1335,35 @@ fun HelpScreen() {
                     )
                 }
             }
+        }
+        item {
+            Text(
+                text = "Version $versionName",
+                color = UestraColors.TextSub,
+                fontSize = 11.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 8.dp)
+                    .clickable {
+                        val now = System.currentTimeMillis()
+                        tapCount = if (now - lastTapMs > 2000L) 1 else tapCount + 1
+                        lastTapMs = now
+                        if (tapCount >= 7) {
+                            tapCount = 0
+                            scope.launch {
+                                val newState = !debugMode
+                                sessionStore.setDebugMode(newState)
+                                android.widget.Toast.makeText(
+                                    context,
+                                    if (newState) "Debug-Modus aktiviert" else "Debug-Modus deaktiviert",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                    .padding(vertical = 8.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }
