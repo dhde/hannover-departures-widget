@@ -2,17 +2,27 @@
 set -e
 
 # Konfiguration
-TAG="v1.9.2"                    # Release-Tag (z. B. v1.0.0)
+TAG="v1.9.5"                    # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.9.2" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.9.5" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.9.2
+## Üstra Widget 1.9.5
 
-🐛 Fix: „Verbindung fehlgeschlagen" hing im Widget fest
-- Wenn das Android-System den Refresh-Coroutine-Scope während eines Widget-Rerenders abgebrochen hat, wurde die Cancellation fälschlicherweise als Netzwerkfehler angezeigt. Ab jetzt wird sie sauber durchgereicht.
-- Der Fehler-Zustand wird beim Start eines neuen Refresh-Versuchs sofort geleert, damit keine stale „Verbindung fehlgeschlagen"-Meldung mehr neben frischen Daten stehen bleibt.
+Wartungs- und Feinschliff-Release ohne funktionale Änderungen für Endnutzer.
 
-_Inhaltlich identisch zu v1.9.1 — nur neuer versionCode (30), damit die AAB im Play Store re-uploadbar ist._
+### Unter der Haube
+
+📦 Dependency-Update
+- Alle AndroidX-, Compose-, Glance-, Play-Services- und Coroutines-Bibliotheken auf aktuelle Stable-Versionen gehoben (Compose BOM 2026.08.00, Lifecycle 2.11, Core-KTX 1.19 usw.).
+- `compileSdk` auf 37 angehoben. `targetSdk`/`minSdk` unverändert.
+- Retrofit bewusst auf 2.9.0 belassen (2→3 mit OkHttp-4.12-Sprung folgt separat).
+
+📍 GPS-Fast-Path im Widget
+- Fused-Location-Cache wird zuerst geprüft (< 30 s alt → Millisekunden-Response), aktiver `getCurrentLocation(HIGH_ACCURACY)`-Fix nur als Fallback (Timeout 4 s statt 7 s).
+- GPS-Toggle löst nur noch einen API-Call aus, wenn sich die nächste Haltestelle wirklich geändert hat — sonst reines UI-Feedback ohne Netzwerk-Roundtrip.
+
+🐛 Debug-Screen (nur bei aktiviertem Debug-Modus)
+- JSON-Blöcke in Log-Zeilen werden jetzt pretty-printed und farbcodiert (Keys blau, Strings grün, Zahlen orange, `null` rot, Booleans lila).
 NOTES
 )  # Optional: Release-Notizen
 
