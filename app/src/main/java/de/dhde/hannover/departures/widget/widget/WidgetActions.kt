@@ -539,6 +539,20 @@ class TogglePickerFilterAction : ActionCallback {
     }
 }
 
+class EnableAutoFollowAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val session = WidgetSessionStore(context)
+        de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] enableAutoFollow")
+        session.setGpsMode(true)
+        session.clearPickerState()
+        RefreshAction.triggerUpdate(context)
+    }
+}
+
 class ClosePickerAction : ActionCallback {
     override suspend fun onAction(
         context: Context,

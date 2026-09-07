@@ -55,6 +55,7 @@ import de.dhde.hannover.departures.widget.widget.OpenPickerAction
 import de.dhde.hannover.departures.widget.widget.PickCandidateAction
 import de.dhde.hannover.departures.widget.widget.TogglePickerFilterAction
 import de.dhde.hannover.departures.widget.widget.ClosePickerAction
+import de.dhde.hannover.departures.widget.widget.EnableAutoFollowAction
 import de.dhde.hannover.departures.widget.data.StopCandidate
 import java.time.Instant
 import java.time.format.DateTimeParseException
@@ -438,7 +439,7 @@ class DeparturesWidget : GlanceAppWidget() {
                             .clickable(actionRunCallback<TogglePickerFilterAction>())
                             .padding(end = 6.dp),
                         colorFilter = ColorFilter.tint(
-                            ColorProvider(if (filterOverride == "ALL") UestraColors.GpsBlue else UestraColors.TextSub)
+                            ColorProvider(if (filterOverride == "ALL") UestraColors.TextSub else UestraColors.GpsBlue)
                         )
                     )
                 }
@@ -448,6 +449,26 @@ class DeparturesWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.size(24.dp)
                         .clickable(actionRunCallback<ClosePickerAction>()),
                     colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                )
+            }
+
+            // Auto-Folgen-Row — immer sichtbar, auch bei leeren Kandidaten
+            Row(
+                modifier = GlanceModifier.fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .clickable(actionRunCallback<EnableAutoFollowAction>()),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_gps),
+                    contentDescription = null,
+                    modifier = GlanceModifier.size(18.dp).padding(end = 8.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(UestraColors.GpsBlue))
+                )
+                Text(
+                    text = "Auto-Folgen",
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(color = ColorProvider(UestraColors.GpsBlue), fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 )
             }
 

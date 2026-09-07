@@ -729,12 +729,41 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                                 }
                             }
                         }) {
-                            Text(if (pickerFilterOverride) "Filter aktiv" else "Alle anzeigen",
-                                color = UestraColors.Teal)
+                            Text(if (pickerFilterOverride) "Filter aktivieren" else "Alle anzeigen",
+                                color = if (pickerFilterOverride) UestraColors.TextSub else UestraColors.Teal)
                         }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
+
+                // Auto-Folgen-Row — immer sichtbar
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable {
+                            scope.launch {
+                                de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] app enableAutoFollow")
+                                de.dhde.hannover.departures.widget.data.WidgetSessionStore(context).setGpsMode(true)
+                                de.dhde.hannover.departures.widget.widget.findAndSetActiveNearestStation(context)
+                                de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
+                                showPickerSheet = false
+                            }
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_widget_gps),
+                        contentDescription = null,
+                        tint = UestraColors.GpsBlue,
+                        modifier = Modifier.size(18.dp).padding(end = 8.dp)
+                    )
+                    Text("Auto-Folgen", color = UestraColors.GpsBlue,
+                        fontSize = 16.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f))
+                }
+                HorizontalDivider(color = UestraColors.TextSub.copy(alpha = 0.2f))
+                Spacer(Modifier.height(8.dp))
+
                 when {
                     pickerLoading -> CircularProgressIndicator(color = UestraColors.Teal)
                     pickerError == "Standort-Berechtigung fehlt" -> {
