@@ -516,7 +516,7 @@ class DeparturesWidget : GlanceAppWidget() {
                                     Image(
                                         provider = ImageProvider(R.drawable.ic_widget_tram),
                                         contentDescription = null,
-                                        modifier = GlanceModifier.size(16.dp).padding(end = 2.dp),
+                                        modifier = GlanceModifier.size(20.dp).padding(end = 2.dp),
                                         colorFilter = ColorFilter.tint(ColorProvider(UestraColors.LineBlue))
                                     )
                                 }
@@ -524,7 +524,7 @@ class DeparturesWidget : GlanceAppWidget() {
                                     Image(
                                         provider = ImageProvider(R.drawable.ic_widget_bus),
                                         contentDescription = null,
-                                        modifier = GlanceModifier.size(16.dp),
+                                        modifier = GlanceModifier.size(20.dp),
                                         colorFilter = ColorFilter.tint(ColorProvider(UestraColors.AccentRed))
                                     )
                                 }
