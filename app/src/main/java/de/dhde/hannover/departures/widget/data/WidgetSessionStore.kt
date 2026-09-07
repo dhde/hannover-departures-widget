@@ -14,6 +14,10 @@ class WidgetSessionStore(private val context: Context) {
         private val REFRESH_TS = longPreferencesKey("refresh_ts")
         private val ERROR_STATE = stringPreferencesKey("error_state")
         private val DEBUG_MODE = booleanPreferencesKey("debug_mode")
+        private val PICKER_MODE = booleanPreferencesKey("picker_mode")
+        private val PICKER_CANDIDATES = stringPreferencesKey("picker_candidates_json")
+        private val PICKER_OPENED_AT = longPreferencesKey("picker_opened_at")
+        private val PICKER_FILTER_OVERRIDE = stringPreferencesKey("picker_filter_override")
     }
 
     fun debugModeFlow(): Flow<Boolean> =
@@ -72,4 +76,56 @@ class WidgetSessionStore(private val context: Context) {
 
     fun getErrorStateFlow(): Flow<String> =
         context.cacheDataStore.data.map { it[ERROR_STATE] ?: "" }
+
+    // --- Picker-State ---
+
+    fun pickerModeFlow(): Flow<Boolean> =
+        context.cacheDataStore.data.map { it[PICKER_MODE] ?: false }
+
+    suspend fun isPickerModeActive(): Boolean =
+        context.cacheDataStore.data.map { it[PICKER_MODE] }.first() ?: false
+
+    suspend fun setPickerMode(active: Boolean) {
+        context.cacheDataStore.edit { it[PICKER_MODE] = active }
+    }
+
+    fun pickerCandidatesFlow(): Flow<String?> =
+        context.cacheDataStore.data.map { it[PICKER_CANDIDATES] }
+
+    suspend fun getPickerCandidatesJson(): String? =
+        context.cacheDataStore.data.map { it[PICKER_CANDIDATES] }.first()
+
+    suspend fun setPickerCandidatesJson(json: String?) {
+        context.cacheDataStore.edit { prefs ->
+            if (json == null) prefs.remove(PICKER_CANDIDATES) else prefs[PICKER_CANDIDATES] = json
+        }
+    }
+
+    suspend fun getPickerOpenedAt(): Long =
+        context.cacheDataStore.data.map { it[PICKER_OPENED_AT] }.first() ?: 0L
+
+    suspend fun setPickerOpenedAt(ts: Long) {
+        context.cacheDataStore.edit { it[PICKER_OPENED_AT] = ts }
+    }
+
+    fun pickerFilterOverrideFlow(): Flow<String?> =
+        context.cacheDataStore.data.map { it[PICKER_FILTER_OVERRIDE] }
+
+    suspend fun getPickerFilterOverride(): String? =
+        context.cacheDataStore.data.map { it[PICKER_FILTER_OVERRIDE] }.first()
+
+    suspend fun setPickerFilterOverride(value: String?) {
+        context.cacheDataStore.edit { prefs ->
+            if (value == null) prefs.remove(PICKER_FILTER_OVERRIDE) else prefs[PICKER_FILTER_OVERRIDE] = value
+        }
+    }
+
+    suspend fun clearPickerState() {
+        context.cacheDataStore.edit { prefs ->
+            prefs[PICKER_MODE] = false
+            prefs.remove(PICKER_CANDIDATES)
+            prefs.remove(PICKER_FILTER_OVERRIDE)
+            // PICKER_OPENED_AT bleibt drin, aber picker_mode=false verhindert Wirkung
+        }
+    }
 }
