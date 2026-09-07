@@ -50,7 +50,6 @@ import de.dhde.hannover.departures.widget.widget.RefreshAction
 import de.dhde.hannover.departures.widget.widget.ChangeTabAction
 import de.dhde.hannover.departures.widget.widget.ChangeStationAction
 import de.dhde.hannover.departures.widget.widget.ChangeDirectionAction
-import de.dhde.hannover.departures.widget.widget.LocateNearestStationAction
 import de.dhde.hannover.departures.widget.widget.ToggleTimeDisplayAction
 import de.dhde.hannover.departures.widget.widget.OpenPickerAction
 import de.dhde.hannover.departures.widget.widget.PickCandidateAction

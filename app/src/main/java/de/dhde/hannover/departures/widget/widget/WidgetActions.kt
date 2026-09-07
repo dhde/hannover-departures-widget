@@ -289,37 +289,6 @@ class ToggleTimeDisplayAction : ActionCallback {
     }
 }
 
-class LocateNearestStationAction : ActionCallback {
-    override suspend fun onAction(
-        context: Context,
-        glanceId: GlanceId,
-        parameters: ActionParameters
-    ) {
-        val session = WidgetSessionStore(context)
-        val next = !session.isGpsModeActive()
-        session.setGpsMode(next)
-        if (next) {
-            // Im GPS-Modus steuert der Verkehrsmittel-Filter, welcher Halt gewählt wird:
-            // Filter Bahn → nächste Bahn-Haltestelle, Filter Bus → nächster Bus-Halt,
-            // Filter ALL → nächster Halt insgesamt. findAndSet übernimmt den aktiven
-            // Filter auch auf den neuen Halt, damit er nicht bei jedem Refresh rausspringt.
-            // Beim Einschalten daher KEIN forciertes Reset auf ALL mehr (siehe Bug-Video
-            // Claudiusstraße: Tram-Filter sprang sonst beim GPS-Toggle automatisch raus).
-            val changed = findAndSetActiveNearestStation(context)
-            if (changed) {
-                // Neue Station → volle Aktualisierung (inkl. API-Call).
-                RefreshAction.triggerUpdate(context)
-            } else {
-                // Station gleich → nur UI-Feedback für den Toggle, kein neuer API-Call.
-                DeparturesWidget().updateAll(context)
-            }
-        } else {
-            // GPS ausgeschaltet → normaler Refresh auf der bestehenden Favoriten-Station.
-            RefreshAction.triggerUpdate(context)
-        }
-    }
-}
-
 /**
  * Bestmögliche Position: fordert AKTIV einen frischen Fix via FusedLocationProviderClient an
  * (mit Timeout), fällt sonst auf den zuletzt bekannten Standort über mehrere Provider zurück.
