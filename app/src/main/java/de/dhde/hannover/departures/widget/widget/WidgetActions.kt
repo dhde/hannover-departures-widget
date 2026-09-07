@@ -16,6 +16,8 @@ import de.dhde.hannover.departures.widget.data.DeparturesCache
 import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
+import de.dhde.hannover.departures.widget.data.NearestStationsFinder
+import de.dhde.hannover.departures.widget.data.StopCandidate
 import de.dhde.hannover.departures.widget.data.StopsRepository
 import de.dhde.hannover.departures.widget.data.TrackedMessage
 import de.dhde.hannover.departures.widget.data.TransportFilter
@@ -433,5 +435,56 @@ suspend fun findAndSetActiveNearestStation(context: Context): Boolean {
             "findAndSetActiveNearestStation: no station change (nearest=${nearestStop?.name ?: "null"}, ${minDistance.toInt()}m)"
         )
         false
+    }
+}
+
+class OpenPickerAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val session = WidgetSessionStore(context)
+        val favRepo = FavoritesRepository(context)
+        val stopsRepo = StopsRepository(context)
+        val filters = FilterStateStore(context)
+        val currentStationId = favRepo.getActiveStationIdNow()
+        val globalFilter = filters.getTabState(currentStationId)
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] open: nearestCount=? filter=$globalFilter gpsActiveBefore=${session.isGpsModeActive()}"
+        )
+
+        val loc = getBestLocation(context)
+        val count = favRepo.getNearestCountNow()
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] fix: ${loc?.let { "age=${System.currentTimeMillis() - it.time}ms acc=${it.accuracy}m" } ?: "null (timeout/error)"}"
+        )
+
+        val candidates: List<StopCandidate> = if (loc != null) {
+            val allStops = stopsRepo.getAllStops()
+            de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                "[picker] finder: stopsInCache=${allStops.size} count=$count filter=$globalFilter"
+            )
+            NearestStationsFinder.findNearestStops(
+                stops = allStops,
+                userLat = loc.latitude,
+                userLon = loc.longitude,
+                count = count,
+                transportFilter = globalFilter
+            )
+        } else emptyList()
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] candidates: n=${candidates.size} first=${candidates.firstOrNull()?.let { "${it.name}@${it.distanceM}m" } ?: "-"}"
+        )
+
+        val json = if (candidates.isEmpty()) null else Gson().toJson(candidates)
+        session.setPickerCandidatesJson(json)
+        session.setPickerFilterOverride(null)
+        session.setPickerOpenedAt(System.currentTimeMillis())
+        session.setPickerMode(true)
+
+        DeparturesWidget().updateAll(context)
     }
 }
