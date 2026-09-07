@@ -486,7 +486,7 @@ class PickCandidateAction : ActionCallback {
             filters.setTabState(stopId, TransportFilter.ALL)
         }
         filters.setDirectionState(stopId, DirectionFilter.ALL)
-        session.setGpsMode(true)
+        session.setGpsMode(false)
         session.clearPickerState()
 
         RefreshAction.triggerUpdate(context)

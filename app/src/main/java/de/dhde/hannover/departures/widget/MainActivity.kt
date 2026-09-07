@@ -740,7 +740,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                                     scope.launch {
                                         repo.setActiveStation(c.stopId, c.name)
                                         if (pickerFilterOverride) filterState.setTabState(c.stopId, TransportFilter.ALL)
-                                        de.dhde.hannover.departures.widget.data.WidgetSessionStore(context).setGpsMode(true)
+                                        de.dhde.hannover.departures.widget.data.WidgetSessionStore(context).setGpsMode(false)
                                         de.dhde.hannover.departures.widget.debug.DebugLog.log(
                                             "[picker] app pick: stopId=${c.stopId} overrideFilter=$pickerFilterOverride"
                                         )

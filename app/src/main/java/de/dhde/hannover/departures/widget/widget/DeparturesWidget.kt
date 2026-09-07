@@ -428,7 +428,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 Text(
                     text = "Station wählen",
                     modifier = GlanceModifier.defaultWeight(),
-                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 14.sp)
+                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 15.sp)
                 )
                 if (globalFilter != TransportFilter.ALL) {
                     Image(
@@ -456,13 +456,13 @@ class DeparturesWidget : GlanceAppWidget() {
                 candidates.isEmpty() -> {
                     Text(
                         "Standort nicht verfügbar",
-                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 13.sp)
+                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
                     )
                 }
                 visible.isEmpty() -> {
                     Text(
                         "Keine Stationen für diesen Filter",
-                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 13.sp)
+                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
                     )
                 }
                 else -> {
@@ -484,12 +484,12 @@ class DeparturesWidget : GlanceAppWidget() {
                                 Text(
                                     text = c.name,
                                     modifier = GlanceModifier.defaultWeight(),
-                                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 14.sp)
+                                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 16.sp, fontWeight = FontWeight.Medium)
                                 )
                                 Text(
                                     text = "${c.distanceM} m",
                                     modifier = GlanceModifier.padding(end = 6.dp),
-                                    style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 12.sp)
+                                    style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 13.sp)
                                 )
                                 if (c.transportTypes.contains("TRAM")) {
                                     Image(
