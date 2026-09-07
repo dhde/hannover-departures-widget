@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -348,6 +349,43 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     var pickerFilterOverride by remember { mutableStateOf(false) }
     var pickerError by remember { mutableStateOf<String?>(null) }
     val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Compose-seitiger Permission-Launcher für den App-Picker (Spec §2.6)
+    val pickerPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val granted = results[android.Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                results[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] app permission-result: granted=$granted"
+        )
+        if (granted) {
+            scope.launch {
+                pickerLoading = true
+                pickerError = null
+                pickerCandidates = emptyList()
+                val loc = de.dhde.hannover.departures.widget.widget.getBestLocation(context)
+                if (loc == null) {
+                    pickerError = "Standort nicht verfügbar"
+                } else {
+                    val count = repo.getNearestCountNow()
+                    val stationId = repo.getActiveStationIdNow()
+                    val filter = FilterStateStore(context).getTabState(stationId)
+                    val stops = StopsRepository(context).getAllStops()
+                    pickerCandidates = NearestStationsFinder.findNearestStops(
+                        stops = stops, userLat = loc.latitude, userLon = loc.longitude,
+                        count = count, transportFilter = filter
+                    )
+                    if (pickerCandidates.isEmpty()) pickerError = "Keine Stationen in der Nähe"
+                }
+                pickerLoading = false
+            }
+        } else {
+            pickerError = "Berechtigung wurde nicht erteilt"
+            pickerLoading = false
+        }
+    }
+
     val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
 
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
@@ -674,6 +712,25 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 Spacer(Modifier.height(8.dp))
                 when {
                     pickerLoading -> CircularProgressIndicator(color = UestraColors.Teal)
+                    pickerError == "Standort-Berechtigung fehlt" -> {
+                        Column {
+                            Text(pickerError!!, color = UestraColors.TextSub)
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = {
+                                de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                                    "[picker] app permission-requested"
+                                )
+                                pickerPermissionLauncher.launch(
+                                    arrayOf(
+                                        android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                        android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }) {
+                                Text("Berechtigung anfordern", color = UestraColors.Teal)
+                            }
+                        }
+                    }
                     pickerError != null -> Text(pickerError!!, color = UestraColors.TextSub)
                     visible.isEmpty() -> Text("Keine Stationen für diesen Filter", color = UestraColors.TextSub)
                     else -> LazyColumn {
