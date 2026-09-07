@@ -348,6 +348,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     var pickerLoading by remember { mutableStateOf(false) }
     var pickerFilterOverride by remember { mutableStateOf(false) }
     var pickerError by remember { mutableStateOf<String?>(null) }
+    var pickerLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Compose-seitiger Permission-Launcher für den App-Picker (Spec §2.6)
@@ -366,8 +367,10 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 pickerCandidates = emptyList()
                 val loc = de.dhde.hannover.departures.widget.widget.getBestLocation(context)
                 if (loc == null) {
+                    pickerLocation = null
                     pickerError = "Standort nicht verfügbar"
                 } else {
+                    pickerLocation = loc.latitude to loc.longitude
                     val count = repo.getNearestCountNow()
                     val stationId = repo.getActiveStationIdNow()
                     val filter = FilterStateStore(context).getTabState(stationId)
@@ -567,8 +570,10 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                         } else {
                             val loc = de.dhde.hannover.departures.widget.widget.getBestLocation(context)
                             if (loc == null) {
+                                pickerLocation = null
                                 pickerError = "Standort nicht verfügbar"
                             } else {
+                                pickerLocation = loc.latitude to loc.longitude
                                 val count = repo.getNearestCountNow()
                                 val stationId = repo.getActiveStationIdNow()
                                 val filter = FilterStateStore(context).getTabState(stationId)
@@ -703,7 +708,27 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                     Text("Station wählen", color = UestraColors.TextMain, fontSize = 16.sp,
                         modifier = Modifier.weight(1f))
                     if (currentGlobalFilter.value != TransportFilter.ALL) {
-                        TextButton(onClick = { pickerFilterOverride = !pickerFilterOverride }) {
+                        TextButton(onClick = {
+                            val nextOverride = !pickerFilterOverride
+                            pickerFilterOverride = nextOverride
+                            val loc = pickerLocation
+                            if (loc != null) {
+                                scope.launch {
+                                    val count = repo.getNearestCountNow()
+                                    val stationId = repo.getActiveStationIdNow()
+                                    val globalFilter = filterState.getTabState(stationId)
+                                    val effectiveFilter = if (nextOverride) null else globalFilter
+                                    val stops = StopsRepository(context).getAllStops()
+                                    pickerCandidates = NearestStationsFinder.findNearestStops(
+                                        stops = stops, userLat = loc.first, userLon = loc.second,
+                                        count = count, transportFilter = effectiveFilter
+                                    )
+                                    de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                                        "[picker] app toggleFilter recomputed: n=${pickerCandidates.size} effectiveFilter=${effectiveFilter ?: "ALL"}"
+                                    )
+                                }
+                            }
+                        }) {
                             Text(if (pickerFilterOverride) "Filter aktiv" else "Alle anzeigen",
                                 color = UestraColors.Teal)
                         }
@@ -755,10 +780,10 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                                     modifier = Modifier.padding(end = 8.dp))
                                 if (c.transportTypes.contains("TRAM"))
                                     Icon(painterResource(R.drawable.ic_widget_tram), null,
-                                        tint = UestraColors.TextSub, modifier = Modifier.size(16.dp))
+                                        tint = UestraColors.LineBlue, modifier = Modifier.size(16.dp))
                                 if (c.transportTypes.contains("BUS"))
                                     Icon(painterResource(R.drawable.ic_widget_bus), null,
-                                        tint = UestraColors.TextSub, modifier = Modifier.size(16.dp))
+                                        tint = UestraColors.AccentRed, modifier = Modifier.size(16.dp))
                             }
                         }
                     }

@@ -422,13 +422,13 @@ class DeparturesWidget : GlanceAppWidget() {
         Column(modifier = GlanceModifier.fillMaxSize().padding(8.dp)) {
             // Header
             Row(
-                modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
+                modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Station wählen",
                     modifier = GlanceModifier.defaultWeight(),
-                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 15.sp)
+                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 17.sp, fontWeight = FontWeight.Medium)
                 )
                 if (globalFilter != TransportFilter.ALL) {
                     Image(
@@ -496,7 +496,7 @@ class DeparturesWidget : GlanceAppWidget() {
                                         provider = ImageProvider(R.drawable.ic_widget_tram),
                                         contentDescription = null,
                                         modifier = GlanceModifier.size(16.dp).padding(end = 2.dp),
-                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.LineBlue))
                                     )
                                 }
                                 if (c.transportTypes.contains("BUS")) {
@@ -504,7 +504,7 @@ class DeparturesWidget : GlanceAppWidget() {
                                         provider = ImageProvider(R.drawable.ic_widget_bus),
                                         contentDescription = null,
                                         modifier = GlanceModifier.size(16.dp),
-                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.AccentRed))
                                     )
                                 }
                             }

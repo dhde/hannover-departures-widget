@@ -431,6 +431,7 @@ class OpenPickerAction : ActionCallback {
         )
 
         val candidates: List<StopCandidate> = if (loc != null) {
+            session.setPickerLocation(loc.latitude, loc.longitude)
             val allStops = stopsRepo.getAllStops()
             de.dhde.hannover.departures.widget.debug.DebugLog.log(
                 "[picker] finder: stopsInCache=${allStops.size} count=$count filter=$globalFilter"
@@ -442,7 +443,10 @@ class OpenPickerAction : ActionCallback {
                 count = count,
                 transportFilter = globalFilter
             )
-        } else emptyList()
+        } else {
+            session.setPickerLocation(null, null)
+            emptyList()
+        }
 
         de.dhde.hannover.departures.widget.debug.DebugLog.log(
             "[picker] candidates: n=${candidates.size} first=${candidates.firstOrNull()?.let { "${it.name}@${it.distanceM}m" } ?: "-"}"
@@ -500,12 +504,37 @@ class TogglePickerFilterAction : ActionCallback {
         parameters: ActionParameters
     ) {
         val session = WidgetSessionStore(context)
+        val favRepo = FavoritesRepository(context)
+        val filters = FilterStateStore(context)
+        val stopsRepo = StopsRepository(context)
+
         val current = session.getPickerFilterOverride()
         val next = if (current == "ALL") null else "ALL"
         de.dhde.hannover.departures.widget.debug.DebugLog.log(
             "[picker] toggleFilter: ${current ?: "null"} -> ${next ?: "null"}"
         )
         session.setPickerFilterOverride(next)
+
+        // Kandidaten mit neuem effektiven Filter neu berechnen (KEIN neuer GPS-Fix)
+        val loc = session.getPickerLocation()
+        if (loc != null) {
+            val stationId = favRepo.getActiveStationIdNow()
+            val globalFilter = filters.getTabState(stationId)
+            val effectiveFilter = if (next == "ALL") null else globalFilter
+            val count = favRepo.getNearestCountNow()
+            val allStops = stopsRepo.getAllStops()
+            val newCandidates = NearestStationsFinder.findNearestStops(
+                stops = allStops,
+                userLat = loc.first, userLon = loc.second,
+                count = count, transportFilter = effectiveFilter
+            )
+            val json = if (newCandidates.isEmpty()) null else Gson().toJson(newCandidates)
+            session.setPickerCandidatesJson(json)
+            de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                "[picker] toggleFilter recomputed: n=${newCandidates.size} effectiveFilter=${effectiveFilter ?: "ALL"}"
+            )
+        }
+
         DeparturesWidget().updateAll(context)
     }
 }

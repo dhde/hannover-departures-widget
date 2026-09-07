@@ -18,6 +18,8 @@ class WidgetSessionStore(private val context: Context) {
         private val PICKER_CANDIDATES = stringPreferencesKey("picker_candidates_json")
         private val PICKER_OPENED_AT = longPreferencesKey("picker_opened_at")
         private val PICKER_FILTER_OVERRIDE = stringPreferencesKey("picker_filter_override")
+        private val PICKER_LOC_LAT = doublePreferencesKey("picker_loc_lat")
+        private val PICKER_LOC_LON = doublePreferencesKey("picker_loc_lon")
     }
 
     fun debugModeFlow(): Flow<Boolean> =
@@ -120,11 +122,28 @@ class WidgetSessionStore(private val context: Context) {
         }
     }
 
+    suspend fun setPickerLocation(lat: Double?, lon: Double?) {
+        context.cacheDataStore.edit { prefs ->
+            if (lat == null || lon == null) {
+                prefs.remove(PICKER_LOC_LAT); prefs.remove(PICKER_LOC_LON)
+            } else {
+                prefs[PICKER_LOC_LAT] = lat; prefs[PICKER_LOC_LON] = lon
+            }
+        }
+    }
+
+    suspend fun getPickerLocation(): Pair<Double, Double>? {
+        val prefs = context.cacheDataStore.data.first()
+        val lat = prefs[PICKER_LOC_LAT]; val lon = prefs[PICKER_LOC_LON]
+        return if (lat != null && lon != null) lat to lon else null
+    }
+
     suspend fun clearPickerState() {
         context.cacheDataStore.edit { prefs ->
             prefs[PICKER_MODE] = false
             prefs.remove(PICKER_CANDIDATES)
             prefs.remove(PICKER_FILTER_OVERRIDE)
+            prefs.remove(PICKER_LOC_LAT); prefs.remove(PICKER_LOC_LON)
             // PICKER_OPENED_AT bleibt drin, aber picker_mode=false verhindert Wirkung
         }
     }
