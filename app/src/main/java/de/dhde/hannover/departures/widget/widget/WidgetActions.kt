@@ -488,3 +488,67 @@ class OpenPickerAction : ActionCallback {
         DeparturesWidget().updateAll(context)
     }
 }
+
+class PickCandidateAction : ActionCallback {
+    companion object {
+        val KEY_STOP_ID = ActionParameters.Key<String>("stopId")
+        val KEY_STOP_NAME = ActionParameters.Key<String>("stopName")
+    }
+
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val session = WidgetSessionStore(context)
+        val favRepo = FavoritesRepository(context)
+        val filters = FilterStateStore(context)
+
+        val stopId = parameters[KEY_STOP_ID] ?: return
+        val stopName = parameters[KEY_STOP_NAME] ?: stopId
+        val override = session.getPickerFilterOverride()
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] pick: stopId=$stopId overrideFilter=$override"
+        )
+
+        favRepo.setActiveStation(stopId, stopName)
+        if (override == "ALL") {
+            filters.setTabState(stopId, TransportFilter.ALL)
+        }
+        filters.setDirectionState(stopId, DirectionFilter.ALL)
+        session.setGpsMode(true)
+        session.clearPickerState()
+
+        RefreshAction.triggerUpdate(context)
+    }
+}
+
+class TogglePickerFilterAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val session = WidgetSessionStore(context)
+        val current = session.getPickerFilterOverride()
+        val next = if (current == "ALL") null else "ALL"
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] toggleFilter: ${current ?: "null"} -> ${next ?: "null"}"
+        )
+        session.setPickerFilterOverride(next)
+        DeparturesWidget().updateAll(context)
+    }
+}
+
+class ClosePickerAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] close (user)")
+        WidgetSessionStore(context).clearPickerState()
+        DeparturesWidget().updateAll(context)
+    }
+}
