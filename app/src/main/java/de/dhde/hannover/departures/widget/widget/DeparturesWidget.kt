@@ -52,6 +52,11 @@ import de.dhde.hannover.departures.widget.widget.ChangeStationAction
 import de.dhde.hannover.departures.widget.widget.ChangeDirectionAction
 import de.dhde.hannover.departures.widget.widget.LocateNearestStationAction
 import de.dhde.hannover.departures.widget.widget.ToggleTimeDisplayAction
+import de.dhde.hannover.departures.widget.widget.OpenPickerAction
+import de.dhde.hannover.departures.widget.widget.PickCandidateAction
+import de.dhde.hannover.departures.widget.widget.TogglePickerFilterAction
+import de.dhde.hannover.departures.widget.widget.ClosePickerAction
+import de.dhde.hannover.departures.widget.data.StopCandidate
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.time.Duration
@@ -128,6 +133,10 @@ class DeparturesWidget : GlanceAppWidget() {
 
             val errorState by session.getErrorStateFlow().collectAsState(initial = "")
             val isRefreshing by session.isRefreshingFlow().collectAsState(initial = false)
+
+            val pickerMode by session.pickerModeFlow().collectAsState(initial = false)
+            val pickerCandidatesJson by session.pickerCandidatesFlow().collectAsState(initial = null)
+            val pickerFilterOverride by session.pickerFilterOverrideFlow().collectAsState(initial = null)
             val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
             val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
             val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
@@ -186,7 +195,10 @@ class DeparturesWidget : GlanceAppWidget() {
                 groupDepartures  = groupDepartures,
                 maxGroupedDepartures = maxGroupedDepartures,
                 groupedFontSize  = groupedFontSize,
-                activeFavUniqueId = activeFavUniqueId
+                activeFavUniqueId = activeFavUniqueId,
+                pickerMode       = pickerMode,
+                pickerCandidatesJson = pickerCandidatesJson,
+                pickerFilterOverride = pickerFilterOverride
             )
         }
     }
@@ -216,7 +228,10 @@ class DeparturesWidget : GlanceAppWidget() {
         groupDepartures: Boolean,
         maxGroupedDepartures: Int,
         groupedFontSize: String = "STANDARD",
-        activeFavUniqueId: String? = null
+        activeFavUniqueId: String? = null,
+        pickerMode: Boolean = false,
+        pickerCandidatesJson: String? = null,
+        pickerFilterOverride: String? = null
     ) {
         Box(
             modifier = GlanceModifier
@@ -224,6 +239,14 @@ class DeparturesWidget : GlanceAppWidget() {
                 .appWidgetBackground()
                 .background(ColorProvider(UestraColors.WidgetBackground))
         ) {
+            if (pickerMode) {
+                PickerLayout(
+                    candidatesJson = pickerCandidatesJson,
+                    filterOverride = pickerFilterOverride,
+                    globalFilter = tabState
+                )
+            } else {
+
             // --- Hintergrund-Icon (Subtil) ---
             BackgroundIcon(tabState)
 
@@ -367,8 +390,131 @@ class DeparturesWidget : GlanceAppWidget() {
             FavoritesRow(favorites, activeFavUniqueId ?: stationId, maxFavorites, maxFavRows, favoritesHeight)
             Footer(lastUpdated, isStale)
         }
+            } // end else (not pickerMode)
     }
 }
+
+    @Composable
+    private fun PickerLayout(
+        candidatesJson: String?,
+        filterOverride: String?,
+        globalFilter: TransportFilter
+    ) {
+        val candidates: List<StopCandidate> = if (candidatesJson.isNullOrBlank()) {
+            emptyList()
+        } else {
+            runCatching {
+                val type = com.google.gson.reflect.TypeToken.getParameterized(
+                    List::class.java, StopCandidate::class.java
+                ).type
+                Gson().fromJson<List<StopCandidate>>(candidatesJson, type) ?: emptyList()
+            }.getOrDefault(emptyList())
+        }
+
+        val effectiveFilter = if (filterOverride == "ALL") TransportFilter.ALL else globalFilter
+        val visible = candidates.filter { c ->
+            when (effectiveFilter) {
+                TransportFilter.BUS -> c.transportTypes.contains("BUS") || c.transportTypes.isEmpty()
+                TransportFilter.TRAM -> c.transportTypes.contains("TRAM") || c.transportTypes.isEmpty()
+                else -> true
+            }
+        }
+
+        Column(modifier = GlanceModifier.fillMaxSize().padding(8.dp)) {
+            // Header
+            Row(
+                modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Station wählen",
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 14.sp)
+                )
+                if (globalFilter != TransportFilter.ALL) {
+                    Image(
+                        provider = ImageProvider(R.drawable.ic_widget_filter),
+                        contentDescription = "Alle anzeigen",
+                        modifier = GlanceModifier.size(24.dp)
+                            .clickable(actionRunCallback<TogglePickerFilterAction>())
+                            .padding(end = 6.dp),
+                        colorFilter = ColorFilter.tint(
+                            ColorProvider(if (filterOverride == "ALL") UestraColors.GpsBlue else UestraColors.TextSub)
+                        )
+                    )
+                }
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_close),
+                    contentDescription = "Schließen",
+                    modifier = GlanceModifier.size(24.dp)
+                        .clickable(actionRunCallback<ClosePickerAction>()),
+                    colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                )
+            }
+
+            // Content
+            when {
+                candidates.isEmpty() -> {
+                    Text(
+                        "Standort nicht verfügbar",
+                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 13.sp)
+                    )
+                }
+                visible.isEmpty() -> {
+                    Text(
+                        "Keine Stationen für diesen Filter",
+                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 13.sp)
+                    )
+                }
+                else -> {
+                    LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                        items(visible) { c ->
+                            Row(
+                                modifier = GlanceModifier.fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .clickable(
+                                        actionRunCallback<PickCandidateAction>(
+                                            actionParametersOf(
+                                                PickCandidateAction.KEY_STOP_ID to c.stopId,
+                                                PickCandidateAction.KEY_STOP_NAME to c.name
+                                            )
+                                        )
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = c.name,
+                                    modifier = GlanceModifier.defaultWeight(),
+                                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 14.sp)
+                                )
+                                Text(
+                                    text = "${c.distanceM} m",
+                                    modifier = GlanceModifier.padding(end = 6.dp),
+                                    style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 12.sp)
+                                )
+                                if (c.transportTypes.contains("TRAM")) {
+                                    Image(
+                                        provider = ImageProvider(R.drawable.ic_widget_tram),
+                                        contentDescription = null,
+                                        modifier = GlanceModifier.size(16.dp).padding(end = 2.dp),
+                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                                    )
+                                }
+                                if (c.transportTypes.contains("BUS")) {
+                                    Image(
+                                        provider = ImageProvider(R.drawable.ic_widget_bus),
+                                        contentDescription = null,
+                                        modifier = GlanceModifier.size(16.dp),
+                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @Composable
     private fun BackgroundIcon(tabState: TransportFilter) {
@@ -445,7 +591,7 @@ class DeparturesWidget : GlanceAppWidget() {
             Image(
                 provider = ImageProvider(android.R.drawable.ic_menu_mylocation),
                 contentDescription = "GPS Nearest Station",
-                modifier = GlanceModifier.padding(end = 8.dp).clickable(actionRunCallback<LocateNearestStationAction>()),
+                modifier = GlanceModifier.padding(end = 8.dp).clickable(actionRunCallback<OpenPickerAction>()),
                 colorFilter = ColorFilter.tint(ColorProvider(gpsIconColor))
             )
 
