@@ -78,6 +78,10 @@ class FavoritesRepository(private val context: Context) {
         val SEEN_MESSAGES_KEY    = stringPreferencesKey("seen_messages_json")
         val GROUP_FONT_SIZE_KEY  = stringPreferencesKey("group_font_size")  // "KLEIN" | "STANDARD" | "GROSS"
         val ALLOW_DUPLICATES_KEY = booleanPreferencesKey("allow_duplicates")
+        private val NEAREST_COUNT = intPreferencesKey("nearest_count")
+        private const val DEFAULT_NEAREST_COUNT = 3
+        private const val MIN_NEAREST_COUNT = 2
+        private const val MAX_NEAREST_COUNT = 5
     }
 
     // ── Aktive Station ───────────────────────────────────────────────────────
@@ -285,6 +289,17 @@ class FavoritesRepository(private val context: Context) {
 
     suspend fun setMaxRows(max: Int) {
         context.dataStore.edit { prefs -> prefs[MAX_ROWS_KEY] = max }
+    }
+
+    val nearestCountFlow: Flow<Int> = context.dataStore.data
+        .map { (it[NEAREST_COUNT] ?: DEFAULT_NEAREST_COUNT).coerceIn(MIN_NEAREST_COUNT, MAX_NEAREST_COUNT) }
+
+    suspend fun getNearestCountNow(): Int =
+        context.dataStore.data.map { it[NEAREST_COUNT] ?: DEFAULT_NEAREST_COUNT }.first()
+            .coerceIn(MIN_NEAREST_COUNT, MAX_NEAREST_COUNT)
+
+    suspend fun setNearestCount(count: Int) {
+        context.dataStore.edit { it[NEAREST_COUNT] = count.coerceIn(MIN_NEAREST_COUNT, MAX_NEAREST_COUNT) }
     }
 
     // ── Verkehrsmittel Filter ────────────────────────────────────────────────
