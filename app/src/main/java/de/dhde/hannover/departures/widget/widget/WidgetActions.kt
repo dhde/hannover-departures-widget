@@ -539,6 +539,56 @@ class TogglePickerFilterAction : ActionCallback {
     }
 }
 
+class SetPickerFilterAction : ActionCallback {
+    companion object {
+        val KEY_FILTER = ActionParameters.Key<String>("filter")
+    }
+
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val filter = parameters[KEY_FILTER] ?: "ALL"
+        val session = WidgetSessionStore(context)
+        val favRepo = FavoritesRepository(context)
+        val filters = FilterStateStore(context)
+        val stopsRepo = StopsRepository(context)
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] setFilter: -> $filter"
+        )
+        session.setPickerFilterOverride(filter)
+
+        // Kandidaten mit neuem effektiven Filter neu berechnen (KEIN neuer GPS-Fix)
+        val loc = session.getPickerLocation()
+        if (loc != null) {
+            val stationId = favRepo.getActiveStationIdNow()
+            val globalFilter = filters.getTabState(stationId)
+            val effectiveFilter: TransportFilter? = when (filter) {
+                "BUS"  -> TransportFilter.BUS
+                "TRAM" -> TransportFilter.TRAM
+                "ALL"  -> null
+                else   -> if (globalFilter == TransportFilter.ALL) null else globalFilter
+            }
+            val count = favRepo.getNearestCountNow()
+            val allStops = stopsRepo.getAllStops()
+            val newCandidates = NearestStationsFinder.findNearestStops(
+                stops = allStops,
+                userLat = loc.first, userLon = loc.second,
+                count = count, transportFilter = effectiveFilter
+            )
+            val json = if (newCandidates.isEmpty()) null else Gson().toJson(newCandidates)
+            session.setPickerCandidatesJson(json)
+            de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                "[picker] setFilter recomputed: n=${newCandidates.size} effectiveFilter=${effectiveFilter ?: "ALL"}"
+            )
+        }
+
+        DeparturesWidget().updateAll(context)
+    }
+}
+
 class EnableAutoFollowAction : ActionCallback {
     override suspend fun onAction(
         context: Context,
