@@ -458,6 +458,8 @@ class OpenPickerAction : ActionCallback {
         session.setPickerOpenedAt(System.currentTimeMillis())
         session.setPickerMode(true)
 
+        PickerAutoCloseAlarm.schedule(context)
+        PickerScreenOffCloser.arm(context)
         DeparturesWidget().updateAll(context)
     }
 }
@@ -492,6 +494,8 @@ class PickCandidateAction : ActionCallback {
         filters.setDirectionState(stopId, DirectionFilter.ALL)
         session.setGpsMode(false)
         session.clearPickerState()
+        PickerAutoCloseAlarm.cancel(context)
+        PickerScreenOffCloser.disarm(context)
 
         RefreshAction.triggerUpdate(context)
     }
@@ -537,8 +541,9 @@ class SetPickerFilterAction : ActionCallback {
                 userLat = loc.first, userLon = loc.second,
                 count = count, transportFilter = effectiveFilter
             )
-            val json = if (newCandidates.isEmpty()) null else Gson().toJson(newCandidates)
-            session.setPickerCandidatesJson(json)
+            // Leeres Ergebnis als "[]" speichern (nicht null), damit der Picker
+            // "Keine Stationen für diesen Filter" statt "Standort nicht verfügbar" zeigt.
+            session.setPickerCandidatesJson(Gson().toJson(newCandidates))
             de.dhde.hannover.departures.widget.debug.DebugLog.log(
                 "[picker] setFilter recomputed: n=${newCandidates.size} effectiveFilter=${effectiveFilter ?: "ALL"}"
             )
@@ -558,6 +563,8 @@ class EnableAutoFollowAction : ActionCallback {
         de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] enableAutoFollow")
         session.setGpsMode(true)
         session.clearPickerState()
+        PickerAutoCloseAlarm.cancel(context)
+        PickerScreenOffCloser.disarm(context)
         RefreshAction.triggerUpdate(context)
     }
 }
@@ -570,6 +577,8 @@ class ClosePickerAction : ActionCallback {
     ) {
         de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] close (user)")
         WidgetSessionStore(context).clearPickerState()
+        PickerAutoCloseAlarm.cancel(context)
+        PickerScreenOffCloser.disarm(context)
         DeparturesWidget().updateAll(context)
     }
 }

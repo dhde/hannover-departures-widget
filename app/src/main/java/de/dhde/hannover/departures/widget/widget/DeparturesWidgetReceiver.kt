@@ -16,6 +16,18 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
+        if (intent.action == PickerAutoCloseAlarm.ACTION) {
+            val scope = CoroutineScope(Dispatchers.IO)
+            scope.launch {
+                val session = WidgetSessionStore(context)
+                if (session.isPickerModeActive()) {
+                    de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] autoclose alarm fired, closing")
+                    session.clearPickerState()
+                    DeparturesWidget().updateAll(context)
+                }
+            }
+            return
+        }
         if (intent.action == "de.dhde.hannover.departures.widget.TICK") {
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {

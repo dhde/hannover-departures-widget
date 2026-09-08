@@ -75,7 +75,7 @@ object WidgetTicker {
             action = "de.dhde.hannover.departures.widget.TICK"
         }
         val pendingIntent = PendingIntent.getBroadcast(
-            context, 0, intent, 
+            context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val now = System.currentTimeMillis()
@@ -88,10 +88,46 @@ object WidgetTicker {
             action = "de.dhde.hannover.departures.widget.TICK"
         }
         val pendingIntent = PendingIntent.getBroadcast(
-            context, 0, intent, 
+            context, 0, intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
         if (pendingIntent != null) alarmManager.cancel(pendingIntent)
+    }
+}
+
+/**
+ * Eigener One-Shot-Alarm für den Picker-Auto-Close. Unabhängig vom Minuten-Ticker,
+ * der nur bei vorhandenen Departures läuft und dessen Kette reißen kann, wenn das
+ * Widget zwischen Ticks nicht re-rendert.
+ */
+object PickerAutoCloseAlarm {
+    const val ACTION = "de.dhde.hannover.departures.widget.PICKER_AUTOCLOSE"
+    const val TIMEOUT_MS = 60_000L
+
+    private fun pendingIntent(context: Context, flags: Int): PendingIntent? {
+        val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
+            action = ACTION
+        }
+        return PendingIntent.getBroadcast(context, 1, intent, flags or PendingIntent.FLAG_IMMUTABLE)
+    }
+
+    fun schedule(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pi = pendingIntent(context, PendingIntent.FLAG_UPDATE_CURRENT) ?: return
+        // Inexact: Android verzögert wegen app_standby um bis zu ~45s.
+        // Fürs zuverlässige Schließen sorgt der PickerScreenOffCloser bei Screen-Off.
+        alarmManager.setWindow(
+            AlarmManager.RTC,
+            System.currentTimeMillis() + TIMEOUT_MS,
+            1000L,
+            pi
+        )
+    }
+
+    fun cancel(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pi = pendingIntent(context, PendingIntent.FLAG_NO_CREATE) ?: return
+        alarmManager.cancel(pi)
     }
 }
 
@@ -411,18 +447,13 @@ class DeparturesWidget : GlanceAppWidget() {
             }.getOrDefault(emptyList())
         }
 
+        // effectiveFilter nur für Button-Highlight; die tatsächliche Filterung
+        // passiert server-seitig in SetPickerFilterAction/OpenPickerAction.
         val effectiveFilter: TransportFilter = when (filterOverride) {
             "ALL"  -> TransportFilter.ALL
             "BUS"  -> TransportFilter.BUS
             "TRAM" -> TransportFilter.TRAM
             else   -> globalFilter
-        }
-        val visible = candidates.filter { c ->
-            when (effectiveFilter) {
-                TransportFilter.BUS -> c.transportTypes.contains("BUS") || c.transportTypes.isEmpty()
-                TransportFilter.TRAM -> c.transportTypes.contains("TRAM") || c.transportTypes.isEmpty()
-                else -> true
-            }
         }
 
         Column(modifier = GlanceModifier.fillMaxSize().padding(8.dp)) {
@@ -491,13 +522,13 @@ class DeparturesWidget : GlanceAppWidget() {
 
             // Content
             when {
-                candidates.isEmpty() -> {
+                candidatesJson.isNullOrBlank() -> {
                     Text(
                         "Standort nicht verfügbar",
                         style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
                     )
                 }
-                visible.isEmpty() -> {
+                candidates.isEmpty() -> {
                     Text(
                         "Keine Stationen für diesen Filter",
                         style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
@@ -505,7 +536,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 }
                 else -> {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                        items(visible) { c ->
+                        items(candidates) { c ->
                             Row(
                                 modifier = GlanceModifier.fillMaxWidth()
                                     .padding(vertical = 6.dp)
