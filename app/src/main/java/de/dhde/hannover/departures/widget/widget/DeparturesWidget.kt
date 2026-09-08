@@ -53,7 +53,7 @@ import de.dhde.hannover.departures.widget.widget.ChangeDirectionAction
 import de.dhde.hannover.departures.widget.widget.ToggleTimeDisplayAction
 import de.dhde.hannover.departures.widget.widget.OpenPickerAction
 import de.dhde.hannover.departures.widget.widget.PickCandidateAction
-import de.dhde.hannover.departures.widget.widget.TogglePickerFilterAction
+import de.dhde.hannover.departures.widget.widget.SetPickerFilterAction
 import de.dhde.hannover.departures.widget.widget.ClosePickerAction
 import de.dhde.hannover.departures.widget.widget.EnableAutoFollowAction
 import de.dhde.hannover.departures.widget.data.StopCandidate
@@ -411,7 +411,12 @@ class DeparturesWidget : GlanceAppWidget() {
             }.getOrDefault(emptyList())
         }
 
-        val effectiveFilter = if (filterOverride == "ALL") TransportFilter.ALL else globalFilter
+        val effectiveFilter: TransportFilter = when (filterOverride) {
+            "ALL"  -> TransportFilter.ALL
+            "BUS"  -> TransportFilter.BUS
+            "TRAM" -> TransportFilter.TRAM
+            else   -> globalFilter
+        }
         val visible = candidates.filter { c ->
             when (effectiveFilter) {
                 TransportFilter.BUS -> c.transportTypes.contains("BUS") || c.transportTypes.isEmpty()
@@ -431,18 +436,30 @@ class DeparturesWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.defaultWeight(),
                     style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 17.sp, fontWeight = FontWeight.Medium)
                 )
-                if (globalFilter != TransportFilter.ALL) {
-                    Image(
-                        provider = ImageProvider(R.drawable.ic_widget_filter),
-                        contentDescription = "Alle anzeigen",
-                        modifier = GlanceModifier.size(24.dp)
-                            .clickable(actionRunCallback<TogglePickerFilterAction>())
-                            .padding(end = 6.dp),
-                        colorFilter = ColorFilter.tint(
-                            ColorProvider(if (filterOverride == "ALL") UestraColors.TextSub else UestraColors.GpsBlue)
-                        )
+                SegmentButton(
+                    R.drawable.ic_widget_bus, null,
+                    isActive = effectiveFilter == TransportFilter.BUS,
+                    activeColor = UestraColors.AccentRed,
+                    filterHeight = "STANDARD"
+                ) {
+                    val next = if (effectiveFilter == TransportFilter.BUS) "ALL" else "BUS"
+                    actionRunCallback<SetPickerFilterAction>(
+                        actionParametersOf(SetPickerFilterAction.KEY_FILTER to next)
                     )
                 }
+                Spacer(modifier = GlanceModifier.width(2.dp))
+                SegmentButton(
+                    R.drawable.ic_widget_tram, null,
+                    isActive = effectiveFilter == TransportFilter.TRAM,
+                    activeColor = UestraColors.LineBlue,
+                    filterHeight = "STANDARD"
+                ) {
+                    val next = if (effectiveFilter == TransportFilter.TRAM) "ALL" else "TRAM"
+                    actionRunCallback<SetPickerFilterAction>(
+                        actionParametersOf(SetPickerFilterAction.KEY_FILTER to next)
+                    )
+                }
+                Spacer(modifier = GlanceModifier.width(6.dp))
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_close),
                     contentDescription = "Schließen",
