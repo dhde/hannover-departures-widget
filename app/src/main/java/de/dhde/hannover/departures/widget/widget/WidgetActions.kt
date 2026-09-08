@@ -16,6 +16,8 @@ import de.dhde.hannover.departures.widget.data.DeparturesCache
 import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
+import de.dhde.hannover.departures.widget.data.NearestStationsFinder
+import de.dhde.hannover.departures.widget.data.StopCandidate
 import de.dhde.hannover.departures.widget.data.StopsRepository
 import de.dhde.hannover.departures.widget.data.TrackedMessage
 import de.dhde.hannover.departures.widget.data.TransportFilter
@@ -287,37 +289,6 @@ class ToggleTimeDisplayAction : ActionCallback {
     }
 }
 
-class LocateNearestStationAction : ActionCallback {
-    override suspend fun onAction(
-        context: Context,
-        glanceId: GlanceId,
-        parameters: ActionParameters
-    ) {
-        val session = WidgetSessionStore(context)
-        val next = !session.isGpsModeActive()
-        session.setGpsMode(next)
-        if (next) {
-            // Im GPS-Modus steuert der Verkehrsmittel-Filter, welcher Halt gewählt wird:
-            // Filter Bahn → nächste Bahn-Haltestelle, Filter Bus → nächster Bus-Halt,
-            // Filter ALL → nächster Halt insgesamt. findAndSet übernimmt den aktiven
-            // Filter auch auf den neuen Halt, damit er nicht bei jedem Refresh rausspringt.
-            // Beim Einschalten daher KEIN forciertes Reset auf ALL mehr (siehe Bug-Video
-            // Claudiusstraße: Tram-Filter sprang sonst beim GPS-Toggle automatisch raus).
-            val changed = findAndSetActiveNearestStation(context)
-            if (changed) {
-                // Neue Station → volle Aktualisierung (inkl. API-Call).
-                RefreshAction.triggerUpdate(context)
-            } else {
-                // Station gleich → nur UI-Feedback für den Toggle, kein neuer API-Call.
-                DeparturesWidget().updateAll(context)
-            }
-        } else {
-            // GPS ausgeschaltet → normaler Refresh auf der bestehenden Favoriten-Station.
-            RefreshAction.triggerUpdate(context)
-        }
-    }
-}
-
 /**
  * Bestmögliche Position: fordert AKTIV einen frischen Fix via FusedLocationProviderClient an
  * (mit Timeout), fällt sonst auf den zuletzt bekannten Standort über mehrere Provider zurück.
@@ -433,5 +404,181 @@ suspend fun findAndSetActiveNearestStation(context: Context): Boolean {
             "findAndSetActiveNearestStation: no station change (nearest=${nearestStop?.name ?: "null"}, ${minDistance.toInt()}m)"
         )
         false
+    }
+}
+
+class OpenPickerAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val session = WidgetSessionStore(context)
+        val favRepo = FavoritesRepository(context)
+        val stopsRepo = StopsRepository(context)
+        val filters = FilterStateStore(context)
+        val currentStationId = favRepo.getActiveStationIdNow()
+        val globalFilter = filters.getTabState(currentStationId)
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] open: nearestCount=? filter=$globalFilter gpsActiveBefore=${session.isGpsModeActive()}"
+        )
+
+        val loc = getBestLocation(context)
+        val count = favRepo.getNearestCountNow()
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] fix: ${loc?.let { "age=${System.currentTimeMillis() - it.time}ms acc=${it.accuracy}m" } ?: "null (timeout/error)"}"
+        )
+
+        val candidates: List<StopCandidate> = if (loc != null) {
+            session.setPickerLocation(loc.latitude, loc.longitude)
+            val allStops = stopsRepo.getAllStops()
+            de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                "[picker] finder: stopsInCache=${allStops.size} count=$count filter=$globalFilter"
+            )
+            NearestStationsFinder.findNearestStops(
+                stops = allStops,
+                userLat = loc.latitude,
+                userLon = loc.longitude,
+                count = count,
+                transportFilter = globalFilter
+            )
+        } else {
+            session.setPickerLocation(null, null)
+            emptyList()
+        }
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] candidates: n=${candidates.size} first=${candidates.firstOrNull()?.let { "${it.name}@${it.distanceM}m" } ?: "-"}"
+        )
+
+        val json = if (candidates.isEmpty()) null else Gson().toJson(candidates)
+        session.setPickerCandidatesJson(json)
+        session.setPickerFilterOverride(null)
+        session.setPickerOpenedAt(System.currentTimeMillis())
+        session.setPickerMode(true)
+
+        PickerAutoCloseAlarm.schedule(context)
+        PickerScreenOffCloser.arm(context)
+        DeparturesWidget().updateAll(context)
+    }
+}
+
+class PickCandidateAction : ActionCallback {
+    companion object {
+        val KEY_STOP_ID = ActionParameters.Key<String>("stopId")
+        val KEY_STOP_NAME = ActionParameters.Key<String>("stopName")
+    }
+
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val session = WidgetSessionStore(context)
+        val favRepo = FavoritesRepository(context)
+        val filters = FilterStateStore(context)
+
+        val stopId = parameters[KEY_STOP_ID] ?: return
+        val stopName = parameters[KEY_STOP_NAME] ?: stopId
+        val override = session.getPickerFilterOverride()
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] pick: stopId=$stopId overrideFilter=$override"
+        )
+
+        favRepo.setActiveStation(stopId, stopName)
+        if (override == "ALL") {
+            filters.setTabState(stopId, TransportFilter.ALL)
+        }
+        filters.setDirectionState(stopId, DirectionFilter.ALL)
+        session.setGpsMode(false)
+        session.clearPickerState()
+        PickerAutoCloseAlarm.cancel(context)
+        PickerScreenOffCloser.disarm(context)
+
+        RefreshAction.triggerUpdate(context)
+    }
+}
+
+
+class SetPickerFilterAction : ActionCallback {
+    companion object {
+        val KEY_FILTER = ActionParameters.Key<String>("filter")
+    }
+
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val filter = parameters[KEY_FILTER] ?: "ALL"
+        val session = WidgetSessionStore(context)
+        val favRepo = FavoritesRepository(context)
+        val filters = FilterStateStore(context)
+        val stopsRepo = StopsRepository(context)
+
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] setFilter: -> $filter"
+        )
+        session.setPickerFilterOverride(filter)
+
+        // Kandidaten mit neuem effektiven Filter neu berechnen (KEIN neuer GPS-Fix)
+        val loc = session.getPickerLocation()
+        if (loc != null) {
+            val stationId = favRepo.getActiveStationIdNow()
+            val globalFilter = filters.getTabState(stationId)
+            val effectiveFilter: TransportFilter? = when (filter) {
+                "BUS"  -> TransportFilter.BUS
+                "TRAM" -> TransportFilter.TRAM
+                "ALL"  -> null
+                else   -> if (globalFilter == TransportFilter.ALL) null else globalFilter
+            }
+            val count = favRepo.getNearestCountNow()
+            val allStops = stopsRepo.getAllStops()
+            val newCandidates = NearestStationsFinder.findNearestStops(
+                stops = allStops,
+                userLat = loc.first, userLon = loc.second,
+                count = count, transportFilter = effectiveFilter
+            )
+            // Leeres Ergebnis als "[]" speichern (nicht null), damit der Picker
+            // "Keine Stationen für diesen Filter" statt "Standort nicht verfügbar" zeigt.
+            session.setPickerCandidatesJson(Gson().toJson(newCandidates))
+            de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                "[picker] setFilter recomputed: n=${newCandidates.size} effectiveFilter=${effectiveFilter ?: "ALL"}"
+            )
+        }
+
+        DeparturesWidget().updateAll(context)
+    }
+}
+
+class EnableAutoFollowAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        val session = WidgetSessionStore(context)
+        de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] enableAutoFollow")
+        session.setGpsMode(true)
+        session.clearPickerState()
+        PickerAutoCloseAlarm.cancel(context)
+        PickerScreenOffCloser.disarm(context)
+        RefreshAction.triggerUpdate(context)
+    }
+}
+
+class ClosePickerAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] close (user)")
+        WidgetSessionStore(context).clearPickerState()
+        PickerAutoCloseAlarm.cancel(context)
+        PickerScreenOffCloser.disarm(context)
+        DeparturesWidget().updateAll(context)
     }
 }

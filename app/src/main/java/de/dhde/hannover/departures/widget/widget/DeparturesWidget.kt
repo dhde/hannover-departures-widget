@@ -50,8 +50,13 @@ import de.dhde.hannover.departures.widget.widget.RefreshAction
 import de.dhde.hannover.departures.widget.widget.ChangeTabAction
 import de.dhde.hannover.departures.widget.widget.ChangeStationAction
 import de.dhde.hannover.departures.widget.widget.ChangeDirectionAction
-import de.dhde.hannover.departures.widget.widget.LocateNearestStationAction
 import de.dhde.hannover.departures.widget.widget.ToggleTimeDisplayAction
+import de.dhde.hannover.departures.widget.widget.OpenPickerAction
+import de.dhde.hannover.departures.widget.widget.PickCandidateAction
+import de.dhde.hannover.departures.widget.widget.SetPickerFilterAction
+import de.dhde.hannover.departures.widget.widget.ClosePickerAction
+import de.dhde.hannover.departures.widget.widget.EnableAutoFollowAction
+import de.dhde.hannover.departures.widget.data.StopCandidate
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.time.Duration
@@ -70,7 +75,7 @@ object WidgetTicker {
             action = "de.dhde.hannover.departures.widget.TICK"
         }
         val pendingIntent = PendingIntent.getBroadcast(
-            context, 0, intent, 
+            context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val now = System.currentTimeMillis()
@@ -83,10 +88,46 @@ object WidgetTicker {
             action = "de.dhde.hannover.departures.widget.TICK"
         }
         val pendingIntent = PendingIntent.getBroadcast(
-            context, 0, intent, 
+            context, 0, intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
         if (pendingIntent != null) alarmManager.cancel(pendingIntent)
+    }
+}
+
+/**
+ * Eigener One-Shot-Alarm für den Picker-Auto-Close. Unabhängig vom Minuten-Ticker,
+ * der nur bei vorhandenen Departures läuft und dessen Kette reißen kann, wenn das
+ * Widget zwischen Ticks nicht re-rendert.
+ */
+object PickerAutoCloseAlarm {
+    const val ACTION = "de.dhde.hannover.departures.widget.PICKER_AUTOCLOSE"
+    const val TIMEOUT_MS = 60_000L
+
+    private fun pendingIntent(context: Context, flags: Int): PendingIntent? {
+        val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
+            action = ACTION
+        }
+        return PendingIntent.getBroadcast(context, 1, intent, flags or PendingIntent.FLAG_IMMUTABLE)
+    }
+
+    fun schedule(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pi = pendingIntent(context, PendingIntent.FLAG_UPDATE_CURRENT) ?: return
+        // Inexact: Android verzögert wegen app_standby um bis zu ~45s.
+        // Fürs zuverlässige Schließen sorgt der PickerScreenOffCloser bei Screen-Off.
+        alarmManager.setWindow(
+            AlarmManager.RTC,
+            System.currentTimeMillis() + TIMEOUT_MS,
+            1000L,
+            pi
+        )
+    }
+
+    fun cancel(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pi = pendingIntent(context, PendingIntent.FLAG_NO_CREATE) ?: return
+        alarmManager.cancel(pi)
     }
 }
 
@@ -128,6 +169,10 @@ class DeparturesWidget : GlanceAppWidget() {
 
             val errorState by session.getErrorStateFlow().collectAsState(initial = "")
             val isRefreshing by session.isRefreshingFlow().collectAsState(initial = false)
+
+            val pickerMode by session.pickerModeFlow().collectAsState(initial = false)
+            val pickerCandidatesJson by session.pickerCandidatesFlow().collectAsState(initial = null)
+            val pickerFilterOverride by session.pickerFilterOverrideFlow().collectAsState(initial = null)
             val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
             val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
             val favoritesHeight by repo.favoritesHeightFlow.collectAsState(initial = "STANDARD")
@@ -186,7 +231,10 @@ class DeparturesWidget : GlanceAppWidget() {
                 groupDepartures  = groupDepartures,
                 maxGroupedDepartures = maxGroupedDepartures,
                 groupedFontSize  = groupedFontSize,
-                activeFavUniqueId = activeFavUniqueId
+                activeFavUniqueId = activeFavUniqueId,
+                pickerMode       = pickerMode,
+                pickerCandidatesJson = pickerCandidatesJson,
+                pickerFilterOverride = pickerFilterOverride
             )
         }
     }
@@ -216,7 +264,10 @@ class DeparturesWidget : GlanceAppWidget() {
         groupDepartures: Boolean,
         maxGroupedDepartures: Int,
         groupedFontSize: String = "STANDARD",
-        activeFavUniqueId: String? = null
+        activeFavUniqueId: String? = null,
+        pickerMode: Boolean = false,
+        pickerCandidatesJson: String? = null,
+        pickerFilterOverride: String? = null
     ) {
         Box(
             modifier = GlanceModifier
@@ -224,6 +275,14 @@ class DeparturesWidget : GlanceAppWidget() {
                 .appWidgetBackground()
                 .background(ColorProvider(UestraColors.WidgetBackground))
         ) {
+            if (pickerMode) {
+                PickerLayout(
+                    candidatesJson = pickerCandidatesJson,
+                    filterOverride = pickerFilterOverride,
+                    globalFilter = tabState
+                )
+            } else {
+
             // --- Hintergrund-Icon (Subtil) ---
             BackgroundIcon(tabState)
 
@@ -367,8 +426,163 @@ class DeparturesWidget : GlanceAppWidget() {
             FavoritesRow(favorites, activeFavUniqueId ?: stationId, maxFavorites, maxFavRows, favoritesHeight)
             Footer(lastUpdated, isStale)
         }
+            } // end else (not pickerMode)
     }
 }
+
+    @Composable
+    private fun PickerLayout(
+        candidatesJson: String?,
+        filterOverride: String?,
+        globalFilter: TransportFilter
+    ) {
+        val candidates: List<StopCandidate> = if (candidatesJson.isNullOrBlank()) {
+            emptyList()
+        } else {
+            runCatching {
+                val type = com.google.gson.reflect.TypeToken.getParameterized(
+                    List::class.java, StopCandidate::class.java
+                ).type
+                Gson().fromJson<List<StopCandidate>>(candidatesJson, type) ?: emptyList()
+            }.getOrDefault(emptyList())
+        }
+
+        // effectiveFilter nur für Button-Highlight; die tatsächliche Filterung
+        // passiert server-seitig in SetPickerFilterAction/OpenPickerAction.
+        val effectiveFilter: TransportFilter = when (filterOverride) {
+            "ALL"  -> TransportFilter.ALL
+            "BUS"  -> TransportFilter.BUS
+            "TRAM" -> TransportFilter.TRAM
+            else   -> globalFilter
+        }
+
+        Column(modifier = GlanceModifier.fillMaxSize().padding(8.dp)) {
+            // Header
+            Row(
+                modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Station wählen",
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                )
+                SegmentButton(
+                    R.drawable.ic_widget_bus, null,
+                    isActive = effectiveFilter == TransportFilter.BUS,
+                    activeColor = UestraColors.AccentRed,
+                    filterHeight = "STANDARD"
+                ) {
+                    val next = if (effectiveFilter == TransportFilter.BUS) "ALL" else "BUS"
+                    actionRunCallback<SetPickerFilterAction>(
+                        actionParametersOf(SetPickerFilterAction.KEY_FILTER to next)
+                    )
+                }
+                Spacer(modifier = GlanceModifier.width(2.dp))
+                SegmentButton(
+                    R.drawable.ic_widget_tram, null,
+                    isActive = effectiveFilter == TransportFilter.TRAM,
+                    activeColor = UestraColors.LineBlue,
+                    filterHeight = "STANDARD"
+                ) {
+                    val next = if (effectiveFilter == TransportFilter.TRAM) "ALL" else "TRAM"
+                    actionRunCallback<SetPickerFilterAction>(
+                        actionParametersOf(SetPickerFilterAction.KEY_FILTER to next)
+                    )
+                }
+                Spacer(modifier = GlanceModifier.width(6.dp))
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_close),
+                    contentDescription = "Schließen",
+                    modifier = GlanceModifier.size(24.dp)
+                        .clickable(actionRunCallback<ClosePickerAction>()),
+                    colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                )
+            }
+
+            // Auto-Folgen-Row — immer sichtbar, auch bei leeren Kandidaten
+            Row(
+                modifier = GlanceModifier.fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .clickable(actionRunCallback<EnableAutoFollowAction>()),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_gps),
+                    contentDescription = null,
+                    modifier = GlanceModifier.size(18.dp).padding(end = 8.dp),
+                    colorFilter = ColorFilter.tint(ColorProvider(UestraColors.GpsBlue))
+                )
+                Text(
+                    text = "Auto-Folgen",
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(color = ColorProvider(UestraColors.GpsBlue), fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                )
+            }
+
+            // Content
+            when {
+                candidatesJson.isNullOrBlank() -> {
+                    Text(
+                        "Standort nicht verfügbar",
+                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
+                    )
+                }
+                candidates.isEmpty() -> {
+                    Text(
+                        "Keine Stationen für diesen Filter",
+                        style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
+                    )
+                }
+                else -> {
+                    LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                        items(candidates) { c ->
+                            Row(
+                                modifier = GlanceModifier.fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .clickable(
+                                        actionRunCallback<PickCandidateAction>(
+                                            actionParametersOf(
+                                                PickCandidateAction.KEY_STOP_ID to c.stopId,
+                                                PickCandidateAction.KEY_STOP_NAME to c.name
+                                            )
+                                        )
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = c.name,
+                                    modifier = GlanceModifier.defaultWeight(),
+                                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                )
+                                Text(
+                                    text = "${c.distanceM} m",
+                                    modifier = GlanceModifier.padding(end = 6.dp),
+                                    style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 13.sp)
+                                )
+                                if (c.transportTypes.contains("TRAM")) {
+                                    Image(
+                                        provider = ImageProvider(R.drawable.ic_widget_tram),
+                                        contentDescription = null,
+                                        modifier = GlanceModifier.size(20.dp).padding(end = 2.dp),
+                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.LineBlue))
+                                    )
+                                }
+                                if (c.transportTypes.contains("BUS")) {
+                                    Image(
+                                        provider = ImageProvider(R.drawable.ic_widget_bus),
+                                        contentDescription = null,
+                                        modifier = GlanceModifier.size(20.dp),
+                                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.AccentRed))
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @Composable
     private fun BackgroundIcon(tabState: TransportFilter) {
@@ -445,7 +659,7 @@ class DeparturesWidget : GlanceAppWidget() {
             Image(
                 provider = ImageProvider(android.R.drawable.ic_menu_mylocation),
                 contentDescription = "GPS Nearest Station",
-                modifier = GlanceModifier.padding(end = 8.dp).clickable(actionRunCallback<LocateNearestStationAction>()),
+                modifier = GlanceModifier.padding(end = 8.dp).clickable(actionRunCallback<OpenPickerAction>()),
                 colorFilter = ColorFilter.tint(ColorProvider(gpsIconColor))
             )
 

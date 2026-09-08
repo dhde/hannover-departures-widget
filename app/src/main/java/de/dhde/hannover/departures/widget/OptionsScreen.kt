@@ -49,6 +49,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val maxGroupedDeparturesFlow by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
     val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
     val allowDuplicates by repo.allowDuplicatesFlow.collectAsState(initial = false)
+    val nearestCount by repo.nearestCountFlow.collectAsState(initial = 3)
 
     var showDuplicatesWarning by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
@@ -94,6 +95,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         repo.setRefreshOnScreenOn(false)
                         de.dhde.hannover.departures.widget.widget.ScreenOnRefreshManager.ensureState(context, false)
                         repo.setAllowDuplicates(false)
+                        repo.setNearestCount(3)
                     }
                     showResetConfirm = false
                 }) { Text("Zurücksetzen", color = UestraColors.AccentRed) }
@@ -126,6 +128,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     var localMaxFavRows by remember(maxFavRowsFlow) { mutableStateOf(maxFavRowsFlow.toFloat()) }
     var localMaxRows by remember(maxRowsFlow) { mutableStateOf(maxRowsFlow.toFloat()) }
     var localMaxGroupedDepartures by remember(maxGroupedDeparturesFlow) { mutableStateOf(maxGroupedDeparturesFlow.toFloat()) }
+    var localNearestCount by remember(nearestCount) { mutableStateOf(nearestCount.toFloat()) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(UestraColors.DarkBg),
@@ -168,6 +171,39 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         item { OptionsGroupHeader("Verhalten") }
         item { ApiRefreshCard(autoRefreshOnInteraction, repo, scope) }
         item { RefreshOnScreenOnCard(refreshOnScreenOn, repo, scope) }
+        item { OptionsGroupHeader("Standort") }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = UestraColors.CardBg)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Anzahl Kandidaten beim GPS-Klick: ${localNearestCount.roundToInt()}",
+                        color = UestraColors.TextMain,
+                        fontSize = 14.sp
+                    )
+                    Slider(
+                        value = localNearestCount,
+                        onValueChange = { localNearestCount = it },
+                        onValueChangeFinished = {
+                            scope.launch { repo.setNearestCount(localNearestCount.roundToInt()) }
+                        },
+                        valueRange = 2f..5f,
+                        steps = 2,
+                        colors = SliderDefaults.colors(
+                            thumbColor = UestraColors.Teal,
+                            activeTrackColor = UestraColors.Teal
+                        )
+                    )
+                    Text(
+                        text = "Beim Klick auf das GPS-Icon erscheinen die ${localNearestCount.roundToInt()} nächsten Haltestellen zur Auswahl.",
+                        color = UestraColors.TextSub,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
         item { OptionsGroupHeader("Erweitert") }
         item {
             AdvancedCard(

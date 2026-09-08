@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -54,12 +55,17 @@ import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.lineDirection
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
+import de.dhde.hannover.departures.widget.data.NearestStationsFinder
+import de.dhde.hannover.departures.widget.data.StopCandidate
+import de.dhde.hannover.departures.widget.data.StopsRepository
+import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.painterResource
 
 import android.content.Intent
 
@@ -330,11 +336,59 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val session = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
+
+    var showPickerSheet by remember { mutableStateOf(false) }
+    var pickerCandidates by remember { mutableStateOf<List<StopCandidate>>(emptyList()) }
+    var pickerLoading by remember { mutableStateOf(false) }
+    var pickerFilterOverride by remember { mutableStateOf(false) }
+    var pickerError by remember { mutableStateOf<String?>(null) }
+    var pickerLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Compose-seitiger Permission-Launcher für den App-Picker (Spec §2.6)
+    val pickerPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val granted = results[android.Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                results[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+            "[picker] app permission-result: granted=$granted"
+        )
+        if (granted) {
+            scope.launch {
+                pickerLoading = true
+                pickerError = null
+                pickerCandidates = emptyList()
+                val loc = de.dhde.hannover.departures.widget.widget.getBestLocation(context)
+                if (loc == null) {
+                    pickerLocation = null
+                    pickerError = "Standort nicht verfügbar"
+                } else {
+                    pickerLocation = loc.latitude to loc.longitude
+                    val count = repo.getNearestCountNow()
+                    val stationId = repo.getActiveStationIdNow()
+                    val filter = FilterStateStore(context).getTabState(stationId)
+                    val stops = StopsRepository(context).getAllStops()
+                    pickerCandidates = NearestStationsFinder.findNearestStops(
+                        stops = stops, userLat = loc.latitude, userLon = loc.longitude,
+                        count = count, transportFilter = filter
+                    )
+                    if (pickerCandidates.isEmpty()) pickerError = "Keine Stationen in der Nähe"
+                }
+                pickerLoading = false
+            }
+        } else {
+            pickerError = "Berechtigung wurde nicht erteilt"
+            pickerLoading = false
+        }
+    }
+
     val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
 
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
@@ -502,13 +556,39 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 onInfoClick = { onInfoClick(InfoDialogData(title = "Meldungen: $activeStationName", groupedMsgs = groupedMessagesList)) },
                 onGps = {
                     scope.launch {
-                        val newState = !gpsModeActive
-                        session.setGpsMode(newState)
-                        // Wie im Widget: bei Aktivierung sofort die nächste Haltestelle suchen.
-                        // Der Wechsel von activeStationId löst über den Flow das Neuladen aus.
-                        if (newState) {
-                            de.dhde.hannover.departures.widget.widget.findAndSetActiveNearestStation(context)
+                        showPickerSheet = true
+                        pickerLoading = true
+                        pickerError = null
+                        pickerCandidates = emptyList()
+                        pickerFilterOverride = false
+
+                        val fine = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        val coarse = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        if (!fine && !coarse) {
+                            pickerError = "Standort-Berechtigung fehlt"
+                            pickerLoading = false
+                        } else {
+                            val loc = de.dhde.hannover.departures.widget.widget.getBestLocation(context)
+                            if (loc == null) {
+                                pickerLocation = null
+                                pickerError = "Standort nicht verfügbar"
+                            } else {
+                                pickerLocation = loc.latitude to loc.longitude
+                                val count = repo.getNearestCountNow()
+                                val stationId = repo.getActiveStationIdNow()
+                                val filter = FilterStateStore(context).getTabState(stationId)
+                                val stops = StopsRepository(context).getAllStops()
+                                pickerCandidates = NearestStationsFinder.findNearestStops(
+                                    stops = stops, userLat = loc.latitude, userLon = loc.longitude,
+                                    count = count, transportFilter = filter
+                                )
+                                if (pickerCandidates.isEmpty()) pickerError = "Keine Stationen in der Nähe"
+                            }
+                            pickerLoading = false
                         }
+                        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                            "[picker] app open: err=$pickerError count=${pickerCandidates.size}"
+                        )
                     }
                 },
                 onRefresh = { activeStationId?.let { loadData(it) } }
@@ -600,6 +680,143 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                     fontSize = 10.sp,
                     modifier = Modifier.padding(top = 4.dp).align(Alignment.End)
                 )
+            }
+        }
+    }
+
+    if (showPickerSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showPickerSheet = false },
+            sheetState = pickerSheetState,
+            containerColor = UestraColors.CardBg
+        ) {
+            val filterState = FilterStateStore(context)
+            val currentGlobalFilter = remember { mutableStateOf(TransportFilter.ALL) }
+            LaunchedEffect(Unit) {
+                currentGlobalFilter.value = filterState.getTabState(repo.getActiveStationIdNow())
+            }
+            val effectiveFilter = if (pickerFilterOverride) TransportFilter.ALL else currentGlobalFilter.value
+            val visible = pickerCandidates.filter { c ->
+                when (effectiveFilter) {
+                    TransportFilter.BUS -> c.transportTypes.contains("BUS") || c.transportTypes.isEmpty()
+                    TransportFilter.TRAM -> c.transportTypes.contains("TRAM") || c.transportTypes.isEmpty()
+                    else -> true
+                }
+            }
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Station wählen", color = UestraColors.TextMain, fontSize = 16.sp,
+                        modifier = Modifier.weight(1f))
+                    if (currentGlobalFilter.value != TransportFilter.ALL) {
+                        TextButton(onClick = {
+                            val nextOverride = !pickerFilterOverride
+                            pickerFilterOverride = nextOverride
+                            val loc = pickerLocation
+                            if (loc != null) {
+                                scope.launch {
+                                    val count = repo.getNearestCountNow()
+                                    val stationId = repo.getActiveStationIdNow()
+                                    val globalFilter = filterState.getTabState(stationId)
+                                    val effectiveFilter = if (nextOverride) null else globalFilter
+                                    val stops = StopsRepository(context).getAllStops()
+                                    pickerCandidates = NearestStationsFinder.findNearestStops(
+                                        stops = stops, userLat = loc.first, userLon = loc.second,
+                                        count = count, transportFilter = effectiveFilter
+                                    )
+                                    de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                                        "[picker] app toggleFilter recomputed: n=${pickerCandidates.size} effectiveFilter=${effectiveFilter ?: "ALL"}"
+                                    )
+                                }
+                            }
+                        }) {
+                            Text(if (pickerFilterOverride) "Filter aktivieren" else "Alle anzeigen",
+                                color = if (pickerFilterOverride) UestraColors.TextSub else UestraColors.Teal)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+
+                // Auto-Folgen-Row — immer sichtbar
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable {
+                            scope.launch {
+                                de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] app enableAutoFollow")
+                                de.dhde.hannover.departures.widget.data.WidgetSessionStore(context).setGpsMode(true)
+                                de.dhde.hannover.departures.widget.widget.findAndSetActiveNearestStation(context)
+                                de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
+                                showPickerSheet = false
+                            }
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_widget_gps),
+                        contentDescription = null,
+                        tint = UestraColors.GpsBlue,
+                        modifier = Modifier.size(18.dp).padding(end = 8.dp)
+                    )
+                    Text("Auto-Folgen", color = UestraColors.GpsBlue,
+                        fontSize = 16.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f))
+                }
+                HorizontalDivider(color = UestraColors.TextSub.copy(alpha = 0.2f))
+                Spacer(Modifier.height(8.dp))
+
+                when {
+                    pickerLoading -> CircularProgressIndicator(color = UestraColors.Teal)
+                    pickerError == "Standort-Berechtigung fehlt" -> {
+                        Column {
+                            Text(pickerError!!, color = UestraColors.TextSub)
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = {
+                                de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                                    "[picker] app permission-requested"
+                                )
+                                pickerPermissionLauncher.launch(
+                                    arrayOf(
+                                        android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                        android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }) {
+                                Text("Berechtigung anfordern", color = UestraColors.Teal)
+                            }
+                        }
+                    }
+                    pickerError != null -> Text(pickerError!!, color = UestraColors.TextSub)
+                    visible.isEmpty() -> Text("Keine Stationen für diesen Filter", color = UestraColors.TextSub)
+                    else -> LazyColumn {
+                        items(visible) { c ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    scope.launch {
+                                        repo.setActiveStation(c.stopId, c.name)
+                                        if (pickerFilterOverride) filterState.setTabState(c.stopId, TransportFilter.ALL)
+                                        de.dhde.hannover.departures.widget.data.WidgetSessionStore(context).setGpsMode(false)
+                                        de.dhde.hannover.departures.widget.debug.DebugLog.log(
+                                            "[picker] app pick: stopId=${c.stopId} overrideFilter=$pickerFilterOverride"
+                                        )
+                                        de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
+                                        showPickerSheet = false
+                                    }
+                                }.padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(c.name, color = UestraColors.TextMain, modifier = Modifier.weight(1f))
+                                Text("${c.distanceM} m", color = UestraColors.TextSub, fontSize = 12.sp,
+                                    modifier = Modifier.padding(end = 8.dp))
+                                if (c.transportTypes.contains("TRAM"))
+                                    Icon(painterResource(R.drawable.ic_widget_tram), null,
+                                        tint = UestraColors.LineBlue, modifier = Modifier.size(16.dp))
+                                if (c.transportTypes.contains("BUS"))
+                                    Icon(painterResource(R.drawable.ic_widget_bus), null,
+                                        tint = UestraColors.AccentRed, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
     }

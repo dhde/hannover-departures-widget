@@ -58,7 +58,7 @@ fun DebugScreen() {
         }
 
         if (entries.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                 Text(
                     "Noch keine Debug-Ausgaben.\nWidget-Refresh o.ä. auslösen.",
                     color = UestraColors.TextSub,

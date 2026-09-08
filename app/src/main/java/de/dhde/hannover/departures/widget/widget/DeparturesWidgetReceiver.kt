@@ -16,14 +16,34 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
+        if (intent.action == PickerAutoCloseAlarm.ACTION) {
+            val scope = CoroutineScope(Dispatchers.IO)
+            scope.launch {
+                val session = WidgetSessionStore(context)
+                if (session.isPickerModeActive()) {
+                    de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] autoclose alarm fired, closing")
+                    session.clearPickerState()
+                    DeparturesWidget().updateAll(context)
+                }
+            }
+            return
+        }
         if (intent.action == "de.dhde.hannover.departures.widget.TICK") {
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {
+                val session = WidgetSessionStore(context)
+                if (session.isPickerModeActive() &&
+                    System.currentTimeMillis() - session.getPickerOpenedAt() > 60_000L) {
+                    de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] timeout after 60s, closing")
+                    session.clearPickerState()
+                    DeparturesWidget().updateAll(context)
+                    return@launch
+                }
                 // Fix B-light: Im GPS-Modus die nächste Haltestelle bei den Minuten-Ticks
                 // neu bestimmen – aber NUR wenn der Bildschirm an ist (Nutzer schaut hin).
                 // Kein Hintergrund-Dauer-Tracking; bei ausgeschaltetem Display nur Redraw.
                 val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-                if (WidgetSessionStore(context).isGpsModeActive() && pm.isInteractive) {
+                if (session.isGpsModeActive() && pm.isInteractive) {
                     RefreshAction.triggerUpdate(context)
                 } else {
                     DeparturesWidget().updateAll(context)
