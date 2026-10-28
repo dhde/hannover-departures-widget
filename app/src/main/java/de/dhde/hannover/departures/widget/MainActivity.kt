@@ -437,7 +437,16 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     // States matching the widget
     var tabState by remember { mutableStateOf(TransportFilter.ALL) }
     var directionState by remember { mutableStateOf(DirectionFilter.ALL) }
-    var timeDisplayMode by remember { mutableStateOf("MIN") }
+    var timeDisplayMode by remember { mutableStateOf(TimeFormat.MODE_MIN) }
+
+    // Sekundengenauer Countdown in der Vorschau: "jetzt" jede Sekunde neu bestimmen.
+    var now by remember { mutableStateOf(java.time.Instant.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            now = java.time.Instant.now()
+        }
+    }
 
     // Im GPS-Modus zählt der Halt nicht als Favorit → keine Favoriten-Filter (alle Linien/Richtungen).
     val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
@@ -519,7 +528,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         typeMatch && dirMatch
     }
     // Zeit-Filter: Abfahrten bis 10 s nach Abfahrt noch zeigen (wie im Widget)
-    .filter { TimeFormat.isStillVisible(it.departureTime) }
+    .filter { TimeFormat.isStillVisible(it.departureTime, now) }
 
     val messagesDeps = filtered.map { dep ->
         dep.copy(messages = de.dhde.hannover.departures.widget.data.filterMessages(dep.messages, ignoredMessages))
@@ -666,7 +675,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(limitedFiltered) { (dep, subDeps) ->
-                        WidgetFlatDepartureRow(dep, subDeps, timeDisplayMode, isWarning, groupedFontSize, countdownFormat, clockFormat, onInfoClick = onInfoClick)
+                        WidgetFlatDepartureRow(dep, subDeps, timeDisplayMode, isWarning, groupedFontSize, countdownFormat, clockFormat, now = now, onInfoClick = onInfoClick)
                     }
                 }
                 // Invisible box to toggle time display mode
@@ -996,6 +1005,7 @@ fun WidgetFlatDepartureRow(
     groupedFontSize: String = "STANDARD",
     countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
     clockFormat: String = TimeFormat.DEFAULT_CLOCK,
+    now: java.time.Instant = java.time.Instant.now(),
     onInfoClick: (InfoDialogData) -> Unit = {}
 ) {
     Column(
@@ -1033,7 +1043,7 @@ fun WidgetFlatDepartureRow(
             )
 
             val timeText = TimeFormat.formatDepartureTime(
-                timeDisplayMode, dep.departureTime, countdownFormat, clockFormat, isWarning
+                timeDisplayMode, dep.departureTime, countdownFormat, clockFormat, isWarning, now = now
             )
 
             val hasDelay = (dep.delayMinutes ?: 0) > 0
@@ -1062,7 +1072,7 @@ fun WidgetFlatDepartureRow(
                 if (subsequentDepartures.isNotEmpty()) {
                     val subFontSize = groupedSubFontSize(groupedFontSize)
                     val subText = subsequentDepartures.joinToString(", ") { subDep ->
-                        var t = TimeFormat.formatShortTime(timeDisplayMode, subDep.departureTime)
+                        var t = TimeFormat.formatShortTime(timeDisplayMode, subDep.departureTime, now = now)
                         if (subDep.isCancelled) t = t.map { it + "\u0336" }.joinToString("")
                         t
                     }
