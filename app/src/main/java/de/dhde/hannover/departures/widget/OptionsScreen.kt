@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.R
 import kotlinx.coroutines.launch
-import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -224,10 +223,6 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 Text("Auf Standard zurücksetzen")
             }
         }
-    }
-
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, refreshOnScreenOn, groupDepartures, maxGroupedDeparturesFlow, groupedFontSize, allowDuplicates) {
-        de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }
 

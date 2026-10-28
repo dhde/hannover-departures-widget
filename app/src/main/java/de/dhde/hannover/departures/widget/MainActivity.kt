@@ -61,7 +61,13 @@ import de.dhde.hannover.departures.widget.data.StopsRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
 import de.dhde.hannover.departures.widget.ui.UestraColors
+import de.dhde.hannover.departures.widget.data.dataStore
+import de.dhde.hannover.departures.widget.widget.DeparturesWidget
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
@@ -114,6 +120,18 @@ class MainActivity : ComponentActivity() {
             ) {
                 val scope = rememberCoroutineScope()
                 val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
+
+                // Widget neu zeichnen, sobald sich Optionen oder Favoriten ändern
+                // (alle liegen im favorites_prefs-DataStore). Kurz entprellt, damit
+                // Slider & Co. nicht pro Zwischenschritt ein Update auslösen.
+                LaunchedEffect(Unit) {
+                    @OptIn(FlowPreview::class)
+                    dataStore.data
+                        .drop(1)
+                        .distinctUntilChanged()
+                        .debounce(300)
+                        .collect { DeparturesWidget().updateAll(this@MainActivity) }
+                }
                 
                 ConfigurationScreen(repo, onInfoClick = { infoDialogState = it })
                 
