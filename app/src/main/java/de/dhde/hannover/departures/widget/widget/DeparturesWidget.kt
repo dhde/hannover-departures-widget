@@ -69,8 +69,100 @@ import androidx.compose.runtime.SideEffect
 import androidx.glance.LocalContext
 import androidx.glance.appwidget.CircularProgressIndicator
 
+/** Ergebnis des Abfahrts-Filters: gefilterte Abfahrten und die tatsächlich gezeigten Zeilen. */
+internal data class VisibleDepartures(
+    val filtered: List<FlatDeparture>,
+    /** Hauptabfahrt + gruppierte Folgeabfahrten, chronologisch und auf maxRows begrenzt. */
+    val rows: List<Pair<FlatDeparture, List<FlatDeparture>>>
+)
+
+/**
+ * Filter (Verkehrsmittel, Linien-Favorit, Tab, Richtung, Zeit), Gruppierung und
+ * maxRows-Begrenzung der Widget-Liste. Wird auch für den Ticker genutzt, damit der
+ * Takt sich an genau den sichtbaren Zeilen orientiert.
+ */
+internal fun visibleDepartures(
+    flatDepartures: List<FlatDeparture>,
+    transportFilters: Set<String>,
+    favorites: List<FavoriteStation>,
+    activeFavUniqueId: String?,
+    gpsModeActive: Boolean,
+    tabState: TransportFilter,
+    directionState: DirectionFilter,
+    groupDepartures: Boolean,
+    maxGroupedDepartures: Int,
+    maxRows: Int
+): VisibleDepartures {
+    val filtered = flatDepartures.filter {
+        val isAnyTypeExcluded = transportFilters.size < 5
+        val globalTypeMatch = when {
+            it.isFernbus -> "Fernbus" in transportFilters
+            it.isDB -> "DB" in transportFilters
+            it.isBus -> "Bus" in transportFilters
+            it.isTram -> "Stadtbahn" in transportFilters
+            it.isSBahn -> "S-Bahn" in transportFilters
+            else -> !isAnyTypeExcluded
+        }
+        if (!globalTypeMatch) return@filter false
+
+        // Stations-spezifischer Linien-Filter (nach uniqueId des aktiven Duplikats).
+        // Im GPS-Modus bewusst ignorieren: der nächste Halt wird ungefiltert gezeigt,
+        // auch wenn er zufällig als Favorit mit Linienfilter gespeichert ist.
+        val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavUniqueId }
+        val linesFilter = currentFav?.filteredLines
+        if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
+
+        val typeMatch = when (tabState) {
+            TransportFilter.BUS -> it.isBus
+            TransportFilter.TRAM -> it.isTram
+            else -> true
+        }
+        val dirMatch = when (directionState) {
+            DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
+            DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
+            else -> true
+        }
+        typeMatch && dirMatch
+    }
+    // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie in App-Vorschau)
+    .filter { TimeFormat.isStillVisible(it.departureTime) }
+
+    // Gruppieren der Abfahrten
+    val groupedList = mutableListOf<Pair<FlatDeparture, List<FlatDeparture>>>()
+    if (groupDepartures) {
+        val groupedMap = mutableMapOf<String, MutableList<FlatDeparture>>()
+        for (dep in filtered) {
+            val key = "${dep.lineShort}|${dep.destination}"
+            groupedMap.getOrPut(key) { mutableListOf() }.add(dep)
+        }
+        for (group in groupedMap.values) {
+            val mainDep = group.first()
+            val subDeps = group.drop(1).take(maxGroupedDepartures)
+            groupedList.add(mainDep to subDeps)
+        }
+        // WICHTIG: Nach der Gruppierung wieder chronologisch sortieren!
+        groupedList.sortBy { it.first.departureTime }
+    } else {
+        for (dep in filtered) {
+            groupedList.add(dep to emptyList())
+        }
+    }
+
+    val rows = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
+    return VisibleDepartures(filtered, rows)
+}
+
 object WidgetTicker {
-    fun scheduleNextTick(context: Context, nextDepartureIso: String? = null) {
+    /** Nur für das Debug-Log: Wechsel zwischen Minuten- und 10-s-Takt melden, nicht jeden Tick. */
+    @Volatile private var lastWasFast = false
+
+    /**
+     * Plant den nächsten Widget-Tick (RTC, ohne Wakeup).
+     *
+     * @param nextDepartureIso nächste sichtbare Abfahrt (erste gezeigte Zeile)
+     * @param fastTick die Hauptzeit zeigt Sekunden (siehe [TimeFormat.showsSeconds])
+     */
+    fun scheduleNextTick(context: Context, nextDepartureIso: String?, fastTick: Boolean) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
             action = "de.dhde.hannover.departures.widget.TICK"
@@ -82,20 +174,31 @@ object WidgetTicker {
         val now = System.currentTimeMillis()
         val nextMinute = now + (60000L - (now % 60000L))
 
-        // Smart Ticker: In den letzten 2 Minuten vor der nächsten Abfahrt (inkl. der
-        // 10 s Nachlauf) alle 10 s neu zeichnen, damit die Sekundenanzeige stimmt.
         var targetTime = nextMinute
-        if (nextDepartureIso != null) {
-            try {
-                val diffSec = (java.time.Instant.parse(nextDepartureIso).toEpochMilli() - now) / 1000L
+        var isFast = false
+        val depMillis = try {
+            nextDepartureIso?.let { java.time.Instant.parse(it).toEpochMilli() }
+        } catch (_: Exception) { null }
+        if (depMillis != null) {
+            if (fastTick) {
+                // Smart Ticker: In den letzten 2 Minuten vor der nächsten Abfahrt (inkl. der
+                // 10 s Nachlauf) alle 10 s neu zeichnen, damit die Sekundenanzeige stimmt.
+                val diffSec = (depMillis - now) / 1000L
                 if (diffSec in -10..120) {
                     targetTime = minOf(now + 10_000L, nextMinute)
+                    isFast = true
                 }
-            } catch (_: Exception) {}
+            } else {
+                // Ohne Sekundenanzeige reicht der Minutentakt – außer die Abfahrt
+                // verschwindet (10 s nach Abfahrt) vor der nächsten vollen Minute.
+                val vanishAt = depMillis + 10_000L
+                if (vanishAt in (now + 1)..<nextMinute) targetTime = vanishAt
+            }
         }
 
-        if (targetTime != nextMinute) {
-            DebugLog.log("[ticker] fast tick at ${java.time.Instant.ofEpochMilli(targetTime)}")
+        if (isFast != lastWasFast) {
+            lastWasFast = isFast
+            DebugLog.log("[ticker] fast mode ${if (isFast) "on" else "off"}")
         }
         alarmManager.setWindow(AlarmManager.RTC, targetTime, 1000L, pendingIntent)
     }
@@ -220,15 +323,15 @@ class DeparturesWidget : GlanceAppWidget() {
                 // isRefreshing-Flags greifen kann und ein hängender Zustand
                 // beim nächsten Tick zurückgesetzt wird.
                 if (hasFutureDepartures || isRefreshing || errorState.isNotEmpty()) {
-                    // Nur noch sichtbare Abfahrten (max. 10 s abgefahren) zählen – sonst
-                    // hält eine längst vergangene Abfahrt aus dem Cache den 10-s-Takt am Laufen.
-                    val tickNow = Instant.now()
-                    val nextIso = flatDepartures.firstOrNull {
-                        try {
-                            Duration.between(tickNow, Instant.parse(it.departureTime)).seconds > -10
-                        } catch (_: Exception) { false }
-                    }?.departureTime
-                    WidgetTicker.scheduleNextTick(context, nextIso)
+                    // Takt nach der ersten tatsächlich gezeigten Zeile (gleicher Filter wie
+                    // WidgetContent) – sonst hält eine ausgefilterte oder längst vergangene
+                    // Abfahrt aus dem Cache den 10-s-Takt am Laufen.
+                    val nextIso = visibleDepartures(
+                        flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
+                        tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
+                    ).rows.firstOrNull()?.first?.departureTime
+                    val fastTick = TimeFormat.showsSeconds(timeDisplayMode, countdownFormat)
+                    WidgetTicker.scheduleNextTick(context, nextIso, fastTick)
                 } else {
                     WidgetTicker.cancelTick(context)
                 }
@@ -322,39 +425,11 @@ class DeparturesWidget : GlanceAppWidget() {
                     .fillMaxSize()
                     .padding(8.dp)
             ) {
-            val filtered = flatDepartures.filter {
-                val isAnyTypeExcluded = transportFilters.size < 5
-                val globalTypeMatch = when {
-                    it.isFernbus -> "Fernbus" in transportFilters
-                    it.isDB -> "DB" in transportFilters
-                    it.isBus -> "Bus" in transportFilters
-                    it.isTram -> "Stadtbahn" in transportFilters
-                    it.isSBahn -> "S-Bahn" in transportFilters
-                    else -> !isAnyTypeExcluded
-                }
-                if (!globalTypeMatch) return@filter false
-
-                // Stations-spezifischer Linien-Filter (nach uniqueId des aktiven Duplikats).
-                // Im GPS-Modus bewusst ignorieren: der nächste Halt wird ungefiltert gezeigt,
-                // auch wenn er zufällig als Favorit mit Linienfilter gespeichert ist.
-                val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavUniqueId }
-                val linesFilter = currentFav?.filteredLines
-                if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
-
-                val typeMatch = when (tabState) {
-                    TransportFilter.BUS -> it.isBus
-                    TransportFilter.TRAM -> it.isTram
-                    else -> true
-                }
-                val dirMatch = when (directionState) {
-                    DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
-                    DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
-                    else -> true
-                }
-                typeMatch && dirMatch
-            }
-            // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie in App-Vorschau)
-            .filter { TimeFormat.isStillVisible(it.departureTime) }
+            val visible = visibleDepartures(
+                flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
+                tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
+            )
+            val filtered = visible.filtered
 
             // Meldungen nur aus den (per Tab/Richtung) sichtbaren Abfahrten, ausgeblendete entfernt.
             val messagesDeps = filtered.map { dep ->
@@ -388,28 +463,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val isWarning = minutesSinceUpdate >= 10
 
             Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.CenterEnd) {
-                // Gruppieren der Abfahrten
-                val groupedList = mutableListOf<Pair<FlatDeparture, List<FlatDeparture>>>()
-                if (groupDepartures) {
-                    val groupedMap = mutableMapOf<String, MutableList<FlatDeparture>>()
-                    for (dep in filtered) {
-                        val key = "${dep.lineShort}|${dep.destination}"
-                        groupedMap.getOrPut(key) { mutableListOf() }.add(dep)
-                    }
-                    for (group in groupedMap.values) {
-                        val mainDep = group.first()
-                        val subDeps = group.drop(1).take(maxGroupedDepartures)
-                        groupedList.add(mainDep to subDeps)
-                    }
-                    // WICHTIG: Nach der Gruppierung wieder chronologisch sortieren!
-                    groupedList.sortBy { it.first.departureTime }
-                } else {
-                    for (dep in filtered) {
-                        groupedList.add(dep to emptyList())
-                    }
-                }
-
-                val limitedFiltered = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
+                val limitedFiltered = visible.rows
                 
                 if (limitedFiltered.isEmpty()) {
                     Box(
