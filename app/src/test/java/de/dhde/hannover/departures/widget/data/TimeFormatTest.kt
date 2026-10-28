@@ -70,6 +70,11 @@ class TimeFormatTest {
     }
 
     @Test
+    fun countdown_zeroSecondsDoesNotRecurse() {
+        assertEquals("0s", TimeFormat.formatCountdown(TimeFormat.DEFAULT_COUNTDOWN, 0))
+    }
+
+    @Test
     fun countdown_secondsPrecisionBoundary() {
         assertEquals("1 Min 59s", TimeFormat.formatCountdown(TimeFormat.DEFAULT_COUNTDOWN, 119))
         assertEquals("2 Min", TimeFormat.formatCountdown(TimeFormat.DEFAULT_COUNTDOWN, 121))

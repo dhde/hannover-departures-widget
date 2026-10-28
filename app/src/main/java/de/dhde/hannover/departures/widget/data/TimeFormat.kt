@@ -88,7 +88,10 @@ object TimeFormat {
             if (values.isNotEmpty() && values.all { it == 0L }) "" else fill(inner)
         }
         // Ein gültiges Muster kann leer ergeben (z. B. "[{m} Min ]" bei 35 s) – dann Default.
-        return fill(withoutBrackets).trim().ifBlank { formatCountdown(DEFAULT_COUNTDOWN, secs) }
+        // Leeres Ergebnis (z. B. "[{m} Min ]" bei 35 s) → Standardmuster; beim Standard selbst nur Sekunden
+        return fill(withoutBrackets).trim().ifBlank {
+            if (p != DEFAULT_COUNTDOWN) formatCountdown(DEFAULT_COUNTDOWN, secs) else "${secs}s"
+        }
     }
 
     /** Zeigt die Hauptzeit Sekunden an (dann braucht das Widget den 10-s-Takt)? */
