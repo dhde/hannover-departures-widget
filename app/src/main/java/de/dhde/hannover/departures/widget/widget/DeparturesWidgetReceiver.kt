@@ -11,7 +11,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-
 class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget = DeparturesWidget()
 
@@ -21,7 +20,6 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {
                 val session = WidgetSessionStore(context)
-                session.setLastTickTs(System.currentTimeMillis())
                 if (session.isPickerModeActive()) {
                     de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] autoclose alarm fired, closing")
                     session.clearPickerState()
@@ -34,7 +32,6 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {
                 val session = WidgetSessionStore(context)
-                session.setLastTickTs(System.currentTimeMillis())
                 if (session.isPickerModeActive() &&
                     System.currentTimeMillis() - session.getPickerOpenedAt() > 60_000L) {
                     de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] timeout after 60s, closing")
@@ -45,15 +42,16 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
                 // Fix B-light: Im GPS-Modus die nächste Haltestelle bei den Minuten-Ticks
                 // neu bestimmen – aber NUR wenn der Bildschirm an ist (Nutzer schaut hin).
                 // Kein Hintergrund-Dauer-Tracking; bei ausgeschaltetem Display nur Redraw.
-                
-                
+                // Auf max. 1x pro Minute gedrosselt, da der Ticker vor Abfahrten alle 10 s feuert.
                 val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-                if (session.isGpsModeActive() && pm.isInteractive) {
+                val now = System.currentTimeMillis()
+                if (session.isGpsModeActive() && pm.isInteractive &&
+                    now - session.getLastGpsTickTs() >= 55_000L) {
+                    session.setLastGpsTickTs(now)
                     RefreshAction.triggerUpdate(context)
                 } else {
                     DeparturesWidget().updateAll(context)
                 }
-                
             }
         }
     }

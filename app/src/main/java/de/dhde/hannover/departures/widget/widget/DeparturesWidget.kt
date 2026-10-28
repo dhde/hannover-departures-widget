@@ -81,25 +81,22 @@ object WidgetTicker {
         )
         val now = System.currentTimeMillis()
         val nextMinute = now + (60000L - (now % 60000L))
-        
+
+        // Smart Ticker: In den letzten 2 Minuten vor der nächsten Abfahrt (inkl. der
+        // 10 s Nachlauf) alle 10 s neu zeichnen, damit die Sekundenanzeige stimmt.
         var targetTime = nextMinute
         if (nextDepartureIso != null) {
             try {
-                val depInstant = java.time.Instant.parse(nextDepartureIso)
-                val depMs = depInstant.toEpochMilli()
-                val diffSec = (depMs - now) / 1000L
-                if (diffSec <= 60) {
-                    targetTime = now + 10_000L
-                } else if (diffSec <= 120) {
-                    val target60sMs = depMs - 60_000L
-                    if (target60sMs > now) {
-                        targetTime = minOf(target60sMs, nextMinute)
-                    }
+                val diffSec = (java.time.Instant.parse(nextDepartureIso).toEpochMilli() - now) / 1000L
+                if (diffSec in -10..120) {
+                    targetTime = minOf(now + 10_000L, nextMinute)
                 }
             } catch (_: Exception) {}
         }
-        
-        DebugLog.log("[ticker] scheduling next tick for " + targetTime)
+
+        if (targetTime != nextMinute) {
+            DebugLog.log("[ticker] fast tick at ${java.time.Instant.ofEpochMilli(targetTime)}")
+        }
         alarmManager.setWindow(AlarmManager.RTC, targetTime, 1000L, pendingIntent)
     }
     fun cancelTick(context: Context) {
@@ -183,7 +180,6 @@ class DeparturesWidget : GlanceAppWidget() {
             val directionState by filters.getDirectionStateFlow(stationId).collectAsState(initial = DirectionFilter.ALL)
             val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
             val timeDisplayMode by session.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
-            val lastTickTs by session.lastTickTsFlow().collectAsState(initial = 0L)
 
             val cachedJson by cache.getDeparturesJsonFlow(stationId).collectAsState(initial = "[]")
             val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
@@ -222,7 +218,14 @@ class DeparturesWidget : GlanceAppWidget() {
                 // isRefreshing-Flags greifen kann und ein hängender Zustand
                 // beim nächsten Tick zurückgesetzt wird.
                 if (hasFutureDepartures || isRefreshing || errorState.isNotEmpty()) {
-                    val nextIso = flatDepartures.firstOrNull()?.departureTime
+                    // Nur noch sichtbare Abfahrten (max. 10 s abgefahren) zählen – sonst
+                    // hält eine längst vergangene Abfahrt aus dem Cache den 10-s-Takt am Laufen.
+                    val tickNow = Instant.now()
+                    val nextIso = flatDepartures.firstOrNull {
+                        try {
+                            Duration.between(tickNow, Instant.parse(it.departureTime)).seconds > -10
+                        } catch (_: Exception) { false }
+                    }?.departureTime
                     WidgetTicker.scheduleNextTick(context, nextIso)
                 } else {
                     WidgetTicker.cancelTick(context)
@@ -239,7 +242,6 @@ class DeparturesWidget : GlanceAppWidget() {
                 tabState        = tabState,
                 directionState  = directionState,
                 gpsModeActive   = gpsModeActive,
-                lastTickTs      = lastTickTs,
                 timeDisplayMode = timeDisplayMode,
                 status          = if (errorState.isNotEmpty()) "error" else "ok",
                 errorMsg        = errorState,
@@ -272,7 +274,6 @@ class DeparturesWidget : GlanceAppWidget() {
         favorites: List<FavoriteStation>,
         tabState: TransportFilter,
         directionState: DirectionFilter,
-        lastTickTs: Long,
         gpsModeActive: Boolean,
         timeDisplayMode: String,
         status: String,
@@ -886,7 +887,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
 
             val timeText = when (timeDisplayMode) {
-                "CLOCK" -> clockTime(departure.departureTime, includeSeconds = true)
+                "CLOCK" -> clockTime(departure.departureTime)
                 "CLOCK_SEC" -> clockTime(departure.departureTime, includeSeconds = true)
                 else -> {
                     try {

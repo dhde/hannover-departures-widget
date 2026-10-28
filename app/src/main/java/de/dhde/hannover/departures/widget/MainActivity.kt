@@ -498,10 +498,10 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         typeMatch && dirMatch
     }
     .filter {
-        // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie im Widget)
+        // Zeit-Filter: Abfahrten bis 10 s nach Abfahrt noch zeigen (wie im Widget)
         try {
             val secs = java.time.Duration.between(java.time.Instant.now(), java.time.Instant.parse(it.departureTime)).seconds
-            secs > 0
+            secs > -10
         } catch (e: Exception) {
             true
         }

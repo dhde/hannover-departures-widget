@@ -20,7 +20,7 @@ class WidgetSessionStore(private val context: Context) {
         private val PICKER_FILTER_OVERRIDE = stringPreferencesKey("picker_filter_override")
         private val PICKER_LOC_LAT = doublePreferencesKey("picker_loc_lat")
         private val PICKER_LOC_LON = doublePreferencesKey("picker_loc_lon")
-        private val LAST_TICK_TS = longPreferencesKey("last_tick_ts")
+        private val LAST_GPS_TICK_TS = longPreferencesKey("last_gps_tick_ts")
     }
 
     fun debugModeFlow(): Flow<Boolean> =
@@ -139,11 +139,11 @@ class WidgetSessionStore(private val context: Context) {
         return if (lat != null && lon != null) lat to lon else null
     }
 
-    fun lastTickTsFlow(): Flow<Long> =
-        context.cacheDataStore.data.map { it[LAST_TICK_TS] ?: 0L }
+    suspend fun getLastGpsTickTs(): Long =
+        context.cacheDataStore.data.map { it[LAST_GPS_TICK_TS] }.first() ?: 0L
 
-    suspend fun setLastTickTs(ts: Long) {
-        context.cacheDataStore.edit { it[LAST_TICK_TS] = ts }
+    suspend fun setLastGpsTickTs(ts: Long) {
+        context.cacheDataStore.edit { it[LAST_GPS_TICK_TS] = ts }
     }
 
     suspend fun clearPickerState() {
