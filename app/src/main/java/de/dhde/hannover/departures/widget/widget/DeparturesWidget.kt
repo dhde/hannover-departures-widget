@@ -66,6 +66,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.key
 import androidx.glance.LocalContext
 import androidx.glance.appwidget.CircularProgressIndicator
 
@@ -283,6 +284,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val directionState by filters.getDirectionStateFlow(stationId).collectAsState(initial = DirectionFilter.ALL)
             val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
             val timeDisplayMode by session.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
+            val lastTickTs by session.lastTickTsFlow().collectAsState(initial = 0L)
 
             val cachedJson by cache.getDeparturesJsonFlow(stationId).collectAsState(initial = "[]")
             val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
@@ -318,22 +320,27 @@ class DeparturesWidget : GlanceAppWidget() {
             val hasFutureDepartures = flatDepartures.isNotEmpty()
 
             val context = LocalContext.current
-            SideEffect {
-                // Ticker läuft auch bei Refresh/Error, damit die 15-s-TTL des
-                // isRefreshing-Flags greifen kann und ein hängender Zustand
-                // beim nächsten Tick zurückgesetzt wird.
-                if (hasFutureDepartures || isRefreshing || errorState.isNotEmpty()) {
-                    // Takt nach der ersten tatsächlich gezeigten Zeile (gleicher Filter wie
-                    // WidgetContent) – sonst hält eine ausgefilterte oder längst vergangene
-                    // Abfahrt aus dem Cache den 10-s-Takt am Laufen.
-                    val nextIso = visibleDepartures(
-                        flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
-                        tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
-                    ).rows.firstOrNull()?.first?.departureTime
-                    val fastTick = TimeFormat.showsSeconds(timeDisplayMode, countdownFormat)
-                    WidgetTicker.scheduleNextTick(context, nextIso, fastTick)
-                } else {
-                    WidgetTicker.cancelTick(context)
+            // lastTickTs als Key: Jeder Tick ändert diesen State und erzwingt so die Recomposition
+            // (Zeiten neu berechnen + nächsten Tick planen). GlanceAppWidget.update() allein
+            // recomposed eine noch laufende Session nicht, wenn sich kein State geändert hat.
+            key(lastTickTs) {
+                SideEffect {
+                    // Ticker läuft auch bei Refresh/Error, damit die 15-s-TTL des
+                    // isRefreshing-Flags greifen kann und ein hängender Zustand
+                    // beim nächsten Tick zurückgesetzt wird.
+                    if (hasFutureDepartures || isRefreshing || errorState.isNotEmpty()) {
+                        // Takt nach der ersten tatsächlich gezeigten Zeile (gleicher Filter wie
+                        // WidgetContent) – sonst hält eine ausgefilterte oder längst vergangene
+                        // Abfahrt aus dem Cache den 10-s-Takt am Laufen.
+                        val nextIso = visibleDepartures(
+                            flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
+                            tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
+                        ).rows.firstOrNull()?.first?.departureTime
+                        val fastTick = TimeFormat.showsSeconds(timeDisplayMode, countdownFormat)
+                        WidgetTicker.scheduleNextTick(context, nextIso, fastTick)
+                    } else {
+                        WidgetTicker.cancelTick(context)
+                    }
                 }
             }
 
