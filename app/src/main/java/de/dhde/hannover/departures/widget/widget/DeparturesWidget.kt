@@ -27,6 +27,7 @@ import androidx.glance.text.*
 import androidx.glance.unit.ColorProvider
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.action.ActionParameters
+import de.dhde.hannover.departures.widget.debug.DebugLog
 import androidx.glance.appwidget.appWidgetBackground
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -41,6 +42,7 @@ import de.dhde.hannover.departures.widget.data.DeparturesCache
 import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import de.dhde.hannover.departures.widget.data.TransportFilter
+import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.data.filterMessages
 import de.dhde.hannover.departures.widget.api.LineMessages
 import de.dhde.hannover.departures.widget.data.lineDirection
@@ -58,7 +60,6 @@ import de.dhde.hannover.departures.widget.widget.ClosePickerAction
 import de.dhde.hannover.departures.widget.widget.EnableAutoFollowAction
 import de.dhde.hannover.departures.widget.data.StopCandidate
 import java.time.Instant
-import java.time.format.DateTimeParseException
 import java.time.Duration
 import de.dhde.hannover.departures.widget.R
 import android.app.AlarmManager
@@ -68,8 +69,100 @@ import androidx.compose.runtime.SideEffect
 import androidx.glance.LocalContext
 import androidx.glance.appwidget.CircularProgressIndicator
 
+/** Ergebnis des Abfahrts-Filters: gefilterte Abfahrten und die tatsächlich gezeigten Zeilen. */
+internal data class VisibleDepartures(
+    val filtered: List<FlatDeparture>,
+    /** Hauptabfahrt + gruppierte Folgeabfahrten, chronologisch und auf maxRows begrenzt. */
+    val rows: List<Pair<FlatDeparture, List<FlatDeparture>>>
+)
+
+/**
+ * Filter (Verkehrsmittel, Linien-Favorit, Tab, Richtung, Zeit), Gruppierung und
+ * maxRows-Begrenzung der Widget-Liste. Wird auch für den Ticker genutzt, damit der
+ * Takt sich an genau den sichtbaren Zeilen orientiert.
+ */
+internal fun visibleDepartures(
+    flatDepartures: List<FlatDeparture>,
+    transportFilters: Set<String>,
+    favorites: List<FavoriteStation>,
+    activeFavUniqueId: String?,
+    gpsModeActive: Boolean,
+    tabState: TransportFilter,
+    directionState: DirectionFilter,
+    groupDepartures: Boolean,
+    maxGroupedDepartures: Int,
+    maxRows: Int
+): VisibleDepartures {
+    val filtered = flatDepartures.filter {
+        val isAnyTypeExcluded = transportFilters.size < 5
+        val globalTypeMatch = when {
+            it.isFernbus -> "Fernbus" in transportFilters
+            it.isDB -> "DB" in transportFilters
+            it.isBus -> "Bus" in transportFilters
+            it.isTram -> "Stadtbahn" in transportFilters
+            it.isSBahn -> "S-Bahn" in transportFilters
+            else -> !isAnyTypeExcluded
+        }
+        if (!globalTypeMatch) return@filter false
+
+        // Stations-spezifischer Linien-Filter (nach uniqueId des aktiven Duplikats).
+        // Im GPS-Modus bewusst ignorieren: der nächste Halt wird ungefiltert gezeigt,
+        // auch wenn er zufällig als Favorit mit Linienfilter gespeichert ist.
+        val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavUniqueId }
+        val linesFilter = currentFav?.filteredLines
+        if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
+
+        val typeMatch = when (tabState) {
+            TransportFilter.BUS -> it.isBus
+            TransportFilter.TRAM -> it.isTram
+            else -> true
+        }
+        val dirMatch = when (directionState) {
+            DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
+            DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
+            else -> true
+        }
+        typeMatch && dirMatch
+    }
+    // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie in App-Vorschau)
+    .filter { TimeFormat.isStillVisible(it.departureTime) }
+
+    // Gruppieren der Abfahrten
+    val groupedList = mutableListOf<Pair<FlatDeparture, List<FlatDeparture>>>()
+    if (groupDepartures) {
+        val groupedMap = mutableMapOf<String, MutableList<FlatDeparture>>()
+        for (dep in filtered) {
+            val key = "${dep.lineShort}|${dep.destination}"
+            groupedMap.getOrPut(key) { mutableListOf() }.add(dep)
+        }
+        for (group in groupedMap.values) {
+            val mainDep = group.first()
+            val subDeps = group.drop(1).take(maxGroupedDepartures)
+            groupedList.add(mainDep to subDeps)
+        }
+        // WICHTIG: Nach der Gruppierung wieder chronologisch sortieren!
+        groupedList.sortBy { it.first.departureTime }
+    } else {
+        for (dep in filtered) {
+            groupedList.add(dep to emptyList())
+        }
+    }
+
+    val rows = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
+    return VisibleDepartures(filtered, rows)
+}
+
 object WidgetTicker {
-    fun scheduleNextTick(context: Context) {
+    /** Nur für das Debug-Log: Wechsel zwischen Minuten- und 10-s-Takt melden, nicht jeden Tick. */
+    @Volatile private var lastWasFast = false
+
+    /**
+     * Plant den nächsten Widget-Tick (RTC, ohne Wakeup).
+     *
+     * @param nextDepartureIso nächste sichtbare Abfahrt (erste gezeigte Zeile)
+     * @param fastTick die Hauptzeit zeigt Sekunden (siehe [TimeFormat.showsSeconds])
+     */
+    fun scheduleNextTick(context: Context, nextDepartureIso: String?, fastTick: Boolean) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
             action = "de.dhde.hannover.departures.widget.TICK"
@@ -80,7 +173,34 @@ object WidgetTicker {
         )
         val now = System.currentTimeMillis()
         val nextMinute = now + (60000L - (now % 60000L))
-        alarmManager.setWindow(AlarmManager.RTC, nextMinute, 1000L, pendingIntent)
+
+        var targetTime = nextMinute
+        var isFast = false
+        val depMillis = try {
+            nextDepartureIso?.let { java.time.Instant.parse(it).toEpochMilli() }
+        } catch (_: Exception) { null }
+        if (depMillis != null) {
+            if (fastTick) {
+                // Smart Ticker: In den letzten 2 Minuten vor der nächsten Abfahrt (inkl. der
+                // 10 s Nachlauf) alle 10 s neu zeichnen, damit die Sekundenanzeige stimmt.
+                val diffSec = (depMillis - now) / 1000L
+                if (diffSec in -10..120) {
+                    targetTime = minOf(now + 10_000L, nextMinute)
+                    isFast = true
+                }
+            } else {
+                // Ohne Sekundenanzeige reicht der Minutentakt – außer die Abfahrt
+                // verschwindet (10 s nach Abfahrt) vor der nächsten vollen Minute.
+                val vanishAt = depMillis + 10_000L
+                if (vanishAt in (now + 1)..<nextMinute) targetTime = vanishAt
+            }
+        }
+
+        if (isFast != lastWasFast) {
+            lastWasFast = isFast
+            DebugLog.log("[ticker] fast mode ${if (isFast) "on" else "off"}")
+        }
+        alarmManager.setWindow(AlarmManager.RTC, targetTime, 1000L, pendingIntent)
     }
     fun cancelTick(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -180,6 +300,8 @@ class DeparturesWidget : GlanceAppWidget() {
             val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
             val maxGroupedDepartures by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
             val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
+            val countdownFormat by repo.countdownFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_COUNTDOWN)
+            val clockFormat by repo.clockFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_CLOCK)
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, TypeToken.getParameterized(List::class.java, DepartureItem::class.java).type)
@@ -201,7 +323,15 @@ class DeparturesWidget : GlanceAppWidget() {
                 // isRefreshing-Flags greifen kann und ein hängender Zustand
                 // beim nächsten Tick zurückgesetzt wird.
                 if (hasFutureDepartures || isRefreshing || errorState.isNotEmpty()) {
-                    WidgetTicker.scheduleNextTick(context)
+                    // Takt nach der ersten tatsächlich gezeigten Zeile (gleicher Filter wie
+                    // WidgetContent) – sonst hält eine ausgefilterte oder längst vergangene
+                    // Abfahrt aus dem Cache den 10-s-Takt am Laufen.
+                    val nextIso = visibleDepartures(
+                        flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
+                        tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
+                    ).rows.firstOrNull()?.first?.departureTime
+                    val fastTick = TimeFormat.showsSeconds(timeDisplayMode, countdownFormat)
+                    WidgetTicker.scheduleNextTick(context, nextIso, fastTick)
                 } else {
                     WidgetTicker.cancelTick(context)
                 }
@@ -231,6 +361,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 groupDepartures  = groupDepartures,
                 maxGroupedDepartures = maxGroupedDepartures,
                 groupedFontSize  = groupedFontSize,
+                countdownFormat  = countdownFormat,
+                clockFormat      = clockFormat,
                 activeFavUniqueId = activeFavUniqueId,
                 pickerMode       = pickerMode,
                 pickerCandidatesJson = pickerCandidatesJson,
@@ -264,6 +396,8 @@ class DeparturesWidget : GlanceAppWidget() {
         groupDepartures: Boolean,
         maxGroupedDepartures: Int,
         groupedFontSize: String = "STANDARD",
+        countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
+        clockFormat: String = TimeFormat.DEFAULT_CLOCK,
         activeFavUniqueId: String? = null,
         pickerMode: Boolean = false,
         pickerCandidatesJson: String? = null,
@@ -291,37 +425,11 @@ class DeparturesWidget : GlanceAppWidget() {
                     .fillMaxSize()
                     .padding(8.dp)
             ) {
-            val filtered = flatDepartures.filter {
-                val isAnyTypeExcluded = transportFilters.size < 5
-                val globalTypeMatch = when {
-                    it.isFernbus -> "Fernbus" in transportFilters
-                    it.isDB -> "DB" in transportFilters
-                    it.isBus -> "Bus" in transportFilters
-                    it.isTram -> "Stadtbahn" in transportFilters
-                    it.isSBahn -> "S-Bahn" in transportFilters
-                    else -> !isAnyTypeExcluded
-                }
-                if (!globalTypeMatch) return@filter false
-
-                // Stations-spezifischer Linien-Filter (nach uniqueId des aktiven Duplikats).
-                // Im GPS-Modus bewusst ignorieren: der nächste Halt wird ungefiltert gezeigt,
-                // auch wenn er zufällig als Favorit mit Linienfilter gespeichert ist.
-                val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavUniqueId }
-                val linesFilter = currentFav?.filteredLines
-                if (linesFilter != null && it.lineShort !in linesFilter) return@filter false
-
-                val typeMatch = when (tabState) {
-                    TransportFilter.BUS -> it.isBus
-                    TransportFilter.TRAM -> it.isTram
-                    else -> true
-                }
-                val dirMatch = when (directionState) {
-                    DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
-                    DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
-                    else -> true
-                }
-                typeMatch && dirMatch
-            }
+            val visible = visibleDepartures(
+                flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
+                tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
+            )
+            val filtered = visible.filtered
 
             // Meldungen nur aus den (per Tab/Richtung) sichtbaren Abfahrten, ausgeblendete entfernt.
             val messagesDeps = filtered.map { dep ->
@@ -355,28 +463,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val isWarning = minutesSinceUpdate >= 10
 
             Box(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.CenterEnd) {
-                // Gruppieren der Abfahrten
-                val groupedList = mutableListOf<Pair<FlatDeparture, List<FlatDeparture>>>()
-                if (groupDepartures) {
-                    val groupedMap = mutableMapOf<String, MutableList<FlatDeparture>>()
-                    for (dep in filtered) {
-                        val key = "${dep.lineShort}|${dep.destination}"
-                        groupedMap.getOrPut(key) { mutableListOf() }.add(dep)
-                    }
-                    for (group in groupedMap.values) {
-                        val mainDep = group.first()
-                        val subDeps = group.drop(1).take(maxGroupedDepartures)
-                        groupedList.add(mainDep to subDeps)
-                    }
-                    // WICHTIG: Nach der Gruppierung wieder chronologisch sortieren!
-                    groupedList.sortBy { it.first.departureTime }
-                } else {
-                    for (dep in filtered) {
-                        groupedList.add(dep to emptyList())
-                    }
-                }
-
-                val limitedFiltered = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
+                val limitedFiltered = visible.rows
                 
                 if (limitedFiltered.isEmpty()) {
                     Box(
@@ -408,7 +495,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                         items(limitedFiltered) { (departure, subsequent) ->
-                            FlatDepartureRow(departure, subsequent, timeDisplayMode, isWarning, groupedFontSize)
+                            FlatDepartureRow(departure, subsequent, timeDisplayMode, isWarning, groupedFontSize, countdownFormat, clockFormat)
                         }
                     }
                     
@@ -817,7 +904,15 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FlatDepartureRow(departure: FlatDeparture, subsequentDepartures: List<FlatDeparture>, timeDisplayMode: String, isWarning: Boolean, groupedFontSize: String = "STANDARD") {
+    private fun FlatDepartureRow(
+        departure: FlatDeparture,
+        subsequentDepartures: List<FlatDeparture>,
+        timeDisplayMode: String,
+        isWarning: Boolean,
+        groupedFontSize: String = "STANDARD",
+        countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
+        clockFormat: String = TimeFormat.DEFAULT_CLOCK
+    ) {
         Column(
             modifier = GlanceModifier
                 .fillMaxWidth()
@@ -852,11 +947,9 @@ class DeparturesWidget : GlanceAppWidget() {
             )
 
 
-            val timeText = if (timeDisplayMode == "CLOCK") {
-                clockTime(departure.departureTime)
-            } else {
-                minutesUntil(departure.departureTime, isWarning)
-            }
+            val timeText = TimeFormat.formatDepartureTime(
+                timeDisplayMode, departure.departureTime, countdownFormat, clockFormat, isWarning
+            )
 
             val hasDelay = (departure.delayMinutes ?: 0) > 0
             val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
@@ -886,7 +979,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     }
                     val subText = subsequentDepartures.joinToString(", ") { dep ->
                         // Keine Verspätung in der Gruppen-Kurzansicht
-                        val t = if (timeDisplayMode == "CLOCK") clockTime(dep.departureTime) else minutesUntil(dep.departureTime, isWarning).replace(" min", "m").replace("jetzt", "0m").replace("in ", "")
+                        val t = TimeFormat.formatShortTime(timeDisplayMode, dep.departureTime)
                         var res = t
                         if (dep.isCancelled) res = res.map { it + "\u0336" }.joinToString("")
                         res
@@ -1077,30 +1170,5 @@ class DeparturesWidget : GlanceAppWidget() {
                     .clickable(actionStartActivity(openAppIntent))
             )
         }
-    }
-
-    private fun minutesUntil(isoTime: String?, isWarning: Boolean): String {
-        if (isoTime == null) return "?"
-        return try {
-            val eventTime = Instant.parse(isoTime)
-            val now = Instant.now()
-            val diffMinutes = Duration.between(now, eventTime).toMinutes()
-            when {
-                diffMinutes <= 0 -> if (isWarning) "evtl. weg?" else "jetzt"
-                diffMinutes == 1L -> "1 Min"
-                else -> "$diffMinutes Min"
-            }
-        } catch (e: DateTimeParseException) { "?" }
-    }
-
-    private fun clockTime(isoTime: String?): String {
-        if (isoTime == null) return "?"
-        return try {
-            val instant = Instant.parse(isoTime)
-            java.time.format.DateTimeFormatter
-                .ofPattern("HH:mm")
-                .withZone(java.time.ZoneId.systemDefault())
-                .format(instant)
-        } catch (e: DateTimeParseException) { "?" }
     }
 }

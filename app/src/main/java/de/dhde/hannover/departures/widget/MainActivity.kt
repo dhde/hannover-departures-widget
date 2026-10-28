@@ -59,9 +59,16 @@ import de.dhde.hannover.departures.widget.data.NearestStationsFinder
 import de.dhde.hannover.departures.widget.data.StopCandidate
 import de.dhde.hannover.departures.widget.data.StopsRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
+import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
 import de.dhde.hannover.departures.widget.ui.UestraColors
+import de.dhde.hannover.departures.widget.data.dataStore
+import de.dhde.hannover.departures.widget.widget.DeparturesWidget
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
@@ -114,6 +121,18 @@ class MainActivity : ComponentActivity() {
             ) {
                 val scope = rememberCoroutineScope()
                 val ignoredMessages by repo.ignoredMessagesFlow.collectAsState(initial = emptySet())
+
+                // Widget neu zeichnen, sobald sich Optionen oder Favoriten ändern
+                // (alle liegen im favorites_prefs-DataStore). Kurz entprellt, damit
+                // Slider & Co. nicht pro Zwischenschritt ein Update auslösen.
+                LaunchedEffect(Unit) {
+                    @OptIn(FlowPreview::class)
+                    dataStore.data
+                        .drop(1)
+                        .distinctUntilChanged()
+                        .debounce(300)
+                        .collect { DeparturesWidget().updateAll(this@MainActivity) }
+                }
                 
                 ConfigurationScreen(repo, onInfoClick = { infoDialogState = it })
                 
@@ -407,6 +426,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
     val maxGroupedDepartures by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
     val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
+    val countdownFormat by repo.countdownFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_COUNTDOWN)
+    val clockFormat by repo.clockFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_CLOCK)
     
     var departures by remember { mutableStateOf<List<FlatDeparture>>(emptyList()) }
     var rawDepartures by remember { mutableStateOf<List<de.dhde.hannover.departures.widget.api.DepartureItem>>(emptyList()) }
@@ -416,7 +437,16 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     // States matching the widget
     var tabState by remember { mutableStateOf(TransportFilter.ALL) }
     var directionState by remember { mutableStateOf(DirectionFilter.ALL) }
-    var timeDisplayMode by remember { mutableStateOf("MIN") }
+    var timeDisplayMode by remember { mutableStateOf(TimeFormat.MODE_MIN) }
+
+    // Sekundengenauer Countdown in der Vorschau: "jetzt" jede Sekunde neu bestimmen.
+    var now by remember { mutableStateOf(java.time.Instant.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            now = java.time.Instant.now()
+        }
+    }
 
     // Im GPS-Modus zählt der Halt nicht als Favorit → keine Favoriten-Filter (alle Linien/Richtungen).
     val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
@@ -497,6 +527,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         }
         typeMatch && dirMatch
     }
+    // Zeit-Filter: Abfahrten bis 10 s nach Abfahrt noch zeigen (wie im Widget)
+    .filter { TimeFormat.isStillVisible(it.departureTime, now) }
 
     val messagesDeps = filtered.map { dep ->
         dep.copy(messages = de.dhde.hannover.departures.widget.data.filterMessages(dep.messages, ignoredMessages))
@@ -643,7 +675,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(limitedFiltered) { (dep, subDeps) ->
-                        WidgetFlatDepartureRow(dep, subDeps, timeDisplayMode, isWarning, groupedFontSize, onInfoClick = onInfoClick)
+                        WidgetFlatDepartureRow(dep, subDeps, timeDisplayMode, isWarning, groupedFontSize, countdownFormat, clockFormat, now = now, onInfoClick = onInfoClick)
                     }
                 }
                 // Invisible box to toggle time display mode
@@ -656,7 +688,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             indication = null
                         ) {
-                            timeDisplayMode = if (timeDisplayMode == "MIN") "CLOCK" else "MIN"
+                            timeDisplayMode = if (timeDisplayMode == TimeFormat.MODE_MIN) TimeFormat.MODE_CLOCK else TimeFormat.MODE_MIN
                         }
                 )
             }
@@ -971,6 +1003,9 @@ fun WidgetFlatDepartureRow(
     timeDisplayMode: String, 
     isWarning: Boolean, 
     groupedFontSize: String = "STANDARD",
+    countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
+    clockFormat: String = TimeFormat.DEFAULT_CLOCK,
+    now: java.time.Instant = java.time.Instant.now(),
     onInfoClick: (InfoDialogData) -> Unit = {}
 ) {
     Column(
@@ -1007,20 +1042,9 @@ fun WidgetFlatDepartureRow(
                 modifier = Modifier.weight(1f)
             )
 
-            val minutes = try {
-                val depTime = java.time.Instant.parse(dep.departureTime)
-                java.time.Duration.between(java.time.Instant.now(), depTime).toMinutes()
-            } catch (e: Exception) { -1L }
-
-            val timeText = if (timeDisplayMode == "CLOCK") {
-                try {
-                    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                        .withZone(java.time.ZoneId.systemDefault())
-                        .format(java.time.Instant.parse(dep.departureTime))
-                } catch (e: Exception) { "--:--" }
-            } else {
-                if (minutes in 0..60) "$minutes min" else "-- min"
-            }
+            val timeText = TimeFormat.formatDepartureTime(
+                timeDisplayMode, dep.departureTime, countdownFormat, clockFormat, isWarning, now = now
+            )
 
             val hasDelay = (dep.delayMinutes ?: 0) > 0
             val delayText = if (hasDelay) " (+${dep.delayMinutes})" else ""
@@ -1048,19 +1072,7 @@ fun WidgetFlatDepartureRow(
                 if (subsequentDepartures.isNotEmpty()) {
                     val subFontSize = groupedSubFontSize(groupedFontSize)
                     val subText = subsequentDepartures.joinToString(", ") { subDep ->
-                        var t = if (timeDisplayMode == "CLOCK") {
-                            try {
-                                java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                                    .withZone(java.time.ZoneId.systemDefault())
-                                    .format(java.time.Instant.parse(subDep.departureTime))
-                            } catch (e: Exception) { "--:--" }
-                        } else {
-                            try {
-                                val dTime = java.time.Instant.parse(subDep.departureTime)
-                                val m = java.time.Duration.between(java.time.Instant.now(), dTime).toMinutes()
-                                if (m <= 0) "0m" else "${m}m"
-                            } catch (e: Exception) { "?" }
-                        }
+                        var t = TimeFormat.formatShortTime(timeDisplayMode, subDep.departureTime, now = now)
                         if (subDep.isCancelled) t = t.map { it + "\u0336" }.joinToString("")
                         t
                     }

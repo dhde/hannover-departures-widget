@@ -20,6 +20,7 @@ class WidgetSessionStore(private val context: Context) {
         private val PICKER_FILTER_OVERRIDE = stringPreferencesKey("picker_filter_override")
         private val PICKER_LOC_LAT = doublePreferencesKey("picker_loc_lat")
         private val PICKER_LOC_LON = doublePreferencesKey("picker_loc_lon")
+        private val LAST_GPS_TICK_TS = longPreferencesKey("last_gps_tick_ts")
     }
 
     fun debugModeFlow(): Flow<Boolean> =
@@ -33,10 +34,10 @@ class WidgetSessionStore(private val context: Context) {
     }
 
     fun getTimeDisplayModeFlow(): Flow<String> =
-        context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] ?: "MIN" }
+        context.cacheDataStore.data.map { TimeFormat.normalizeMode(it[TIME_DISPLAY_MODE]) }
 
     suspend fun getTimeDisplayMode(): String =
-        context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] }.first() ?: "MIN"
+        TimeFormat.normalizeMode(context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] }.first())
 
     suspend fun setTimeDisplayMode(mode: String) {
         context.cacheDataStore.edit { it[TIME_DISPLAY_MODE] = mode }
@@ -136,6 +137,13 @@ class WidgetSessionStore(private val context: Context) {
         val prefs = context.cacheDataStore.data.first()
         val lat = prefs[PICKER_LOC_LAT]; val lon = prefs[PICKER_LOC_LON]
         return if (lat != null && lon != null) lat to lon else null
+    }
+
+    suspend fun getLastGpsTickTs(): Long =
+        context.cacheDataStore.data.map { it[LAST_GPS_TICK_TS] }.first() ?: 0L
+
+    suspend fun setLastGpsTickTs(ts: Long) {
+        context.cacheDataStore.edit { it[LAST_GPS_TICK_TS] = ts }
     }
 
     suspend fun clearPickerState() {

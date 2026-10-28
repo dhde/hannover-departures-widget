@@ -19,6 +19,7 @@ import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.NearestStationsFinder
 import de.dhde.hannover.departures.widget.data.StopCandidate
 import de.dhde.hannover.departures.widget.data.StopsRepository
+import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.data.TrackedMessage
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
@@ -277,7 +278,8 @@ class ToggleTimeDisplayAction : ActionCallback {
     ) {
         val session = WidgetSessionStore(context)
         val current = session.getTimeDisplayMode()
-        session.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
+        val nextMode = if (current == TimeFormat.MODE_MIN) TimeFormat.MODE_CLOCK else TimeFormat.MODE_MIN
+        session.setTimeDisplayMode(nextMode)
         // Nur API-Refresh auslösen, wenn der Nutzer es aktiviert hat (Default: AUS)
         val autoRefresh = FavoritesRepository(context).getAutoRefreshOnInteractionNow()
         if (autoRefresh) {

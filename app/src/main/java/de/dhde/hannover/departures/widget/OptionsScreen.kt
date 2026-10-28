@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.R
 import kotlinx.coroutines.launch
-import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,6 +49,9 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
     val allowDuplicates by repo.allowDuplicatesFlow.collectAsState(initial = false)
     val nearestCount by repo.nearestCountFlow.collectAsState(initial = 3)
+    // null bis geladen, damit FormatPicker mit dem gespeicherten Muster startet
+    val countdownFormat by repo.countdownFormatFlow.collectAsState(initial = null)
+    val clockFormat by repo.clockFormatFlow.collectAsState(initial = null)
 
     var showDuplicatesWarning by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
@@ -96,6 +98,8 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         de.dhde.hannover.departures.widget.widget.ScreenOnRefreshManager.ensureState(context, false)
                         repo.setAllowDuplicates(false)
                         repo.setNearestCount(3)
+                        repo.setCountdownFormat(de.dhde.hannover.departures.widget.data.TimeFormat.DEFAULT_COUNTDOWN)
+                        repo.setClockFormat(de.dhde.hannover.departures.widget.data.TimeFormat.DEFAULT_CLOCK)
                     }
                     showResetConfirm = false
                 }) { Text("Zurücksetzen", color = UestraColors.AccentRed) }
@@ -152,6 +156,11 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 repo = repo,
                 scope = scope
             )
+        }
+        item {
+            val cf = countdownFormat
+            val kf = clockFormat
+            if (cf != null && kf != null) TimeFormatCard(cf, kf, repo, scope)
         }
         item { OptionsGroupHeader("Größe & Layout") }
         item {
@@ -224,10 +233,6 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                 Text("Auf Standard zurücksetzen")
             }
         }
-    }
-
-    LaunchedEffect(maxFavsFlow, maxFavRowsFlow, maxRowsFlow, transportTypes, ignoredMessages, favoritesHeight, filterHeight, autoRefreshOnInteraction, refreshOnScreenOn, groupDepartures, maxGroupedDeparturesFlow, groupedFontSize, allowDuplicates) {
-        de.dhde.hannover.departures.widget.widget.DeparturesWidget().updateAll(context)
     }
 }
 

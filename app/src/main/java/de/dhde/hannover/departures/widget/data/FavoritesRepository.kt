@@ -78,6 +78,8 @@ class FavoritesRepository(private val context: Context) {
         val SEEN_MESSAGES_KEY    = stringPreferencesKey("seen_messages_json")
         val GROUP_FONT_SIZE_KEY  = stringPreferencesKey("group_font_size")  // "KLEIN" | "STANDARD" | "GROSS"
         val ALLOW_DUPLICATES_KEY = booleanPreferencesKey("allow_duplicates")
+        val COUNTDOWN_FORMAT_KEY = stringPreferencesKey("countdown_format")
+        val CLOCK_FORMAT_KEY     = stringPreferencesKey("clock_format")
         private val NEAREST_COUNT = intPreferencesKey("nearest_count")
         private const val DEFAULT_NEAREST_COUNT = 3
         private const val MIN_NEAREST_COUNT = 2
@@ -454,6 +456,22 @@ class FavoritesRepository(private val context: Context) {
 
     suspend fun setGroupedFontSize(size: String) {
         context.dataStore.edit { prefs -> prefs[GROUP_FONT_SIZE_KEY] = size }
+    }
+
+    // ── Zeitformate (siehe TimeFormat) ───────────────────────────────────────
+
+    val countdownFormatFlow: Flow<String> = context.dataStore.data
+        .map { prefs -> prefs[COUNTDOWN_FORMAT_KEY]?.takeIf { it.isNotBlank() } ?: TimeFormat.DEFAULT_COUNTDOWN }
+
+    suspend fun setCountdownFormat(pattern: String) {
+        context.dataStore.edit { prefs -> prefs[COUNTDOWN_FORMAT_KEY] = pattern }
+    }
+
+    val clockFormatFlow: Flow<String> = context.dataStore.data
+        .map { prefs -> prefs[CLOCK_FORMAT_KEY]?.takeIf { it.isNotBlank() } ?: TimeFormat.DEFAULT_CLOCK }
+
+    suspend fun setClockFormat(pattern: String) {
+        context.dataStore.edit { prefs -> prefs[CLOCK_FORMAT_KEY] = pattern }
     }
 }
 
