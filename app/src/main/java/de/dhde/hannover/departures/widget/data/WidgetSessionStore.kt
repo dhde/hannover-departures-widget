@@ -34,10 +34,10 @@ class WidgetSessionStore(private val context: Context) {
     }
 
     fun getTimeDisplayModeFlow(): Flow<String> =
-        context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] ?: "MIN" }
+        context.cacheDataStore.data.map { TimeFormat.normalizeMode(it[TIME_DISPLAY_MODE]) }
 
     suspend fun getTimeDisplayMode(): String =
-        context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] }.first() ?: "MIN"
+        TimeFormat.normalizeMode(context.cacheDataStore.data.map { it[TIME_DISPLAY_MODE] }.first())
 
     suspend fun setTimeDisplayMode(mode: String) {
         context.cacheDataStore.edit { it[TIME_DISPLAY_MODE] = mode }
