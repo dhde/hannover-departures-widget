@@ -32,6 +32,9 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {
                 val session = WidgetSessionStore(context)
+                // Ohne geänderten State recomposed Glance innerhalb einer laufenden Session nicht –
+                // dann bliebe die Anzeige stehen und der nächste Tick würde nie geplant.
+                session.setLastTickTs(System.currentTimeMillis())
                 if (session.isPickerModeActive() &&
                     System.currentTimeMillis() - session.getPickerOpenedAt() > 60_000L) {
                     de.dhde.hannover.departures.widget.debug.DebugLog.log("[picker] timeout after 60s, closing")
