@@ -63,6 +63,41 @@ class TimeFormatTest {
         assertFalse("unbekannter Platzhalter", TimeFormat.isValidCountdownPattern("{h}:{m}"))
     }
 
+    @Test
+    fun countdown_blankResultFallsBackToDefault() {
+        assertEquals("35s", TimeFormat.formatCountdown("[{m} Min ]", 35))
+        assertEquals("3 Min", TimeFormat.formatCountdown("[{s}s]", 180))
+    }
+
+    @Test
+    fun countdown_secondsPrecisionBoundary() {
+        assertEquals("1 Min 59s", TimeFormat.formatCountdown(TimeFormat.DEFAULT_COUNTDOWN, 119))
+        assertEquals("2 Min", TimeFormat.formatCountdown(TimeFormat.DEFAULT_COUNTDOWN, 121))
+        assertEquals("2:00", TimeFormat.formatCountdown("{m}:{ss}", 130))
+    }
+
+    @Test
+    fun showsSeconds() {
+        assertTrue(TimeFormat.showsSeconds("MIN", TimeFormat.DEFAULT_COUNTDOWN))
+        assertTrue(TimeFormat.showsSeconds("MIN", "{m}:{ss}"))
+        assertFalse(TimeFormat.showsSeconds("MIN", "{m} Min"))
+        assertFalse(TimeFormat.showsSeconds("MIN", "{m}'"))
+        assertFalse("Uhrzeit-Modus", TimeFormat.showsSeconds("CLOCK", TimeFormat.DEFAULT_COUNTDOWN))
+        assertFalse("Legacy CLOCK_SEC", TimeFormat.showsSeconds("CLOCK_SEC", "{m}:{ss}"))
+        assertTrue("ungültig → Default mit Sekunden", TimeFormat.showsSeconds("MIN", "ohne Platzhalter"))
+    }
+
+    @Test
+    fun isStillVisible() {
+        val iso = dep.toString()
+        assertTrue(TimeFormat.isStillVisible(iso, dep.minusSeconds(60)))
+        assertTrue(TimeFormat.isStillVisible(iso, dep.plusSeconds(9)))
+        assertFalse(TimeFormat.isStillVisible(iso, dep.plusSeconds(10)))
+        assertFalse(TimeFormat.isStillVisible(iso, dep.plusSeconds(60)))
+        assertTrue("unparsebar bleibt sichtbar", TimeFormat.isStillVisible("kaputt", dep))
+        assertTrue("null bleibt sichtbar", TimeFormat.isStillVisible(null, dep))
+    }
+
     // ── Uhrzeit ───────────────────────────────────────────────────────────
 
     @Test

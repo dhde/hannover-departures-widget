@@ -518,15 +518,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         }
         typeMatch && dirMatch
     }
-    .filter {
-        // Zeit-Filter: Abfahrten bis 10 s nach Abfahrt noch zeigen (wie im Widget)
-        try {
-            val secs = java.time.Duration.between(java.time.Instant.now(), java.time.Instant.parse(it.departureTime)).seconds
-            secs > -10
-        } catch (e: Exception) {
-            true
-        }
-    }
+    // Zeit-Filter: Abfahrten bis 10 s nach Abfahrt noch zeigen (wie im Widget)
+    .filter { TimeFormat.isStillVisible(it.departureTime) }
 
     val messagesDeps = filtered.map { dep ->
         dep.copy(messages = de.dhde.hannover.departures.widget.data.filterMessages(dep.messages, ignoredMessages))

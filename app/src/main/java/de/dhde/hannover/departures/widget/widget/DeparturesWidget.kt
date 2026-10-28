@@ -354,14 +354,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 typeMatch && dirMatch
             }
             // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie in App-Vorschau)
-            .filter {
-                try {
-                    val secs = Duration.between(Instant.now(), Instant.parse(it.departureTime)).seconds
-                    secs > -10
-                } catch (e: Exception) {
-                    true
-                }
-            }
+            .filter { TimeFormat.isStillVisible(it.departureTime) }
 
             // Meldungen nur aus den (per Tab/Richtung) sichtbaren Abfahrten, ausgeblendete entfernt.
             val messagesDeps = filtered.map { dep ->

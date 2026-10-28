@@ -87,7 +87,21 @@ object TimeFormat {
             val values = PLACEHOLDER.findAll(inner).map { if (it.groupValues[1] == "m") m else s }.toList()
             if (values.isNotEmpty() && values.all { it == 0L }) "" else fill(inner)
         }
-        return fill(withoutBrackets).trim()
+        // Ein gültiges Muster kann leer ergeben (z. B. "[{m} Min ]" bei 35 s) – dann Default.
+        return fill(withoutBrackets).trim().ifBlank { formatCountdown(DEFAULT_COUNTDOWN, secs) }
+    }
+
+    /** Zeigt die Hauptzeit Sekunden an (dann braucht das Widget den 10-s-Takt)? */
+    fun showsSeconds(mode: String, countdownPattern: String): Boolean {
+        if (normalizeMode(mode) != MODE_MIN) return false
+        val p = if (isValidCountdownPattern(countdownPattern)) countdownPattern else DEFAULT_COUNTDOWN
+        return PLACEHOLDER.findAll(p).any { it.groupValues[1] != "m" }
+    }
+
+    /** Abfahrten bleiben bis 10 s nach Abfahrt sichtbar; unparsebare Zeiten bleiben stehen. */
+    fun isStillVisible(isoTime: String?, now: Instant = Instant.now()): Boolean {
+        val dep = parse(isoTime) ?: return true
+        return Duration.between(now, dep).seconds > -10
     }
 
     fun formatClock(pattern: String, instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
