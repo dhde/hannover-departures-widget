@@ -133,6 +133,19 @@ class TimeFormatTest {
     }
 
     @Test
+    fun departureTime_lastMinuteWithoutSecondsShowsJetzt() {
+        val iso = dep.toString()
+        val now = dep.minusSeconds(35)
+        assertEquals("jetzt", TimeFormat.formatDepartureTime("MIN", iso, "{m} Min", "HH:mm", false, now, berlin))
+        assertEquals("jetzt", TimeFormat.formatDepartureTime("MIN", iso, "{m}'", "HH:mm", false, now, berlin))
+        assertEquals("evtl. weg?", TimeFormat.formatDepartureTime("MIN", iso, "{m} Min", "HH:mm", true, now, berlin))
+        // Mit Sekunden im Muster bleibt der Countdown sichtbar
+        assertEquals("35s", TimeFormat.formatDepartureTime("MIN", iso, TimeFormat.DEFAULT_COUNTDOWN, "HH:mm", false, now, berlin))
+        // Ab einer vollen Minute wieder normal
+        assertEquals("1 Min", TimeFormat.formatDepartureTime("MIN", iso, "{m} Min", "HH:mm", false, dep.minusSeconds(60), berlin))
+    }
+
+    @Test
     fun departureTime_departedOrInvalid() {
         val iso = dep.toString()
         assertEquals("jetzt", TimeFormat.formatDepartureTime("MIN", iso, TimeFormat.DEFAULT_COUNTDOWN, "HH:mm", false, dep, berlin))

@@ -125,7 +125,9 @@ object TimeFormat {
         val dep = parse(isoTime) ?: return "?"
         if (normalizeMode(mode) == MODE_CLOCK) return formatClock(clockPattern, dep, zone)
         val secs = Duration.between(now, dep).seconds
-        return if (secs <= 0) (if (isWarning) "evtl. weg?" else "jetzt") else formatCountdown(countdownPattern, secs)
+        // Ohne Sekunden im Muster gilt die letzte Minute als "jetzt" (wie bis v1.9.7), statt "0 Min"
+        val departingNow = secs <= 0 || (secs < 60 && !showsSeconds(mode, countdownPattern))
+        return if (departingNow) (if (isWarning) "evtl. weg?" else "jetzt") else formatCountdown(countdownPattern, secs)
     }
 
     /** Kurzzeile der gruppierten Folgeabfahrten – bewusst fest und kompakt. */
