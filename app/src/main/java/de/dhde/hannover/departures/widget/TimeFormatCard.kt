@@ -73,11 +73,21 @@ private fun FormatPicker(
     var customChoice by remember { mutableStateOf<Boolean?>(null) }
     val customMode = customChoice ?: presets.none { it.first == current }
     var text by remember { mutableStateOf(current) }
+    // zuletzt von diesem Picker gespeichertes Muster; Abweichungen in `current` kommen von außen (z. B. Zurücksetzen)
+    var lastSaved by remember { mutableStateOf(current) }
+    val save = { p: String -> lastSaved = p; onSave(p) }
+    LaunchedEffect(current) {
+        if (current != lastSaved) {
+            customChoice = null
+            text = current
+            lastSaved = current
+        }
+    }
     val radioColors = RadioButtonDefaults.colors(selectedColor = UestraColors.Teal)
 
     Text(title, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     presets.forEach { (pattern, label) ->
-        val select = { customChoice = false; onSave(pattern) }
+        val select = { customChoice = false; save(pattern) }
         Row(
             modifier = Modifier.fillMaxWidth().clickable(onClick = select),
             verticalAlignment = Alignment.CenterVertically
@@ -86,7 +96,7 @@ private fun FormatPicker(
             Text(label, color = UestraColors.TextMain, fontSize = 14.sp)
         }
     }
-    val selectCustom = { customChoice = true; text = current }
+    val selectCustom = { if (!customMode) text = current; customChoice = true }
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = selectCustom),
         verticalAlignment = Alignment.CenterVertically
@@ -98,7 +108,7 @@ private fun FormatPicker(
         val valid = isValid(text)
         OutlinedTextField(
             value = text,
-            onValueChange = { text = it; if (isValid(it)) onSave(it) },
+            onValueChange = { text = it; if (isValid(it)) save(it) },
             isError = !valid,
             singleLine = true,
             label = { Text("Muster") },
