@@ -32,3 +32,6 @@ local_tools/
 
 # Superpowers brainstorming specs (bleiben lokal, nie committen)
 docs/superpowers/
+
+# Claude
+.claude/

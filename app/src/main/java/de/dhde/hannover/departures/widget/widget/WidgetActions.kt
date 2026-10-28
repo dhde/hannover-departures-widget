@@ -277,7 +277,12 @@ class ToggleTimeDisplayAction : ActionCallback {
     ) {
         val session = WidgetSessionStore(context)
         val current = session.getTimeDisplayMode()
-        session.setTimeDisplayMode(if (current == "MIN") "CLOCK" else "MIN")
+        val nextMode = when (current) {
+            "MIN" -> "CLOCK"
+            "CLOCK" -> "CLOCK_SEC"
+            else -> "MIN"
+        }
+        session.setTimeDisplayMode(nextMode)
         // Nur API-Refresh auslösen, wenn der Nutzer es aktiviert hat (Default: AUS)
         val autoRefresh = FavoritesRepository(context).getAutoRefreshOnInteractionNow()
         if (autoRefresh) {

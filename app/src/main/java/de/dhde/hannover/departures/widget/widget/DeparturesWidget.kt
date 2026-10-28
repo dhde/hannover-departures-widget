@@ -27,6 +27,7 @@ import androidx.glance.text.*
 import androidx.glance.unit.ColorProvider
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.action.ActionParameters
+import de.dhde.hannover.departures.widget.debug.DebugLog
 import androidx.glance.appwidget.appWidgetBackground
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -69,7 +70,7 @@ import androidx.glance.LocalContext
 import androidx.glance.appwidget.CircularProgressIndicator
 
 object WidgetTicker {
-    fun scheduleNextTick(context: Context) {
+    fun scheduleNextTick(context: Context, nextDepartureIso: String? = null) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, DeparturesWidgetReceiver::class.java).apply {
             action = "de.dhde.hannover.departures.widget.TICK"
@@ -80,7 +81,26 @@ object WidgetTicker {
         )
         val now = System.currentTimeMillis()
         val nextMinute = now + (60000L - (now % 60000L))
-        alarmManager.setWindow(AlarmManager.RTC, nextMinute, 1000L, pendingIntent)
+        
+        var targetTime = nextMinute
+        if (nextDepartureIso != null) {
+            try {
+                val depInstant = java.time.Instant.parse(nextDepartureIso)
+                val depMs = depInstant.toEpochMilli()
+                val diffSec = (depMs - now) / 1000L
+                if (diffSec <= 60) {
+                    targetTime = now + 10_000L
+                } else if (diffSec <= 120) {
+                    val target60sMs = depMs - 60_000L
+                    if (target60sMs > now) {
+                        targetTime = minOf(target60sMs, nextMinute)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        
+        DebugLog.log("[ticker] scheduling next tick for " + targetTime)
+        alarmManager.setWindow(AlarmManager.RTC, targetTime, 1000L, pendingIntent)
     }
     fun cancelTick(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -163,6 +183,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val directionState by filters.getDirectionStateFlow(stationId).collectAsState(initial = DirectionFilter.ALL)
             val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
             val timeDisplayMode by session.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
+            val lastTickTs by session.lastTickTsFlow().collectAsState(initial = 0L)
 
             val cachedJson by cache.getDeparturesJsonFlow(stationId).collectAsState(initial = "[]")
             val lastUpdated by cache.getLastUpdatedFlow(stationId).collectAsState(initial = "")
@@ -201,7 +222,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 // isRefreshing-Flags greifen kann und ein hängender Zustand
                 // beim nächsten Tick zurückgesetzt wird.
                 if (hasFutureDepartures || isRefreshing || errorState.isNotEmpty()) {
-                    WidgetTicker.scheduleNextTick(context)
+                    val nextIso = flatDepartures.firstOrNull()?.departureTime
+                    WidgetTicker.scheduleNextTick(context, nextIso)
                 } else {
                     WidgetTicker.cancelTick(context)
                 }
@@ -217,6 +239,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 tabState        = tabState,
                 directionState  = directionState,
                 gpsModeActive   = gpsModeActive,
+                lastTickTs      = lastTickTs,
                 timeDisplayMode = timeDisplayMode,
                 status          = if (errorState.isNotEmpty()) "error" else "ok",
                 errorMsg        = errorState,
@@ -249,6 +272,7 @@ class DeparturesWidget : GlanceAppWidget() {
         favorites: List<FavoriteStation>,
         tabState: TransportFilter,
         directionState: DirectionFilter,
+        lastTickTs: Long,
         gpsModeActive: Boolean,
         timeDisplayMode: String,
         status: String,
@@ -321,6 +345,15 @@ class DeparturesWidget : GlanceAppWidget() {
                     else -> true
                 }
                 typeMatch && dirMatch
+            }
+            // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie in App-Vorschau)
+            .filter {
+                try {
+                    val secs = Duration.between(Instant.now(), Instant.parse(it.departureTime)).seconds
+                    secs > -10
+                } catch (e: Exception) {
+                    true
+                }
             }
 
             // Meldungen nur aus den (per Tab/Richtung) sichtbaren Abfahrten, ausgeblendete entfernt.
@@ -852,10 +885,21 @@ class DeparturesWidget : GlanceAppWidget() {
             )
 
 
-            val timeText = if (timeDisplayMode == "CLOCK") {
-                clockTime(departure.departureTime)
-            } else {
-                minutesUntil(departure.departureTime, isWarning)
+            val timeText = when (timeDisplayMode) {
+                "CLOCK" -> clockTime(departure.departureTime, includeSeconds = true)
+                "CLOCK_SEC" -> clockTime(departure.departureTime, includeSeconds = true)
+                else -> {
+                    try {
+                        val secs = Duration.between(Instant.now(), Instant.parse(departure.departureTime)).seconds
+                        when {
+                            secs <= 0 -> if (isWarning) "evtl. weg?" else "jetzt"
+                            secs < 120 -> "${secs / 60} Min ${secs % 60}s".replace("0 Min ", "")
+                            else -> "${secs / 60} Min"
+                        }
+                    } catch (_: Exception) {
+                        minutesUntil(departure.departureTime, isWarning)
+                    }
+                }
             }
 
             val hasDelay = (departure.delayMinutes ?: 0) > 0
@@ -886,7 +930,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     }
                     val subText = subsequentDepartures.joinToString(", ") { dep ->
                         // Keine Verspätung in der Gruppen-Kurzansicht
-                        val t = if (timeDisplayMode == "CLOCK") clockTime(dep.departureTime) else minutesUntil(dep.departureTime, isWarning).replace(" min", "m").replace("jetzt", "0m").replace("in ", "")
+                        val t = if (timeDisplayMode == "CLOCK" || timeDisplayMode == "CLOCK_SEC") clockTime(dep.departureTime) else minutesUntil(dep.departureTime, isWarning).replace(" min", "m").replace("jetzt", "0m").replace("in ", "")
                         var res = t
                         if (dep.isCancelled) res = res.map { it + "\u0336" }.joinToString("")
                         res
@@ -1093,12 +1137,12 @@ class DeparturesWidget : GlanceAppWidget() {
         } catch (e: DateTimeParseException) { "?" }
     }
 
-    private fun clockTime(isoTime: String?): String {
+    private fun clockTime(isoTime: String?, includeSeconds: Boolean = false): String {
         if (isoTime == null) return "?"
         return try {
             val instant = Instant.parse(isoTime)
             java.time.format.DateTimeFormatter
-                .ofPattern("HH:mm")
+                .ofPattern(if (includeSeconds) "HH:mm:ss" else "HH:mm")
                 .withZone(java.time.ZoneId.systemDefault())
                 .format(instant)
         } catch (e: DateTimeParseException) { "?" }

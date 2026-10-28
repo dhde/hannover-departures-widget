@@ -497,6 +497,15 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         }
         typeMatch && dirMatch
     }
+    .filter {
+        // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie im Widget)
+        try {
+            val secs = java.time.Duration.between(java.time.Instant.now(), java.time.Instant.parse(it.departureTime)).seconds
+            secs > 0
+        } catch (e: Exception) {
+            true
+        }
+    }
 
     val messagesDeps = filtered.map { dep ->
         dep.copy(messages = de.dhde.hannover.departures.widget.data.filterMessages(dep.messages, ignoredMessages))
@@ -656,7 +665,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             indication = null
                         ) {
-                            timeDisplayMode = if (timeDisplayMode == "MIN") "CLOCK" else "MIN"
+                            timeDisplayMode = when (timeDisplayMode) { "MIN" -> "CLOCK"; "CLOCK" -> "CLOCK_SEC"; else -> "MIN" }
                         }
                 )
             }
@@ -1007,19 +1016,17 @@ fun WidgetFlatDepartureRow(
                 modifier = Modifier.weight(1f)
             )
 
-            val minutes = try {
-                val depTime = java.time.Instant.parse(dep.departureTime)
-                java.time.Duration.between(java.time.Instant.now(), depTime).toMinutes()
-            } catch (e: Exception) { -1L }
-
-            val timeText = if (timeDisplayMode == "CLOCK") {
-                try {
-                    java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                        .withZone(java.time.ZoneId.systemDefault())
-                        .format(java.time.Instant.parse(dep.departureTime))
-                } catch (e: Exception) { "--:--" }
-            } else {
-                if (minutes in 0..60) "$minutes min" else "-- min"
+            val timeText = when (timeDisplayMode) {
+                "CLOCK" -> clockTime(dep.departureTime)
+                "CLOCK_SEC" -> clockTime(dep.departureTime, includeSeconds = true)
+                else -> {
+                    val secs = try { java.time.Duration.between(java.time.Instant.now(), java.time.Instant.parse(dep.departureTime)).seconds } catch (e: Exception) { 0L }
+                    when {
+                        secs <= 0 -> if (isWarning) "evtl. weg?" else "jetzt"
+                        secs < 60 -> "${secs}s"
+                        else -> "${secs / 60} Min"
+                    }
+                }
             }
 
             val hasDelay = (dep.delayMinutes ?: 0) > 0
@@ -1048,18 +1055,11 @@ fun WidgetFlatDepartureRow(
                 if (subsequentDepartures.isNotEmpty()) {
                     val subFontSize = groupedSubFontSize(groupedFontSize)
                     val subText = subsequentDepartures.joinToString(", ") { subDep ->
-                        var t = if (timeDisplayMode == "CLOCK") {
-                            try {
-                                java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                                    .withZone(java.time.ZoneId.systemDefault())
-                                    .format(java.time.Instant.parse(subDep.departureTime))
-                            } catch (e: Exception) { "--:--" }
+                        var t = if (timeDisplayMode == "CLOCK" || timeDisplayMode == "CLOCK_SEC") {
+                            clockTime(subDep.departureTime)
                         } else {
-                            try {
-                                val dTime = java.time.Instant.parse(subDep.departureTime)
-                                val m = java.time.Duration.between(java.time.Instant.now(), dTime).toMinutes()
-                                if (m <= 0) "0m" else "${m}m"
-                            } catch (e: Exception) { "?" }
+                            val m = try { java.time.Duration.between(java.time.Instant.now(), java.time.Instant.parse(subDep.departureTime)).toMinutes() } catch (e: Exception) { 0L }
+                            if (m <= 0) "0m" else "${m}m"
                         }
                         if (subDep.isCancelled) t = t.map { it + "\u0336" }.joinToString("")
                         t
@@ -1089,6 +1089,17 @@ fun WidgetFlatDepartureRow(
             }
         }
     }
+}
+
+private fun clockTime(isoTime: String?, includeSeconds: Boolean = false): String {
+    if (isoTime == null) return "?"
+    return try {
+        val instant = java.time.Instant.parse(isoTime)
+        java.time.format.DateTimeFormatter
+            .ofPattern(if (includeSeconds) "HH:mm:ss" else "HH:mm")
+            .withZone(java.time.ZoneId.systemDefault())
+            .format(instant)
+    } catch (e: Exception) { "?" }
 }
 
 @Composable
