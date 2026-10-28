@@ -42,6 +42,7 @@ import de.dhde.hannover.departures.widget.data.DeparturesCache
 import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
 import de.dhde.hannover.departures.widget.data.TransportFilter
+import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.data.filterMessages
 import de.dhde.hannover.departures.widget.api.LineMessages
 import de.dhde.hannover.departures.widget.data.lineDirection
@@ -59,7 +60,6 @@ import de.dhde.hannover.departures.widget.widget.ClosePickerAction
 import de.dhde.hannover.departures.widget.widget.EnableAutoFollowAction
 import de.dhde.hannover.departures.widget.data.StopCandidate
 import java.time.Instant
-import java.time.format.DateTimeParseException
 import java.time.Duration
 import de.dhde.hannover.departures.widget.R
 import android.app.AlarmManager
@@ -197,6 +197,8 @@ class DeparturesWidget : GlanceAppWidget() {
             val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
             val maxGroupedDepartures by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
             val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
+            val countdownFormat by repo.countdownFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_COUNTDOWN)
+            val clockFormat by repo.clockFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_CLOCK)
 
             val departures: List<DepartureItem> = try {
                 val list: List<DepartureItem> = gson.fromJson(cachedJson, TypeToken.getParameterized(List::class.java, DepartureItem::class.java).type)
@@ -256,6 +258,8 @@ class DeparturesWidget : GlanceAppWidget() {
                 groupDepartures  = groupDepartures,
                 maxGroupedDepartures = maxGroupedDepartures,
                 groupedFontSize  = groupedFontSize,
+                countdownFormat  = countdownFormat,
+                clockFormat      = clockFormat,
                 activeFavUniqueId = activeFavUniqueId,
                 pickerMode       = pickerMode,
                 pickerCandidatesJson = pickerCandidatesJson,
@@ -289,6 +293,8 @@ class DeparturesWidget : GlanceAppWidget() {
         groupDepartures: Boolean,
         maxGroupedDepartures: Int,
         groupedFontSize: String = "STANDARD",
+        countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
+        clockFormat: String = TimeFormat.DEFAULT_CLOCK,
         activeFavUniqueId: String? = null,
         pickerMode: Boolean = false,
         pickerCandidatesJson: String? = null,
@@ -442,7 +448,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 } else {
                     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                         items(limitedFiltered) { (departure, subsequent) ->
-                            FlatDepartureRow(departure, subsequent, timeDisplayMode, isWarning, groupedFontSize)
+                            FlatDepartureRow(departure, subsequent, timeDisplayMode, isWarning, groupedFontSize, countdownFormat, clockFormat)
                         }
                     }
                     
@@ -851,7 +857,15 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FlatDepartureRow(departure: FlatDeparture, subsequentDepartures: List<FlatDeparture>, timeDisplayMode: String, isWarning: Boolean, groupedFontSize: String = "STANDARD") {
+    private fun FlatDepartureRow(
+        departure: FlatDeparture,
+        subsequentDepartures: List<FlatDeparture>,
+        timeDisplayMode: String,
+        isWarning: Boolean,
+        groupedFontSize: String = "STANDARD",
+        countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
+        clockFormat: String = TimeFormat.DEFAULT_CLOCK
+    ) {
         Column(
             modifier = GlanceModifier
                 .fillMaxWidth()
@@ -886,22 +900,9 @@ class DeparturesWidget : GlanceAppWidget() {
             )
 
 
-            val timeText = when (timeDisplayMode) {
-                "CLOCK" -> clockTime(departure.departureTime)
-                "CLOCK_SEC" -> clockTime(departure.departureTime, includeSeconds = true)
-                else -> {
-                    try {
-                        val secs = Duration.between(Instant.now(), Instant.parse(departure.departureTime)).seconds
-                        when {
-                            secs <= 0 -> if (isWarning) "evtl. weg?" else "jetzt"
-                            secs < 120 -> "${secs / 60} Min ${secs % 60}s".replace("0 Min ", "")
-                            else -> "${secs / 60} Min"
-                        }
-                    } catch (_: Exception) {
-                        minutesUntil(departure.departureTime, isWarning)
-                    }
-                }
-            }
+            val timeText = TimeFormat.formatDepartureTime(
+                timeDisplayMode, departure.departureTime, countdownFormat, clockFormat, isWarning
+            )
 
             val hasDelay = (departure.delayMinutes ?: 0) > 0
             val delayText = if (hasDelay) " (+${departure.delayMinutes})" else ""
@@ -931,7 +932,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     }
                     val subText = subsequentDepartures.joinToString(", ") { dep ->
                         // Keine Verspätung in der Gruppen-Kurzansicht
-                        val t = if (timeDisplayMode == "CLOCK" || timeDisplayMode == "CLOCK_SEC") clockTime(dep.departureTime) else minutesUntil(dep.departureTime, isWarning).replace(" min", "m").replace("jetzt", "0m").replace("in ", "")
+                        val t = TimeFormat.formatShortTime(timeDisplayMode, dep.departureTime)
                         var res = t
                         if (dep.isCancelled) res = res.map { it + "\u0336" }.joinToString("")
                         res
@@ -1122,30 +1123,5 @@ class DeparturesWidget : GlanceAppWidget() {
                     .clickable(actionStartActivity(openAppIntent))
             )
         }
-    }
-
-    private fun minutesUntil(isoTime: String?, isWarning: Boolean): String {
-        if (isoTime == null) return "?"
-        return try {
-            val eventTime = Instant.parse(isoTime)
-            val now = Instant.now()
-            val diffMinutes = Duration.between(now, eventTime).toMinutes()
-            when {
-                diffMinutes <= 0 -> if (isWarning) "evtl. weg?" else "jetzt"
-                diffMinutes == 1L -> "1 Min"
-                else -> "$diffMinutes Min"
-            }
-        } catch (e: DateTimeParseException) { "?" }
-    }
-
-    private fun clockTime(isoTime: String?, includeSeconds: Boolean = false): String {
-        if (isoTime == null) return "?"
-        return try {
-            val instant = Instant.parse(isoTime)
-            java.time.format.DateTimeFormatter
-                .ofPattern(if (includeSeconds) "HH:mm:ss" else "HH:mm")
-                .withZone(java.time.ZoneId.systemDefault())
-                .format(instant)
-        } catch (e: DateTimeParseException) { "?" }
     }
 }
