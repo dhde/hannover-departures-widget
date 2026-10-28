@@ -59,6 +59,7 @@ import de.dhde.hannover.departures.widget.data.NearestStationsFinder
 import de.dhde.hannover.departures.widget.data.StopCandidate
 import de.dhde.hannover.departures.widget.data.StopsRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
+import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.widget.WidgetTickerWorker
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.data.dataStore
@@ -425,6 +426,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     val groupDepartures by repo.groupDeparturesFlow.collectAsState(initial = true)
     val maxGroupedDepartures by repo.maxGroupedDeparturesFlow.collectAsState(initial = 2)
     val groupedFontSize by repo.groupedFontSizeFlow.collectAsState(initial = "STANDARD")
+    val countdownFormat by repo.countdownFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_COUNTDOWN)
+    val clockFormat by repo.clockFormatFlow.collectAsState(initial = TimeFormat.DEFAULT_CLOCK)
     
     var departures by remember { mutableStateOf<List<FlatDeparture>>(emptyList()) }
     var rawDepartures by remember { mutableStateOf<List<de.dhde.hannover.departures.widget.api.DepartureItem>>(emptyList()) }
@@ -670,7 +673,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(limitedFiltered) { (dep, subDeps) ->
-                        WidgetFlatDepartureRow(dep, subDeps, timeDisplayMode, isWarning, groupedFontSize, onInfoClick = onInfoClick)
+                        WidgetFlatDepartureRow(dep, subDeps, timeDisplayMode, isWarning, groupedFontSize, countdownFormat, clockFormat, onInfoClick = onInfoClick)
                     }
                 }
                 // Invisible box to toggle time display mode
@@ -683,7 +686,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             indication = null
                         ) {
-                            timeDisplayMode = when (timeDisplayMode) { "MIN" -> "CLOCK"; "CLOCK" -> "CLOCK_SEC"; else -> "MIN" }
+                            timeDisplayMode = if (timeDisplayMode == TimeFormat.MODE_MIN) TimeFormat.MODE_CLOCK else TimeFormat.MODE_MIN
                         }
                 )
             }
@@ -998,6 +1001,8 @@ fun WidgetFlatDepartureRow(
     timeDisplayMode: String, 
     isWarning: Boolean, 
     groupedFontSize: String = "STANDARD",
+    countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
+    clockFormat: String = TimeFormat.DEFAULT_CLOCK,
     onInfoClick: (InfoDialogData) -> Unit = {}
 ) {
     Column(
@@ -1034,18 +1039,9 @@ fun WidgetFlatDepartureRow(
                 modifier = Modifier.weight(1f)
             )
 
-            val timeText = when (timeDisplayMode) {
-                "CLOCK" -> clockTime(dep.departureTime)
-                "CLOCK_SEC" -> clockTime(dep.departureTime, includeSeconds = true)
-                else -> {
-                    val secs = try { java.time.Duration.between(java.time.Instant.now(), java.time.Instant.parse(dep.departureTime)).seconds } catch (e: Exception) { 0L }
-                    when {
-                        secs <= 0 -> if (isWarning) "evtl. weg?" else "jetzt"
-                        secs < 60 -> "${secs}s"
-                        else -> "${secs / 60} Min"
-                    }
-                }
-            }
+            val timeText = TimeFormat.formatDepartureTime(
+                timeDisplayMode, dep.departureTime, countdownFormat, clockFormat, isWarning
+            )
 
             val hasDelay = (dep.delayMinutes ?: 0) > 0
             val delayText = if (hasDelay) " (+${dep.delayMinutes})" else ""
@@ -1073,12 +1069,7 @@ fun WidgetFlatDepartureRow(
                 if (subsequentDepartures.isNotEmpty()) {
                     val subFontSize = groupedSubFontSize(groupedFontSize)
                     val subText = subsequentDepartures.joinToString(", ") { subDep ->
-                        var t = if (timeDisplayMode == "CLOCK" || timeDisplayMode == "CLOCK_SEC") {
-                            clockTime(subDep.departureTime)
-                        } else {
-                            val m = try { java.time.Duration.between(java.time.Instant.now(), java.time.Instant.parse(subDep.departureTime)).toMinutes() } catch (e: Exception) { 0L }
-                            if (m <= 0) "0m" else "${m}m"
-                        }
+                        var t = TimeFormat.formatShortTime(timeDisplayMode, subDep.departureTime)
                         if (subDep.isCancelled) t = t.map { it + "\u0336" }.joinToString("")
                         t
                     }
@@ -1107,17 +1098,6 @@ fun WidgetFlatDepartureRow(
             }
         }
     }
-}
-
-private fun clockTime(isoTime: String?, includeSeconds: Boolean = false): String {
-    if (isoTime == null) return "?"
-    return try {
-        val instant = java.time.Instant.parse(isoTime)
-        java.time.format.DateTimeFormatter
-            .ofPattern(if (includeSeconds) "HH:mm:ss" else "HH:mm")
-            .withZone(java.time.ZoneId.systemDefault())
-            .format(instant)
-    } catch (e: Exception) { "?" }
 }
 
 @Composable
