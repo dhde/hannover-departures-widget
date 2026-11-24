@@ -2,27 +2,22 @@
 set -e
 
 # Konfiguration
-TAG="v1.9.5"                    # Release-Tag (z. B. v1.0.0)
+TAG="v1.10.1"                   # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.9.5" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.10.1" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.9.5
+## Üstra Widget 1.10.1
 
-Wartungs- und Feinschliff-Release ohne funktionale Änderungen für Endnutzer.
+### 🚏 Steig-Filter statt City/Home
 
-### Unter der Haube
+Der Richtungsfilter (City/Home) war bei Bussen unzuverlässig: Linien, die in entgegengesetzte Richtungen fahren, landeten unter demselben Symbol (z.B. am Lister Platz die 100 und die 121). Die Richtungsangabe der Fahrplandaten gilt nämlich nur pro Linie, nicht für die Stadt.
 
-📦 Dependency-Update
-- Alle AndroidX-, Compose-, Glance-, Play-Services- und Coroutines-Bibliotheken auf aktuelle Stable-Versionen gehoben (Compose BOM 2026.08.00, Lifecycle 2.11, Core-KTX 1.19 usw.).
-- `compileSdk` auf 37 angehoben. `targetSdk`/`minSdk` unverändert.
-- Retrofit bewusst auf 2.9.0 belassen (2→3 mit OkHttp-4.12-Sprung folgt separat).
+- Gefiltert wird jetzt nach **Steig** (z.B. „SB1“, „Bus 2“). Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung.
+- Die Steig-Chips erscheinen in Widget und App, sobald ein Halt 2–4 Steige hat. An großen Halten erst per Bus/Bahn-Tab eingrenzen.
+- Der gewählte Steig wird pro Favorit gemerkt. Nochmal tippen zeigt wieder alle Abfahrten.
+- Wird der gemerkte Steig gerade nicht bedient, zeigt das Widget alle Abfahrten statt einer leeren Liste.
 
-📍 GPS-Fast-Path im Widget
-- Fused-Location-Cache wird zuerst geprüft (< 30 s alt → Millisekunden-Response), aktiver `getCurrentLocation(HIGH_ACCURACY)`-Fix nur als Fallback (Timeout 4 s statt 7 s).
-- GPS-Toggle löst nur noch einen API-Call aus, wenn sich die nächste Haltestelle wirklich geändert hat — sonst reines UI-Feedback ohne Netzwerk-Roundtrip.
-
-🐛 Debug-Screen (nur bei aktiviertem Debug-Modus)
-- JSON-Blöcke in Log-Zeilen werden jetzt pretty-printed und farbcodiert (Keys blau, Strings grün, Zahlen orange, `null` rot, Booleans lila).
+Hinweis: Bisher gespeicherte City/Home-Einstellungen werden auf „alle“ zurückgesetzt. Nach dem Update lädt die App die Haltestellenliste einmal neu.
 NOTES
 )  # Optional: Release-Notizen
 
