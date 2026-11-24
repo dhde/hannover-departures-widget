@@ -35,7 +35,10 @@ import de.dhde.hannover.departures.widget.api.DepartureItem
 import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.toFlatRows
 import de.dhde.hannover.departures.widget.api.UestraApi
-import de.dhde.hannover.departures.widget.data.DirectionFilter
+import de.dhde.hannover.departures.widget.data.PlatformOption
+import de.dhde.hannover.departures.widget.data.availablePlatforms
+import de.dhde.hannover.departures.widget.data.effectivePlatform
+import de.dhde.hannover.departures.widget.data.platformMatches
 import de.dhde.hannover.departures.widget.data.FavoriteStation
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.DeparturesCache
@@ -45,13 +48,12 @@ import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.data.filterMessages
 import de.dhde.hannover.departures.widget.api.LineMessages
-import de.dhde.hannover.departures.widget.data.lineDirection
 import de.dhde.hannover.departures.widget.ui.UestraColors
 import de.dhde.hannover.departures.widget.data.DEFAULT_STATION_ID
 import de.dhde.hannover.departures.widget.widget.RefreshAction
 import de.dhde.hannover.departures.widget.widget.ChangeTabAction
 import de.dhde.hannover.departures.widget.widget.ChangeStationAction
-import de.dhde.hannover.departures.widget.widget.ChangeDirectionAction
+import de.dhde.hannover.departures.widget.widget.ChangePlatformAction
 import de.dhde.hannover.departures.widget.widget.ToggleTimeDisplayAction
 import de.dhde.hannover.departures.widget.widget.OpenPickerAction
 import de.dhde.hannover.departures.widget.widget.PickCandidateAction
@@ -71,14 +73,21 @@ import androidx.glance.LocalContext
 import androidx.glance.appwidget.CircularProgressIndicator
 
 /** Ergebnis des Abfahrts-Filters: gefilterte Abfahrten und die tatsächlich gezeigten Zeilen. */
+/** Mehr Steig-Chips passen nicht neben die Verkehrsmittel-Buttons (Glance scrollt nicht). */
+internal const val MAX_PLATFORM_CHIPS = 4
+
 internal data class VisibleDepartures(
     val filtered: List<FlatDeparture>,
     /** Hauptabfahrt + gruppierte Folgeabfahrten, chronologisch und auf maxRows begrenzt. */
-    val rows: List<Pair<FlatDeparture, List<FlatDeparture>>>
+    val rows: List<Pair<FlatDeparture, List<FlatDeparture>>>,
+    /** Anwählbare Steige (nach Typ-/Tab-/Linienfilter, vor dem Steigfilter). */
+    val platforms: List<PlatformOption> = emptyList(),
+    /** Tatsächlich angewandter Steig (null = alle), siehe [effectivePlatform]. */
+    val activePlatform: String? = null
 )
 
 /**
- * Filter (Verkehrsmittel, Linien-Favorit, Tab, Richtung, Zeit), Gruppierung und
+ * Filter (Verkehrsmittel, Linien-Favorit, Tab, Steig, Zeit), Gruppierung und
  * maxRows-Begrenzung der Widget-Liste. Wird auch für den Ticker genutzt, damit der
  * Takt sich an genau den sichtbaren Zeilen orientiert.
  */
@@ -89,12 +98,12 @@ internal fun visibleDepartures(
     activeFavUniqueId: String?,
     gpsModeActive: Boolean,
     tabState: TransportFilter,
-    directionState: DirectionFilter,
+    platformState: String?,
     groupDepartures: Boolean,
     maxGroupedDepartures: Int,
     maxRows: Int
 ): VisibleDepartures {
-    val filtered = flatDepartures.filter {
+    val prefiltered = flatDepartures.filter {
         val isAnyTypeExcluded = transportFilters.size < 5
         val globalTypeMatch = when {
             it.isFernbus -> "Fernbus" in transportFilters
@@ -118,15 +127,15 @@ internal fun visibleDepartures(
             TransportFilter.TRAM -> it.isTram
             else -> true
         }
-        val dirMatch = when (directionState) {
-            DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
-            DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
-            else -> true
-        }
-        typeMatch && dirMatch
+        typeMatch
     }
     // Zeit-Filter: Abgefahrene Abfahrten ausblenden (wie in App-Vorschau)
     .filter { TimeFormat.isStillVisible(it.departureTime) }
+
+    // Steig-Filter: nur Steige anbieten, die nach den übrigen Filtern noch vorkommen.
+    val platforms = availablePlatforms(prefiltered.map { it.platformId to it.platformLabel })
+    val activePlatform = effectivePlatform(platformState, platforms)
+    val filtered = prefiltered.filter { platformMatches(it.platformId, activePlatform) }
 
     // Gruppieren der Abfahrten
     val groupedList = mutableListOf<Pair<FlatDeparture, List<FlatDeparture>>>()
@@ -150,7 +159,7 @@ internal fun visibleDepartures(
     }
 
     val rows = if (maxRows >= 15) groupedList else groupedList.take(maxRows)
-    return VisibleDepartures(filtered, rows)
+    return VisibleDepartures(filtered, rows, platforms, activePlatform)
 }
 
 object WidgetTicker {
@@ -281,7 +290,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val activeFavUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
 
             val tabState by filters.getTabStateFlow(stationId).collectAsState(initial = TransportFilter.ALL)
-            val directionState by filters.getDirectionStateFlow(stationId).collectAsState(initial = DirectionFilter.ALL)
+            val platformState by filters.getPlatformStateFlow(stationId).collectAsState(initial = null)
             val gpsModeActive by session.getGpsModeFlow().collectAsState(initial = false)
             val timeDisplayMode by session.getTimeDisplayModeFlow().collectAsState(initial = "MIN")
             val lastTickTs by session.lastTickTsFlow().collectAsState(initial = 0L)
@@ -334,7 +343,7 @@ class DeparturesWidget : GlanceAppWidget() {
                         // Abfahrt aus dem Cache den 10-s-Takt am Laufen.
                         val nextIso = visibleDepartures(
                             flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
-                            tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
+                            tabState, platformState, groupDepartures, maxGroupedDepartures, maxRows
                         ).rows.firstOrNull()?.first?.departureTime
                         val fastTick = TimeFormat.showsSeconds(timeDisplayMode, countdownFormat)
                         WidgetTicker.scheduleNextTick(context, nextIso, fastTick)
@@ -352,7 +361,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 flatDepartures  = flatDepartures,
                 favorites       = favorites,
                 tabState        = tabState,
-                directionState  = directionState,
+                platformState   = platformState,
                 gpsModeActive   = gpsModeActive,
                 timeDisplayMode = timeDisplayMode,
                 status          = if (errorState.isNotEmpty()) "error" else "ok",
@@ -387,7 +396,7 @@ class DeparturesWidget : GlanceAppWidget() {
         flatDepartures: List<FlatDeparture>,
         favorites: List<FavoriteStation>,
         tabState: TransportFilter,
-        directionState: DirectionFilter,
+        platformState: String?,
         gpsModeActive: Boolean,
         timeDisplayMode: String,
         status: String,
@@ -434,11 +443,11 @@ class DeparturesWidget : GlanceAppWidget() {
             ) {
             val visible = visibleDepartures(
                 flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
-                tabState, directionState, groupDepartures, maxGroupedDepartures, maxRows
+                tabState, platformState, groupDepartures, maxGroupedDepartures, maxRows
             )
             val filtered = visible.filtered
 
-            // Meldungen nur aus den (per Tab/Richtung) sichtbaren Abfahrten, ausgeblendete entfernt.
+            // Meldungen nur aus den (per Tab/Steig) sichtbaren Abfahrten, ausgeblendete entfernt.
             val messagesDeps = filtered.map { dep ->
                 dep.copy(messages = filterMessages(dep.messages, ignoredMessages))
             }.filter { it.messages.isNotEmpty() }
@@ -455,7 +464,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
             Header(stationName, gpsModeActive, isRefreshing, hasMessages, groupedMessages, groupedMessagesJson)
             
-            FilterSegmentedRow(departures, tabState, directionState, filterHeight)
+            FilterSegmentedRow(tabState, visible.platforms, visible.activePlatform, filterHeight)
 
             if (status == "error" && errorMsg.isNotEmpty()) {
                 Text("⚠️ $errorMsg", style = TextStyle(color = ColorProvider(UestraColors.Warning), fontSize = 12.sp, fontWeight = FontWeight.Medium), modifier = GlanceModifier.padding(vertical = 4.dp))
@@ -933,20 +942,6 @@ class DeparturesWidget : GlanceAppWidget() {
             ) {
             LineBadge(departure.lineShort, departure.isBus)
             Spacer(modifier = GlanceModifier.width(8.dp))
-            val dir = lineDirection(departure.lineId)
-            if (dir != null) {
-                Image(
-                    provider = ImageProvider(
-                        if (dir == DirectionFilter.INBOUND) R.drawable.ic_widget_city else R.drawable.ic_widget_home
-                    ),
-                    contentDescription = null,
-                    modifier = GlanceModifier.size(16.dp),
-                    colorFilter = ColorFilter.tint(ColorProvider(
-                        if (dir == DirectionFilter.INBOUND) UestraColors.Teal else UestraColors.AccentRed
-                    ))
-                )
-                Spacer(modifier = GlanceModifier.width(4.dp))
-            }
             Text(
                 text = departure.destination ?: "Unbekannt",
                 style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp),
@@ -1054,10 +1049,15 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun FilterSegmentedRow(departures: List<DepartureItem>, tabState: TransportFilter, directionState: DirectionFilter, filterHeight: String = "STANDARD") {
-        val hasH = departures.any { lineDirection(it.lineId) == DirectionFilter.INBOUND }
-        val hasR = departures.any { lineDirection(it.lineId) == DirectionFilter.OUTBOUND }
-        val showDirectionGroup = hasH || hasR
+    private fun FilterSegmentedRow(
+        tabState: TransportFilter,
+        platforms: List<PlatformOption>,
+        activePlatform: String?,
+        filterHeight: String = "STANDARD"
+    ) {
+        // Steig-Auswahl nur sinnvoll, wenn es mehr als einen Steig gibt. Glance kann nicht
+        // horizontal scrollen → auf MAX_PLATFORM_CHIPS begrenzen (an großen Halten zuerst per Tab eingrenzen).
+        val showPlatformGroup = platforms.size in 2..MAX_PLATFORM_CHIPS
 
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -1077,18 +1077,13 @@ class DeparturesWidget : GlanceAppWidget() {
             // --- PLATZHALTER (drückt die nächste Gruppe nach rechts) ---
             Spacer(modifier = GlanceModifier.defaultWeight())
 
-            // --- Gruppe DIRECTION (Rechts-bündig, dynamisch) ---
-            if (showDirectionGroup) {
+            // --- Gruppe STEIG (Rechts-bündig, dynamisch) ---
+            if (showPlatformGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (hasH) {
-                        SegmentButton(R.drawable.ic_widget_city, null, directionState == DirectionFilter.INBOUND, UestraColors.Teal, filterHeight) {
-                            actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to DirectionFilter.INBOUND.storageValue))
-                        }
-                        if (hasR) Spacer(modifier = GlanceModifier.width(2.dp))
-                    }
-                    if (hasR) {
-                        SegmentButton(R.drawable.ic_widget_home, null, directionState == DirectionFilter.OUTBOUND, UestraColors.AccentRed, filterHeight) {
-                            actionRunCallback<ChangeDirectionAction>(actionParametersOf(ChangeDirectionAction.KEY_DIRECTION to DirectionFilter.OUTBOUND.storageValue))
+                    platforms.forEachIndexed { index, p ->
+                        if (index > 0) Spacer(modifier = GlanceModifier.width(2.dp))
+                        SegmentButton(null, p.label, activePlatform == p.id, UestraColors.Teal, filterHeight) {
+                            actionRunCallback<ChangePlatformAction>(actionParametersOf(ChangePlatformAction.KEY_PLATFORM to p.id))
                         }
                     }
                 }

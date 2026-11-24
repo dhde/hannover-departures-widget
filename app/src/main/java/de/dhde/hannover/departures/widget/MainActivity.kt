@@ -51,8 +51,11 @@ import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.toFlatRows
 import de.dhde.hannover.departures.widget.api.LineMessages
 import de.dhde.hannover.departures.widget.api.MsgItem
-import de.dhde.hannover.departures.widget.data.DirectionFilter
-import de.dhde.hannover.departures.widget.data.lineDirection
+import de.dhde.hannover.departures.widget.data.PlatformOption
+import de.dhde.hannover.departures.widget.data.availablePlatforms
+import de.dhde.hannover.departures.widget.data.effectivePlatform
+import de.dhde.hannover.departures.widget.data.platformMatches
+import de.dhde.hannover.departures.widget.data.withPlatformNames
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.NearestStationsFinder
@@ -436,7 +439,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     
     // States matching the widget
     var tabState by remember { mutableStateOf(TransportFilter.ALL) }
-    var directionState by remember { mutableStateOf(DirectionFilter.ALL) }
+    var platformState by remember { mutableStateOf<String?>(null) }
     var timeDisplayMode by remember { mutableStateOf(TimeFormat.MODE_MIN) }
 
     // Sekundengenauer Countdown in der Vorschau: "jetzt" jede Sekunde neu bestimmen.
@@ -448,20 +451,20 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         }
     }
 
-    // Im GPS-Modus zählt der Halt nicht als Favorit → keine Favoriten-Filter (alle Linien/Richtungen).
+    // Im GPS-Modus zählt der Halt nicht als Favorit → keine Favoriten-Filter (alle Linien/Steige).
     val currentFav = if (gpsModeActive) null else favorites.find { fav -> fav.safeUniqueId == activeFavoriteUniqueId }
 
     LaunchedEffect(currentFav) {
         if (currentFav != null) {
             tabState = TransportFilter.fromStorage(currentFav.transportFilter)
-            directionState = DirectionFilter.fromStorage(currentFav.directionFilter)
+            platformState = currentFav.platformFilter
         }
     }
-    // GPS aktiviert → ungefiltert zeigen (alle Linien/Richtungen), nicht die Favoriten-Filter übernehmen.
+    // GPS aktiviert → ungefiltert zeigen (alle Linien/Steige), nicht die Favoriten-Filter übernehmen.
     LaunchedEffect(gpsModeActive) {
         if (gpsModeActive) {
             tabState = TransportFilter.ALL
-            directionState = DirectionFilter.ALL
+            platformState = null
         }
     }
 
@@ -471,7 +474,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             isLoading = true
             try {
                 val apiResponse = UestraApi.create().getDepartures(stationId, UestraApi.DEFAULT_DEP_SEQUENCE)
-                rawDepartures = apiResponse.departures ?: emptyList()
+                rawDepartures = (apiResponse.departures ?: emptyList())
+                    .withPlatformNames(StopsRepository(context).platformNames(stationId))
                 departures = rawDepartures.flatMap { it.toFlatRows() }.sortedBy { it.departureTime }
                 lastUpdate = java.time.Instant.now()
             } catch (e: Exception) {
@@ -494,7 +498,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     }
 
     // Filter logic
-    val filtered = departures.filter {
+    val prefiltered = departures.filter {
         // Tab-Filter: wenn aktiv, übersteuert er den globalen Typ-Filter für den gewählten Typ
         val tabOverride = (tabState == TransportFilter.BUS && it.isBus) || (tabState == TransportFilter.TRAM && it.isTram)
 
@@ -520,15 +524,15 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             TransportFilter.TRAM -> it.isTram
             else -> true
         }
-        val dirMatch = when (directionState) {
-            DirectionFilter.INBOUND -> lineDirection(it.lineId) == DirectionFilter.INBOUND
-            DirectionFilter.OUTBOUND -> lineDirection(it.lineId) == DirectionFilter.OUTBOUND
-            else -> true
-        }
-        typeMatch && dirMatch
+        typeMatch
     }
     // Zeit-Filter: Abfahrten bis 10 s nach Abfahrt noch zeigen (wie im Widget)
     .filter { TimeFormat.isStillVisible(it.departureTime, now) }
+
+    // Steig-Filter (wie im Widget): nur Steige anbieten, die nach den übrigen Filtern vorkommen.
+    val platforms = availablePlatforms(prefiltered.map { it.platformId to it.platformLabel })
+    val activePlatform = effectivePlatform(platformState, platforms)
+    val filtered = prefiltered.filter { platformMatches(it.platformId, activePlatform) }
 
     val messagesDeps = filtered.map { dep ->
         dep.copy(messages = de.dhde.hannover.departures.widget.data.filterMessages(dep.messages, ignoredMessages))
@@ -628,9 +632,9 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             
             // Filter Segmented Row
             WidgetFilterRow(
-                departures = rawDepartures,
                 tabState = tabState,
-                directionState = directionState,
+                platforms = platforms,
+                activePlatform = activePlatform,
                 filterHeight = filterHeight,
                 onTabChange = { newTab ->
                     tabState = newTab
@@ -638,10 +642,10 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                         scope.launch { repo.setFavoriteTransportFilter(id, newTab) }
                     }
                 },
-                onDirChange = { newDir ->
-                    directionState = newDir
+                onPlatformChange = { newPlatform ->
+                    platformState = newPlatform
                     activeFavoriteUniqueId?.let { id ->
-                        scope.launch { repo.setFavoriteDirectionFilter(id, newDir) }
+                        scope.launch { repo.setFavoritePlatformFilter(id, newPlatform) }
                     }
                 }
             )
@@ -923,16 +927,13 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
 
 @Composable
 fun WidgetFilterRow(
-    departures: List<de.dhde.hannover.departures.widget.api.DepartureItem>,
     tabState: TransportFilter,
-    directionState: DirectionFilter,
+    platforms: List<PlatformOption>,
+    activePlatform: String?,
     filterHeight: String = "STANDARD",
     onTabChange: (TransportFilter) -> Unit,
-    onDirChange: (DirectionFilter) -> Unit
+    onPlatformChange: (String?) -> Unit
 ) {
-    val hasH = departures.any { lineDirection(it.lineId) == DirectionFilter.INBOUND }
-    val hasR = departures.any { lineDirection(it.lineId) == DirectionFilter.OUTBOUND }
-
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -946,15 +947,14 @@ fun WidgetFilterRow(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Direction Filters
-        if (hasH || hasR) {
+        // Steig-Filter (gleiche Obergrenze wie im Widget, damit die Vorschau dem Widget entspricht)
+        if (platforms.size in 2..de.dhde.hannover.departures.widget.widget.MAX_PLATFORM_CHIPS) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (hasH) {
-                    WidgetSegmentButton(R.drawable.ic_widget_city, directionState == DirectionFilter.INBOUND, UestraColors.Teal, filterHeight) { onDirChange(if (directionState == DirectionFilter.INBOUND) DirectionFilter.ALL else DirectionFilter.INBOUND) }
-                    if (hasR) Spacer(modifier = Modifier.width(4.dp))
-                }
-                if (hasR) {
-                    WidgetSegmentButton(R.drawable.ic_widget_home, directionState == DirectionFilter.OUTBOUND, UestraColors.AccentRed, filterHeight) { onDirChange(if (directionState == DirectionFilter.OUTBOUND) DirectionFilter.ALL else DirectionFilter.OUTBOUND) }
+                platforms.forEachIndexed { index, p ->
+                    if (index > 0) Spacer(modifier = Modifier.width(4.dp))
+                    PlatformChip(p.label, activePlatform == p.id, filterHeight) {
+                        onPlatformChange(if (activePlatform == p.id) null else p.id)
+                    }
                 }
             }
         }
@@ -990,6 +990,22 @@ fun SegmentButtonVisual(iconRes: Int, isActive: Boolean, activeColor: Color, mod
 }
 
 @Composable
+fun PlatformChip(label: String, isActive: Boolean, mode: String, onClick: () -> Unit) {
+    val (_, height, _) = filterSegmentSize(mode)
+    Box(
+        modifier = Modifier
+            .height(height)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isActive) UestraColors.Teal else UestraColors.ChipInactive)
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
 fun WidgetSegmentButton(iconRes: Int, isActive: Boolean, activeColor: Color, filterHeight: String = "STANDARD", onClick: () -> Unit) {
     Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onClick() }) {
         SegmentButtonVisual(iconRes, isActive, activeColor, filterHeight)
@@ -1021,18 +1037,6 @@ fun WidgetFlatDepartureRow(
         ) {
             WidgetLineBadge(dep.lineShort, dep.isBus)
             Spacer(modifier = Modifier.width(8.dp))
-            val dir = lineDirection(dep.lineId)
-            if (dir != null) {
-                Icon(
-                    painter = androidx.compose.ui.res.painterResource(
-                        if (dir == DirectionFilter.INBOUND) R.drawable.ic_widget_city else R.drawable.ic_widget_home
-                    ),
-                    contentDescription = null,
-                    tint = if (dir == DirectionFilter.INBOUND) UestraColors.Teal else UestraColors.AccentRed,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            }
             Text(
                 text = dep.destination ?: "Unbekannt",
                 color = Color.White,
@@ -1637,14 +1641,10 @@ private fun WidgetFeaturesCard() {
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
-                    Row {
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = UestraColors.Teal, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(2.dp))
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = UestraColors.AccentRed, modifier = Modifier.size(18.dp))
-                    }
+                    Text("SB1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 },
-                title = "Richtungen & Filter",
-                description = "Nutze die Symbole für City oder Home, um die Richtung zu filtern. Die Zeilen im Widget färben sich automatisch passend (hell/dunkel)."
+                title = "Steige & Filter",
+                description = "Tippe auf einen Steig (z.B. „SB1“, „Bus 2“), um nur Abfahrten von dort zu zeigen. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
@@ -1962,14 +1962,10 @@ private fun HelpCard() {
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Row {
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_city), null, tint = UestraColors.Teal, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(2.dp))
-                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_home), null, tint = UestraColors.AccentRed, modifier = Modifier.size(18.dp))
-                    }
+                    Text("SB1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 },
-                title = "Richtungen & Filter",
-                description = "Nutze die Symbole für City oder Home, um die Richtung zu filtern. Die Zeilen im Widget färben sich automatisch passend (hell/dunkel)."
+                title = "Steige & Filter",
+                description = "Tippe auf einen Steig (z.B. „SB1“, „Bus 2“), um nur Abfahrten von dort zu zeigen. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(

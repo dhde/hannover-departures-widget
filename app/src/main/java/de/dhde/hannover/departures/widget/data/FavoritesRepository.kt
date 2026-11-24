@@ -21,7 +21,8 @@ data class FavoriteStation(
     val filteredLines: Set<String>? = null,
     val uniqueId: String? = null,
     val transportFilter: String? = null,
-    val directionFilter: String? = null
+    // Gewählter Steig (platformId). Ersetzt das frühere directionFilter (H/R), das Gson beim Lesen ignoriert.
+    val platformFilter: String? = null
 ) {
     val safeUniqueId: String
         get() = uniqueId ?: id
@@ -147,7 +148,7 @@ class FavoritesRepository(private val context: Context) {
         // Filter des gewählten Favoriten in den Cache übernehmen
         val filters = FilterStateStore(context)
         filters.setTabState(realId, TransportFilter.fromStorage(fav?.transportFilter))
-        filters.setDirectionState(realId, DirectionFilter.fromStorage(fav?.directionFilter))
+        filters.setPlatformState(realId, fav?.platformFilter)
     }
 
     suspend fun getActiveStationIdNow(): String =
@@ -223,9 +224,9 @@ class FavoritesRepository(private val context: Context) {
         saveFavorites(list)
     }
 
-    suspend fun setFavoriteDirectionFilter(uniqueId: String, filter: DirectionFilter?) {
+    suspend fun setFavoritePlatformFilter(uniqueId: String, platformId: String?) {
         val list = getFavoritesNow().map { fav ->
-            if (fav.safeUniqueId == uniqueId) fav.copy(directionFilter = filter?.storageValue) else fav
+            if (fav.safeUniqueId == uniqueId) fav.copy(platformFilter = platformId) else fav
         }
         saveFavorites(list)
     }

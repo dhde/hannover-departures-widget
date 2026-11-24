@@ -23,7 +23,11 @@ data class DepartureItem(
     @SerializedName("events") val events: List<DepartureEvent>? = null,
     @SerializedName("isCancelled") val apiCancelled: Boolean? = false,
     @SerializedName("infos") val infos: List<DepartureInfo>? = null,
-    @SerializedName("hints") val hints: List<DepartureHint>? = null
+    @SerializedName("hints") val hints: List<DepartureHint>? = null,
+    // Steig-ID (= platforms[].id aus /stops), z.B. "de:03241:2021:3:2023"
+    @SerializedName("bon") val platformId: String? = null,
+    // Nicht von der API: beim Refresh aus /stops angereichert (z.B. "Bus 1"), damit das Widget es synchron hat.
+    @SerializedName("platformName") val platformName: String? = null
 ) {
     /**
      * Einzige Quelle der Verkehrsmittel-Klassifikation. Bewusst computed get()
@@ -156,7 +160,9 @@ data class FlatDeparture(
     val delayMinutes: Long?,
     val lineShort: String,
     val isCancelled: Boolean = false,
-    val messages: List<MsgItem> = emptyList()
+    val messages: List<MsgItem> = emptyList(),
+    val platformId: String? = null,
+    val platformLabel: String? = null
 ) {
     val isBus: Boolean get() = TransportType.BUS in transportTypes
     val isTram: Boolean get() = TransportType.TRAM in transportTypes
@@ -192,7 +198,9 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
                 delayMinutes = delay,
                 lineShort = lineShort,
                 isCancelled = (this@toFlatRows.apiCancelled == true) || (event.apiCancelled == true) || (event.realtimeState == "CANCELED"),
-                messages = messageItems
+                messages = messageItems,
+                platformId = platformId,
+                platformLabel = platformName
             )
         }
         .filterNotNull()
@@ -212,7 +220,9 @@ data class StationSearchResult(
 )
 
 data class Platform(
-    @SerializedName("productClasses") val productClasses: List<Int>? = null
+    @SerializedName("productClasses") val productClasses: List<Int>? = null,
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("name") val name: String? = null
 ) {
     // GVH Produktklassen: 0=Zug, 1=S-Bahn, 2=U-Bahn, 3=Stadtbahn, 4=Straßenbahn, 5/6=Bus
     val isBus: Boolean get() = productClasses?.any { it in 5..11 } == true

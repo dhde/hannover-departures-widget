@@ -13,7 +13,6 @@ import androidx.glance.appwidget.action.ActionCallback
 import com.google.gson.Gson
 import de.dhde.hannover.departures.widget.api.*
 import de.dhde.hannover.departures.widget.data.DeparturesCache
-import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.FilterStateStore
 import de.dhde.hannover.departures.widget.data.NearestStationsFinder
@@ -23,6 +22,7 @@ import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.data.TrackedMessage
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
+import de.dhde.hannover.departures.widget.data.withPlatformNames
 import java.time.Instant
 import java.time.Duration
 import java.time.OffsetDateTime
@@ -92,7 +92,9 @@ class RefreshAction : ActionCallback {
                             val response = api.getDepartures(stationId, UestraApi.DEFAULT_DEP_SEQUENCE)
                             de.dhde.hannover.departures.widget.debug.DebugLog.log("response received: stop=${response.stop}, departuresSize=${response.departures?.size}")
                             de.dhde.hannover.departures.widget.debug.DebugLog.log("first departure JSON: ${Gson().toJson(response.departures?.firstOrNull())}")
+                            // Steig-Namen aus /stops anreichern (gecacht, 7 Tage) – für den Steig-Filter.
                             val departures = response.departures
+                                ?.withPlatformNames(StopsRepository(context).platformNames(stationId))
                             if (departures != null) {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
                                 session.setErrorState("")
@@ -239,9 +241,9 @@ class ChangeStationAction : ActionCallback {
     }
 }
 
-class ChangeDirectionAction : ActionCallback {
+class ChangePlatformAction : ActionCallback {
     companion object {
-        val KEY_DIRECTION = ActionParameters.Key<String>("direction")
+        val KEY_PLATFORM = ActionParameters.Key<String>("platform")
     }
 
     override suspend fun onAction(
@@ -249,21 +251,22 @@ class ChangeDirectionAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        val targetDirection = DirectionFilter.fromStorage(parameters[KEY_DIRECTION])
+        val targetPlatform = parameters[KEY_PLATFORM]?.takeIf { it.isNotBlank() }
         val filters = FilterStateStore(context)
         val repo = FavoritesRepository(context)
         val stationId = repo.getActiveStationIdNow()
         val uniqueId = repo.getActiveFavoriteUniqueIdNow()
 
-        val currentDirection = filters.getDirectionState(stationId)
-        val newDirection = if (currentDirection == targetDirection) DirectionFilter.ALL else targetDirection
+        // Erneutes Tippen auf den aktiven Steig hebt den Filter auf.
+        val currentPlatform = filters.getPlatformState(stationId)
+        val newPlatform = if (currentPlatform == targetPlatform) null else targetPlatform
 
-        filters.setDirectionState(stationId, newDirection)
+        filters.setPlatformState(stationId, newPlatform)
         if (uniqueId != null) {
-            repo.setFavoriteDirectionFilter(uniqueId, newDirection)
+            repo.setFavoritePlatformFilter(uniqueId, newPlatform)
         }
 
-        // Sofortiges UI-Feedback für Richtungswechsel
+        // Sofortiges UI-Feedback für Steigwechsel
         DeparturesWidget().updateAll(context)
 
         RefreshAction.triggerUpdate(context)
@@ -390,13 +393,13 @@ suspend fun findAndSetActiveNearestStation(context: Context): Boolean {
     // Halt überhaupt gewählt wurde (z.B. „Bahn" → nächste Bahn-Haltestelle).
     // setActiveStation hätte den Filter sonst auf den Favoriten-Default (meist ALL)
     // zurückgesetzt → Filter wäre bei jedem Refresh wieder rausgesprungen.
-    // Richtung wird beim Stationswechsel zurückgesetzt (linien-/halt-spezifisch).
+    // Steig wird beim Stationswechsel zurückgesetzt (halt-spezifisch).
     // Den Favoriten-Linienfilter blendet die Anzeige im GPS-Modus aus (siehe
     // gpsModeActive im Render).
     return if (nearestStop != null && nearestStop.id != currentStationId) {
         repo.setActiveStation(nearestStop.id, nearestStop.name)
         filters.setTabState(nearestStop.id, currentTabState)
-        filters.setDirectionState(nearestStop.id, DirectionFilter.ALL)
+        filters.setPlatformState(nearestStop.id, null)
         de.dhde.hannover.departures.widget.debug.DebugLog.log(
             "findAndSetActiveNearestStation: switched ${currentStationId} -> ${nearestStop.id} (${nearestStop.name}, ${minDistance.toInt()}m)"
         )
@@ -493,7 +496,7 @@ class PickCandidateAction : ActionCallback {
         if (override == "ALL") {
             filters.setTabState(stopId, TransportFilter.ALL)
         }
-        filters.setDirectionState(stopId, DirectionFilter.ALL)
+        filters.setPlatformState(stopId, null)
         session.setGpsMode(false)
         session.clearPickerState()
         PickerAutoCloseAlarm.cancel(context)
