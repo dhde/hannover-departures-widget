@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 class StopsRepository(context: Context) {
-    private val fileName = "uestra_stops_v2.json"
+    private val fileName = "uestra_stops_v3.json" // v3: Platform.id/name mitgespeichert (Steig-Filter)
     private val file = File(context.cacheDir, fileName)
     private val CACHE_DURATION_MS = 7L * 24 * 60 * 60 * 1000 // 7 Tage
     private val gson = Gson()
@@ -45,4 +45,15 @@ class StopsRepository(context: Context) {
             emptyList()
         }
     }
+
+    /** Steig-ID → Anzeigename (z.B. "Bus 1") für einen Halt; leer, wenn unbekannt/offline. */
+    suspend fun platformNames(stopId: String): Map<String, String> =
+        getAllStops().firstOrNull { it.id == stopId }
+            ?.platforms.orEmpty()
+            .mapNotNull { p -> val id = p.id ?: return@mapNotNull null; val n = p.name ?: return@mapNotNull null; id to n }
+            .toMap()
 }
+
+/** Reichert Abfahrten um den Steig-Namen an (Fallback-Label, wenn /stops den Steig nicht kennt). */
+fun List<de.dhde.hannover.departures.widget.api.DepartureItem>.withPlatformNames(names: Map<String, String>) =
+    map { it.copy(platformName = platformLabel(it.platformId, names)) }

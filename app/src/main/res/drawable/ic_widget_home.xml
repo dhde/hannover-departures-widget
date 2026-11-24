@@ -1,7 +1,0 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="24.0" android:viewportHeight="24.0">
-    <!-- Stadtauswärts: Haus (Dach + Körper) als Aussparung im Kreis-Badge. Einfarbig/tönbar via evenOdd. -->
-    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
-        android:pathData="M1,12 A11,11 0 1 0 23,12 A11,11 0 1 0 1,12 Z M12,5.5 L18.5,11 L16.5,11 L16.5,17.5 L7.5,17.5 L7.5,11 L5.5,11 Z"/>
-</vector>

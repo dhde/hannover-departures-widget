@@ -1,10 +1,13 @@
 package de.dhde.hannover.departures.widget
 
-import de.dhde.hannover.departures.widget.data.DirectionFilter
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.api.MsgItem
 import de.dhde.hannover.departures.widget.data.filterMessages
-import de.dhde.hannover.departures.widget.data.lineDirection
+import de.dhde.hannover.departures.widget.data.PlatformOption
+import de.dhde.hannover.departures.widget.data.availablePlatforms
+import de.dhde.hannover.departures.widget.data.effectivePlatform
+import de.dhde.hannover.departures.widget.data.platformLabel
+import de.dhde.hannover.departures.widget.data.platformMatches
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -35,40 +38,56 @@ class FiltersTest {
         assertEquals("ALL", TransportFilter.ALL.storageValue)
         assertEquals("BUS", TransportFilter.BUS.storageValue)
         assertEquals("TRAIN", TransportFilter.TRAM.storageValue) // Legacy: Tram wird als "TRAIN" gespeichert
-        assertEquals("ALL", DirectionFilter.ALL.storageValue)
-        assertEquals("H", DirectionFilter.INBOUND.storageValue)
-        assertEquals("R", DirectionFilter.OUTBOUND.storageValue)
     }
 
     @Test
-    fun directionFilter_roundTrip() {
-        for (f in DirectionFilter.entries) {
-            assertEquals(f, DirectionFilter.fromStorage(f.storageValue))
-        }
+    fun platformLabel_usesNameOrFallback() {
+        val names = mapOf("de:03241:2021:3:2023" to "Bus 1")
+        assertEquals("Bus 1", platformLabel("de:03241:2021:3:2023", names))
+        assertEquals("Steig 2024", platformLabel("de:03241:2021:3:2024", names))
+        assertNull(platformLabel(null, names))
+        assertNull(platformLabel("", names))
     }
 
     @Test
-    fun directionFilter_legacyAndDefaults() {
-        assertEquals(DirectionFilter.ALL, DirectionFilter.fromStorage("ALL"))
-        assertEquals(DirectionFilter.INBOUND, DirectionFilter.fromStorage("H"))
-        assertEquals(DirectionFilter.OUTBOUND, DirectionFilter.fromStorage("R"))
-        assertEquals(DirectionFilter.ALL, DirectionFilter.fromStorage(null))
-        assertEquals(DirectionFilter.ALL, DirectionFilter.fromStorage("x"))
+    fun availablePlatforms_distinctAndSortedByLabel() {
+        val result = availablePlatforms(
+            listOf(
+                "de:x:2" to "Bus 2",
+                "de:x:1" to "Bus 1",
+                "de:x:2" to "Bus 2",
+                null to null,
+                "de:x:9" to "SB1"
+            )
+        )
+        assertEquals(
+            listOf(PlatformOption("de:x:1", "Bus 1"), PlatformOption("de:x:2", "Bus 2"), PlatformOption("de:x:9", "SB1")),
+            result
+        )
     }
 
     @Test
-    fun lineDirection_suffixHandR() {
-        assertEquals(DirectionFilter.INBOUND, lineDirection("de:rnv:3:H"))
-        assertEquals(DirectionFilter.OUTBOUND, lineDirection("de:rnv:3:R"))
-        assertEquals(DirectionFilter.INBOUND, lineDirection("xyzh"))
-        assertEquals(DirectionFilter.OUTBOUND, lineDirection("xyzr"))
+    fun availablePlatforms_naturalSortForNumbers() {
+        val result = availablePlatforms(listOf("a" to "Bus 10", "b" to "Bus 2"))
+        assertEquals(listOf("Bus 2", "Bus 10"), result.map { it.label })
     }
 
     @Test
-    fun lineDirection_unknownIsNull() {
-        assertNull(lineDirection(null))
-        assertNull(lineDirection(""))
-        assertNull(lineDirection("de:rnv:3:X"))
+    fun effectivePlatform_fallsBackToAllWhenNotAvailable() {
+        val available = listOf(PlatformOption("p1", "Bus 1"), PlatformOption("p2", "Bus 2"))
+        assertEquals("p1", effectivePlatform("p1", available))
+        assertNull(effectivePlatform("gone", available))
+        assertNull(effectivePlatform(null, available))
+        assertNull(effectivePlatform("", available))
+    }
+
+    @Test
+    fun platformMatches_onlySelectedPlatform() {
+        assertTrue(platformMatches("p1", null))
+        assertTrue(platformMatches(null, null))
+        assertTrue(platformMatches("p1", "p1"))
+        assertFalse(platformMatches("p2", "p1"))
+        assertFalse(platformMatches(null, "p1"))
     }
 
     @Test
