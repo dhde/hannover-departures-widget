@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="platform_button">Платформа</string>
+    <string name="platform_picker_title">Вибери платформу</string>
+    <string name="platform_all">Усі платформи</string>
+</resources>

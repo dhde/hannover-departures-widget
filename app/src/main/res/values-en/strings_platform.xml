@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="platform_button">Platform</string>
+    <string name="platform_picker_title">Choose platform</string>
+    <string name="platform_all">All platforms</string>
+</resources>

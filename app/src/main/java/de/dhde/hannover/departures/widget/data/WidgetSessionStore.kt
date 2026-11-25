@@ -15,6 +15,7 @@ class WidgetSessionStore(private val context: Context) {
         private val ERROR_STATE = stringPreferencesKey("error_state")
         private val DEBUG_MODE = booleanPreferencesKey("debug_mode")
         private val PICKER_MODE = booleanPreferencesKey("picker_mode")
+        private val PLATFORM_PICKER_OPEN = booleanPreferencesKey("platform_picker_open")
         private val PICKER_CANDIDATES = stringPreferencesKey("picker_candidates_json")
         private val PICKER_OPENED_AT = longPreferencesKey("picker_opened_at")
         private val PICKER_FILTER_OVERRIDE = stringPreferencesKey("picker_filter_override")
@@ -80,6 +81,15 @@ class WidgetSessionStore(private val context: Context) {
 
     fun getErrorStateFlow(): Flow<String> =
         context.cacheDataStore.data.map { it[ERROR_STATE] ?: "" }
+
+    // --- Steig-Auswahl (Widget) ---
+
+    fun platformPickerOpenFlow(): Flow<Boolean> =
+        context.cacheDataStore.data.map { it[PLATFORM_PICKER_OPEN] ?: false }
+
+    suspend fun setPlatformPickerOpen(open: Boolean) {
+        context.cacheDataStore.edit { it[PLATFORM_PICKER_OPEN] = open }
+    }
 
     // --- Picker-State ---
 

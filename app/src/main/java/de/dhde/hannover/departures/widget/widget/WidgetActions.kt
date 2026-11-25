@@ -274,6 +274,39 @@ class ChangePlatformAction : ActionCallback {
     }
 }
 
+/** Öffnet die Steig-Auswahl im Widget (wenn nicht alle Steig-Chips in die Breite passen). */
+class OpenPlatformPickerAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        WidgetSessionStore(context).setPlatformPickerOpen(true)
+        DeparturesWidget().updateAll(context)
+    }
+}
+
+class ClosePlatformPickerAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        WidgetSessionStore(context).setPlatformPickerOpen(false)
+        DeparturesWidget().updateAll(context)
+    }
+}
+
+/** Wählt in der Steig-Auswahl einen Steig (leerer Wert = alle) und schließt die Auswahl. */
+class PickPlatformAction : ActionCallback {
+    companion object {
+        val KEY_PLATFORM = ActionParameters.Key<String>("platform")
+    }
+
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val platform = parameters[KEY_PLATFORM]?.takeIf { it.isNotBlank() }
+        val filters = FilterStateStore(context)
+        val repo = FavoritesRepository(context)
+        val stationId = repo.getActiveStationIdNow()
+        filters.setPlatformState(stationId, platform)
+        repo.getActiveFavoriteUniqueIdNow()?.let { repo.setFavoritePlatformFilter(it, platform) }
+        WidgetSessionStore(context).setPlatformPickerOpen(false)
+        DeparturesWidget().updateAll(context)
+    }
+}
+
 class ToggleTimeDisplayAction : ActionCallback {
     override suspend fun onAction(
         context: Context,

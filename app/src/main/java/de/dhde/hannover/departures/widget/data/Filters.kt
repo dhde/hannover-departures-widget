@@ -23,7 +23,15 @@ enum class TransportFilter(val storageValue: String) {
  * Zuverlässig ist nur der Steig (`bon` der Abfahrt = `platforms[].id` aus /stops):
  * alles, was vom selben Steig abfährt, fährt in dieselbe Richtung.
  */
-data class PlatformOption(val id: String, val label: String, val color: LineColor)
+data class PlatformOption(
+    val id: String,
+    val label: String,
+    val color: LineColor,
+    /** Linien an diesem Steig, numerisch sortiert (für die Steig-Auswahl). */
+    val lines: List<String> = emptyList(),
+    /** Ziele an diesem Steig, häufigstes zuerst (für die Steig-Auswahl). */
+    val destinations: List<String> = emptyList()
+)
 
 /** GVH-Linienfarbe (Stadtbahn-Strecken, Bus). UI-Farbwerte: UestraColors.lineColors(). */
 enum class LineColor { BLUE, RED, YELLOW, GREEN, BUS, SPRINT, OTHER }
@@ -70,7 +78,12 @@ fun availablePlatforms(departures: List<FlatDeparture>): List<PlatformOption> =
             val color = deps.distinctBy { it.lineShort }
                 .groupingBy { lineColor(it.lineShort, it.isBus) }.eachCount()
                 .maxByOrNull { it.value }!!.key
-            PlatformOption(id, deps.first().platformLabel!!, color)
+            val lines = deps.map { it.lineShort }.distinct()
+                .sortedWith(compareBy({ it.toIntOrNull() ?: Int.MAX_VALUE }, { it }))
+            val destinations = deps.mapNotNull { it.destination?.takeIf(String::isNotBlank) }
+                .groupingBy { it }.eachCount().entries
+                .sortedByDescending { it.value }.map { it.key }
+            PlatformOption(id, deps.first().platformLabel!!, color, lines, destinations)
         }
         .sortedWith(compareBy(
             { if (it.color == LineColor.BUS || it.color == LineColor.SPRINT) 1 else 0 },
@@ -84,17 +97,18 @@ const val PLATFORM_CHIP_GAP_DP = 2
 /** Konservative Zeichenbreite für 10sp fett (dp) – lieber Chips ausblenden als abschneiden. */
 private const val CHIP_CHAR_DP = 7
 
-/** Geschätzte Breite der Chip-Reihe in dp. */
-fun platformChipsWidthDp(labels: List<String>): Int =
-    labels.sumOf { 2 * PLATFORM_CHIP_PADDING_DP + it.length * CHIP_CHAR_DP } +
+/** Geschätzte Breite der Chip-Reihe in dp; jeder Chip mindestens [minChipDp] breit (= Bus/Bahn-Button). */
+fun platformChipsWidthDp(labels: List<String>, minChipDp: Int = 0): Int =
+    labels.sumOf { maxOf(minChipDp, 2 * PLATFORM_CHIP_PADDING_DP + it.length * CHIP_CHAR_DP) } +
         (labels.size - 1).coerceAtLeast(0) * PLATFORM_CHIP_GAP_DP
 
 /**
  * Steig-Chips nur zeigen, wenn es mindestens zwei gibt und ALLE in [availableDp] passen.
- * Glance kann nicht scrollen; eine abgeschnittene Reihe würde Steige verschlucken.
+ * Glance kann nicht horizontal scrollen; passen sie nicht, zeigt das Widget stattdessen
+ * einen „Steig“-Button mit vertikal scrollbarer Auswahl.
  */
-fun platformChipsFit(labels: List<String>, availableDp: Int): Boolean =
-    labels.size >= 2 && platformChipsWidthDp(labels) <= availableDp
+fun platformChipsFit(labels: List<String>, availableDp: Int, minChipDp: Int = 0): Boolean =
+    labels.size >= 2 && platformChipsWidthDp(labels, minChipDp) <= availableDp
 
 /**
  * Tatsächlich anzuwendender Steig-Filter: der gespeicherte Steig, sofern er unter den

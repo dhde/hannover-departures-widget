@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Steig-Auswahl im Widget/App, wenn nicht alle Steig-Chips in die Breite passen. -->
+<resources>
+    <string name="platform_button">Steig</string>
+    <string name="platform_picker_title">Steig wählen</string>
+    <string name="platform_all">Alle Steige</string>
+</resources>

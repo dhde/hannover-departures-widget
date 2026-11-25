@@ -7,6 +7,7 @@ import de.dhde.hannover.departures.widget.data.PlatformOption
 import de.dhde.hannover.departures.widget.data.LineColor
 import de.dhde.hannover.departures.widget.data.lineColor
 import de.dhde.hannover.departures.widget.data.platformChipsFit
+import de.dhde.hannover.departures.widget.data.platformChipsWidthDp
 import de.dhde.hannover.departures.widget.api.FlatDeparture
 import de.dhde.hannover.departures.widget.api.TransportType
 import de.dhde.hannover.departures.widget.api.cleanDestination
@@ -116,15 +117,36 @@ class FiltersTest {
     }
 
     @Test
-    fun platformChipsFit_kroepckeNeedsWideWidgetOrTab() {
+    fun platformChipsFit_minButtonWidthAndAllOrNothing() {
         val all = listOf("#1", "#2", "#3", "#4", "#5", "#6", "#17", "#18", "#19")
-        val tram = all.take(6)
-        // ~3 Zellen (250 dp) minus Padding und Bus/Bahn-Buttons ≈ 160 dp frei
-        assertFalse(platformChipsFit(all, 160))
-        assertTrue(platformChipsFit(tram, 160))
-        assertTrue(platformChipsFit(all, 260))
+        // Chip mindestens so breit wie ein Bus/Bahn-Button (32 dp), 2 dp Abstand
+        assertEquals(32 * 9 + 2 * 8, platformChipsWidthDp(all, minChipDp = 32))
+        assertFalse(platformChipsFit(all, availableDp = 200, minChipDp = 32))
+        assertTrue(platformChipsFit(all.take(2), availableDp = 200, minChipDp = 32))
+        assertTrue(platformChipsFit(all, availableDp = 310, minChipDp = 32))
         // Ein einzelner Steig braucht keinen Filter
-        assertFalse(platformChipsFit(listOf("#1"), 500))
+        assertFalse(platformChipsFit(listOf("#1"), availableDp = 500, minChipDp = 32))
+    }
+
+    @Test
+    fun platformChipsWidth_longLabelWiderThanMinimum() {
+        // Text breiter als die Mindestbreite → Textbreite zählt (2×4 dp Padding + 7 dp/Zeichen)
+        assertEquals(8 + 7 * 6, platformChipsWidthDp(listOf("Steig1"), minChipDp = 32))
+    }
+
+    @Test
+    fun availablePlatforms_summaryLinesAndDestinations() {
+        val deps = listOf(
+            dep("7", "p1", "#1").copy(destination = "Wettbergen"),
+            dep("3", "p1", "#1").copy(destination = "Wettbergen"),
+            dep("13", "p1", "#1").copy(destination = "Hemmingen"),
+            dep("9", "p1", "#1").copy(destination = "Empelde"),
+            dep("3", "p1", "#1").copy(destination = "Wettbergen")
+        )
+        val p = availablePlatforms(deps).single()
+        assertEquals(listOf("3", "7", "9", "13"), p.lines)              // numerisch sortiert, ohne Duplikate
+        assertEquals("Wettbergen", p.destinations.first())             // häufigstes Ziel zuerst
+        assertEquals(setOf("Wettbergen", "Hemmingen", "Empelde"), p.destinations.toSet())
     }
 
     @Test
