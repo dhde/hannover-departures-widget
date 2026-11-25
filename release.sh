@@ -2,25 +2,23 @@
 set -e
 
 # Konfiguration
-TAG="v1.11.0"                   # Release-Tag (z. B. v1.0.0)
+TAG="v1.11.1"                   # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.11.0" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.11.1" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.11.0
+## Üstra Widget 1.11.1
 
-### 🌍 Mehrsprachig
+### 🚏 Größere Steig-Chips und Steig-Auswahl
 
-Die App und das Widget gibt es jetzt neben Deutsch auch auf **Englisch, Türkisch, Polnisch, Ukrainisch und Russisch**.
+Die Steig-Chips aus 1.11.0 waren zu klein zum Antippen.
 
-- Standardmäßig folgt die App der Sprache des Handys.
-- In den Optionen unter „Darstellung“ lässt sich die Sprache auch direkt wählen, unabhängig von der Handysprache.
-- Ab Android 13 geht das auch über Einstellungen → Apps → Bus & Bahn Hannover Widget → Sprache.
-
-Die Übersetzungen sind neu. Wer einen holprigen Satz findet, kann gern ein Issue aufmachen.
+- Jeder Steig-Chip ist jetzt mindestens so groß wie die Bus/Bahn-Buttons. Es werden so viele angezeigt, wie in die Breite des Widgets passen.
+- Passen nicht alle (z.B. am Kröpcke), erscheint ein **„Steig ▾“**-Button. Er öffnet eine Auswahl, in der man hoch und runter scrollen kann: Jeder Steig steht dort mit Farbe, Linien und Zielen.
+- In der App-Vorschau gibt es dieselbe Auswahl als Menü.
 
 ### Kleinigkeiten
 
-- „1 Zeile“ statt „1 Zeilen“ und ähnliche Einzahl/Mehrzahl-Formen in den Optionen korrigiert.
+- Unten im Widget öffnet jetzt auch ein Tipp auf „Inoffiziell“ die App, nicht nur der kleine Pfeil.
 NOTES
 )  # Optional: Release-Notizen
 
