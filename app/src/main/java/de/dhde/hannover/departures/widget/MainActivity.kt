@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -530,7 +531,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
     .filter { TimeFormat.isStillVisible(it.departureTime, now) }
 
     // Steig-Filter (wie im Widget): nur Steige anbieten, die nach den übrigen Filtern vorkommen.
-    val platforms = availablePlatforms(prefiltered.map { it.platformId to it.platformLabel })
+    val platforms = availablePlatforms(prefiltered)
     val activePlatform = effectivePlatform(platformState, platforms)
     val filtered = prefiltered.filter { platformMatches(it.platformId, activePlatform) }
 
@@ -945,14 +946,17 @@ fun WidgetFilterRow(
             WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == TransportFilter.TRAM, UestraColors.LineBlue, filterHeight) { onTabChange(if (tabState == TransportFilter.TRAM) TransportFilter.ALL else TransportFilter.TRAM) }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.width(8.dp))
 
-        // Steig-Filter (gleiche Obergrenze wie im Widget, damit die Vorschau dem Widget entspricht)
-        if (platforms.size in 2..de.dhde.hannover.departures.widget.widget.MAX_PLATFORM_CHIPS) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                platforms.forEachIndexed { index, p ->
-                    if (index > 0) Spacer(modifier = Modifier.width(4.dp))
-                    PlatformChip(p.label, activePlatform == p.id, filterHeight) {
+        // Steig-Filter: in der App ist Platz zum Scrollen, daher kein Breiten-Limit wie im Widget.
+        if (platforms.size >= 2) {
+            Row(
+                modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                platforms.forEach { p ->
+                    PlatformChip(p, activePlatform == p.id, filterHeight) {
                         onPlatformChange(if (activePlatform == p.id) null else p.id)
                     }
                 }
@@ -990,18 +994,20 @@ fun SegmentButtonVisual(iconRes: Int, isActive: Boolean, activeColor: Color, mod
 }
 
 @Composable
-fun PlatformChip(label: String, isActive: Boolean, mode: String, onClick: () -> Unit) {
+fun PlatformChip(p: PlatformOption, isActive: Boolean, mode: String, onClick: () -> Unit) {
     val (_, height, _) = filterSegmentSize(mode)
+    // Wie im Widget: Linienfarbe des Steigs, inaktiv gedimmt.
+    val (bg, fg) = UestraColors.lineColors(p.color)
     Box(
         modifier = Modifier
             .height(height)
             .clip(RoundedCornerShape(6.dp))
-            .background(if (isActive) UestraColors.Teal else UestraColors.ChipInactive)
+            .background(if (isActive) bg else bg.copy(alpha = 0.35f))
             .clickable { onClick() }
             .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(p.label, color = if (isActive) fg else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -1196,19 +1202,8 @@ fun DuplicateBlob(name: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun WidgetLineBadge(line: String, isBus: Boolean) {
-    val (bgColor, textColor) = if (isBus) {
-        val isSprintH = line.length == 3 && line[0] in '3'..'9' && line.substring(1) == "00"
-        if (isSprintH) UestraColors.SprintMagenta to Color.White
-        else UestraColors.LineRed to Color.White
-    } else {
-        when (line) {
-            "1", "2", "8" -> UestraColors.LineRed to Color.White
-            "3", "7", "9", "13" -> UestraColors.LineBlue to Color.White
-            "4", "5", "6", "11" -> UestraColors.LineYellow to Color.Black
-            "10", "17" -> UestraColors.LineGreen to Color.White
-            else -> Color.Gray to Color.White
-        }
-    }
+    // Gleiche Farbquelle wie die Steig-Chips (lineColor).
+    val (bgColor, textColor) = UestraColors.lineColors(de.dhde.hannover.departures.widget.data.lineColor(line, isBus))
 
     val width = if (line.length >= 4) 42.dp else 34.dp
     Box(
@@ -1641,10 +1636,10 @@ private fun WidgetFeaturesCard() {
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
-                    Text("SB1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("#1", color = UestraColors.LineBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 },
                 title = "Steige & Filter",
-                description = "Tippe auf einen Steig (z.B. „SB1“, „Bus 2“), um nur Abfahrten von dort zu zeigen. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
+                description = "Tippe auf einen Steig (z.B. „#1“, „#17“), um nur Abfahrten von dort zu zeigen. Die Farbe zeigt die Linien, die dort fahren. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
@@ -1962,10 +1957,10 @@ private fun HelpCard() {
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
-                    Text("SB1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("#1", color = UestraColors.LineBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 },
                 title = "Steige & Filter",
-                description = "Tippe auf einen Steig (z.B. „SB1“, „Bus 2“), um nur Abfahrten von dort zu zeigen. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
+                description = "Tippe auf einen Steig (z.B. „#1“, „#17“), um nur Abfahrten von dort zu zeigen. Die Farbe zeigt die Linien, die dort fahren. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(

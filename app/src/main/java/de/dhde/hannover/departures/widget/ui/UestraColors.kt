@@ -41,4 +41,15 @@ object UestraColors {
     val LineYellow    = Color(0xFFFFCC00) // C-Strecke (4,5,6,11)
     val LineGreen     = Color(0xFF009A44) // D-Strecke (10,17)
     val SprintMagenta = Color(0xFFB42082) // SprintH-Busse (300–900)
+
+    /** Hintergrund- und Textfarbe zu einer Linienfarbe (Linien-Badge, aktiver Steig-Chip). */
+    fun lineColors(c: de.dhde.hannover.departures.widget.data.LineColor): Pair<Color, Color> = when (c) {
+        de.dhde.hannover.departures.widget.data.LineColor.RED,
+        de.dhde.hannover.departures.widget.data.LineColor.BUS -> LineRed to Color.White
+        de.dhde.hannover.departures.widget.data.LineColor.BLUE -> LineBlue to Color.White
+        de.dhde.hannover.departures.widget.data.LineColor.YELLOW -> LineYellow to Color.Black
+        de.dhde.hannover.departures.widget.data.LineColor.GREEN -> LineGreen to Color.White
+        de.dhde.hannover.departures.widget.data.LineColor.SPRINT -> SprintMagenta to Color.White
+        de.dhde.hannover.departures.widget.data.LineColor.OTHER -> Color.Gray to Color.White
+    }
 }
