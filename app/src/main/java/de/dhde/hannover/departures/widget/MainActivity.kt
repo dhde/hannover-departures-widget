@@ -956,19 +956,26 @@ fun WidgetFilterRow(
             WidgetSegmentButton(R.drawable.ic_widget_tram, tabState == TransportFilter.TRAM, UestraColors.LineBlue, filterHeight) { onTabChange(if (tabState == TransportFilter.TRAM) TransportFilter.ALL else TransportFilter.TRAM) }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // Steig-Filter: in der App ist Platz zum Scrollen, daher kein Breiten-Limit wie im Widget.
+        // Steig-Filter wie im Widget: Chips mindestens so breit wie ein Bus/Bahn-Button,
+        // mindestens ein halber Button Abstand nach links. Passen nicht alle → „Steig ▾“ mit Auswahl.
+        val buttonWidth = filterSegmentSize(filterHeight).first
+        val gap = buttonWidth / 2
+        Spacer(modifier = Modifier.width(gap))
         if (platforms.size >= 2) {
-            Row(
-                modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                platforms.forEach { p ->
-                    PlatformChip(p, activePlatform == p.id, filterHeight) {
-                        onPlatformChange(if (activePlatform == p.id) null else p.id)
+            BoxWithConstraints(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                val fits = de.dhde.hannover.departures.widget.data.platformChipsFit(
+                    platforms.map { it.label }, maxWidth.value.toInt(), minChipDp = buttonWidth.value.toInt()
+                )
+                if (fits) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(de.dhde.hannover.departures.widget.data.PLATFORM_CHIP_GAP_DP.dp)) {
+                        platforms.forEach { p ->
+                            PlatformChip(p, activePlatform == p.id, filterHeight) {
+                                onPlatformChange(if (activePlatform == p.id) null else p.id)
+                            }
+                        }
                     }
+                } else {
+                    PlatformPickerButton(platforms, activePlatform, filterHeight, onPlatformChange)
                 }
             }
         }
@@ -1005,11 +1012,12 @@ fun SegmentButtonVisual(iconRes: Int, isActive: Boolean, activeColor: Color, mod
 
 @Composable
 fun PlatformChip(p: PlatformOption, isActive: Boolean, mode: String, onClick: () -> Unit) {
-    val (_, height, _) = filterSegmentSize(mode)
-    // Wie im Widget: Linienfarbe des Steigs, inaktiv gedimmt.
+    val (width, height, _) = filterSegmentSize(mode)
+    // Wie im Widget: Linienfarbe des Steigs, inaktiv gedimmt; mindestens so breit wie ein Bus/Bahn-Button.
     val (bg, fg) = UestraColors.lineColors(p.color)
     Box(
         modifier = Modifier
+            .widthIn(min = width)
             .height(height)
             .clip(RoundedCornerShape(6.dp))
             .background(if (isActive) bg else bg.copy(alpha = 0.35f))
@@ -1018,6 +1026,59 @@ fun PlatformChip(p: PlatformOption, isActive: Boolean, mode: String, onClick: ()
         contentAlignment = Alignment.Center
     ) {
         Text(p.label, color = if (isActive) fg else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** „Steig ▾“-Button mit Auswahlmenü (Linien + Ziele je Steig), wenn nicht alle Chips passen. */
+@Composable
+fun PlatformPickerButton(
+    platforms: List<PlatformOption>,
+    activePlatform: String?,
+    mode: String,
+    onPlatformChange: (String?) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    val (_, height, _) = filterSegmentSize(mode)
+    val active = platforms.firstOrNull { it.id == activePlatform }
+    val (bg, fg) = active?.let { UestraColors.lineColors(it.color) } ?: (UestraColors.ChipInactive to Color.White)
+    Box {
+        Box(
+            modifier = Modifier
+                .height(height)
+                .clip(RoundedCornerShape(6.dp))
+                .background(bg)
+                .clickable { open = true }
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text((active?.label ?: stringResource(R.string.platform_button)) + " ▾", color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = UestraColors.CardBg) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.platform_all), color = if (activePlatform == null) UestraColors.Teal else Color.White, fontWeight = FontWeight.Bold) },
+                onClick = { open = false; onPlatformChange(null) }
+            )
+            platforms.forEach { p ->
+                val (pbg, pfg) = UestraColors.lineColors(p.color)
+                DropdownMenuItem(
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier.size(40.dp, 28.dp).clip(RoundedCornerShape(6.dp)).background(pbg),
+                            contentAlignment = Alignment.Center
+                        ) { Text(p.label, color = pfg, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    },
+                    text = {
+                        Column {
+                            Text(p.lines.joinToString("  "), color = if (activePlatform == p.id) UestraColors.Teal else Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                            p.destinations.take(3).joinToString(", ").takeIf { it.isNotBlank() }?.let {
+                                Text("→ $it", color = UestraColors.TextSub, fontSize = 12.sp, maxLines = 1)
+                            }
+                        }
+                    },
+                    onClick = { open = false; onPlatformChange(p.id) }
+                )
+            }
+        }
     }
 }
 

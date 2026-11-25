@@ -58,6 +58,9 @@ import de.dhde.hannover.departures.widget.widget.RefreshAction
 import de.dhde.hannover.departures.widget.widget.ChangeTabAction
 import de.dhde.hannover.departures.widget.widget.ChangeStationAction
 import de.dhde.hannover.departures.widget.widget.ChangePlatformAction
+import de.dhde.hannover.departures.widget.widget.OpenPlatformPickerAction
+import de.dhde.hannover.departures.widget.widget.ClosePlatformPickerAction
+import de.dhde.hannover.departures.widget.widget.PickPlatformAction
 import de.dhde.hannover.departures.widget.widget.ToggleTimeDisplayAction
 import de.dhde.hannover.departures.widget.widget.OpenPickerAction
 import de.dhde.hannover.departures.widget.widget.PickCandidateAction
@@ -311,6 +314,7 @@ class DeparturesWidget : GlanceAppWidget() {
             val isRefreshing by session.isRefreshingFlow().collectAsState(initial = false)
 
             val pickerMode by session.pickerModeFlow().collectAsState(initial = false)
+            val platformPickerOpen by session.platformPickerOpenFlow().collectAsState(initial = false)
             val pickerCandidatesJson by session.pickerCandidatesFlow().collectAsState(initial = null)
             val pickerFilterOverride by session.pickerFilterOverrideFlow().collectAsState(initial = null)
             val transportFilters by repo.transportTypesFlow.collectAsState(initial = setOf("Stadtbahn", "Bus", "S-Bahn"))
@@ -390,6 +394,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 clockFormat      = clockFormat,
                 activeFavUniqueId = activeFavUniqueId,
                 pickerMode       = pickerMode,
+                platformPickerOpen = platformPickerOpen,
                 pickerCandidatesJson = pickerCandidatesJson,
                 pickerFilterOverride = pickerFilterOverride
             )
@@ -426,10 +431,15 @@ class DeparturesWidget : GlanceAppWidget() {
         clockFormat: String = TimeFormat.DEFAULT_CLOCK,
         activeFavUniqueId: String? = null,
         pickerMode: Boolean = false,
+        platformPickerOpen: Boolean = false,
         pickerCandidatesJson: String? = null,
         pickerFilterOverride: String? = null
     ) {
         val context = LocalContext.current
+        val visible = visibleDepartures(
+            flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
+            tabState, platformState, groupDepartures, maxGroupedDepartures, maxRows
+        )
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -442,6 +452,8 @@ class DeparturesWidget : GlanceAppWidget() {
                     filterOverride = pickerFilterOverride,
                     globalFilter = tabState
                 )
+            } else if (platformPickerOpen && visible.platforms.size >= 2) {
+                PlatformPickerLayout(visible.platforms, visible.activePlatform)
             } else {
 
             // --- Hintergrund-Icon (Subtil) ---
@@ -452,10 +464,6 @@ class DeparturesWidget : GlanceAppWidget() {
                     .fillMaxSize()
                     .padding(8.dp)
             ) {
-            val visible = visibleDepartures(
-                flatDepartures, transportFilters, favorites, activeFavUniqueId, gpsModeActive,
-                tabState, platformState, groupDepartures, maxGroupedDepartures, maxRows
-            )
             val filtered = visible.filtered
 
             // Meldungen nur aus den (per Tab/Steig) sichtbaren Abfahrten, ausgeblendete entfernt.
@@ -1058,11 +1066,14 @@ class DeparturesWidget : GlanceAppWidget() {
         filterHeight: String = "STANDARD"
     ) {
         val (vertPadding, iconSize) = segmentMetrics(filterHeight)
-        // Glance kann nicht scrollen: Chips nur, wenn ALLE neben die Bus/Bahn-Buttons passen.
-        // Frei = Widgetbreite − Außenpadding (2×8) − zwei Icon-Buttons (Icon + 2×6) − Abstände.
-        val vehicleDp = 2 * (iconSize.value.toInt() + 12) + 2
-        val availableDp = LocalSize.current.width.value.toInt() - 16 - vehicleDp - 8
-        val showPlatformGroup = platformChipsFit(platforms.map { it.label }, availableDp)
+        // Steig-Chips sind mindestens so breit wie ein Bus/Bahn-Button. Zwischen den Buttons links
+        // und den Chips bleibt mindestens ein halber Button frei. Passen nicht ALLE Chips
+        // (Glance kann nicht horizontal scrollen), gibt es stattdessen den „Steig“-Button mit Auswahl.
+        val buttonDp = iconSize.value.toInt() + 12               // Icon + 2×6 dp Padding
+        val vehicleDp = 2 * buttonDp + 2
+        val availableDp = LocalSize.current.width.value.toInt() - 16 - vehicleDp - buttonDp / 2
+        val chipsFit = platformChipsFit(platforms.map { it.label }, availableDp, minChipDp = buttonDp)
+        val chipHeight = iconSize + vertPadding * 2
 
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -1083,13 +1094,15 @@ class DeparturesWidget : GlanceAppWidget() {
             Spacer(modifier = GlanceModifier.defaultWeight())
 
             // --- Gruppe STEIG (Rechts-bündig, dynamisch) ---
-            if (showPlatformGroup) {
+            if (chipsFit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     platforms.forEachIndexed { index, p ->
                         if (index > 0) Spacer(modifier = GlanceModifier.width(PLATFORM_CHIP_GAP_DP.dp))
-                        PlatformChip(p, activePlatform == p.id, iconSize + vertPadding * 2)
+                        PlatformChip(p, activePlatform == p.id, chipHeight, buttonDp.dp)
                     }
                 }
+            } else if (platforms.size >= 2) {
+                PlatformPickerButton(platforms.firstOrNull { it.id == activePlatform }, chipHeight)
             }
         }
     }
@@ -1106,10 +1119,13 @@ class DeparturesWidget : GlanceAppWidget() {
      * Aktiv: voll eingefärbt; inaktiv: gedimmt (Farbe mit 35 % Deckkraft), damit die Strecke erkennbar bleibt.
      */
     @Composable
-    private fun PlatformChip(p: PlatformOption, isActive: Boolean, height: androidx.compose.ui.unit.Dp) {
+    private fun PlatformChip(p: PlatformOption, isActive: Boolean, height: androidx.compose.ui.unit.Dp, minWidth: androidx.compose.ui.unit.Dp) {
         val (bg, fg) = UestraColors.lineColors(p.color)
+        // Glance kennt kein widthIn: Mindestbreite über feste Breite, wenn der Text schmaler ist.
+        val textDp = 2 * PLATFORM_CHIP_PADDING_DP + p.label.length * 7
+        val widthMod = if (textDp <= minWidth.value) GlanceModifier.width(minWidth) else GlanceModifier
         Box(
-            modifier = GlanceModifier
+            modifier = widthMod
                 .height(height)
                 .cornerRadius(6.dp)
                 .background(ColorProvider(if (isActive) bg else bg.copy(alpha = 0.35f)))
@@ -1122,6 +1138,111 @@ class DeparturesWidget : GlanceAppWidget() {
                 style = TextStyle(color = ColorProvider(if (isActive) fg else Color.White), fontSize = 10.sp, fontWeight = FontWeight.Bold),
                 maxLines = 1
             )
+        }
+    }
+
+    /**
+     * „Steig“-Button, wenn nicht alle Chips passen: zeigt die aktuelle Wahl („Steig ▾“ bzw. farbig „#3 ▾“)
+     * und öffnet die vertikal scrollbare Steig-Auswahl.
+     */
+    @Composable
+    private fun PlatformPickerButton(active: PlatformOption?, height: androidx.compose.ui.unit.Dp) {
+        val context = LocalContext.current
+        val (bg, fg) = active?.let { UestraColors.lineColors(it.color) } ?: (UestraColors.SegmentInactive to Color.White)
+        Box(
+            modifier = GlanceModifier
+                .height(height)
+                .cornerRadius(6.dp)
+                .background(ColorProvider(bg))
+                .clickable(actionRunCallback<OpenPlatformPickerAction>())
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = (active?.label ?: context.getString(R.string.platform_button)) + " ▾",
+                style = TextStyle(color = ColorProvider(fg), fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1
+            )
+        }
+    }
+
+    /** Vertikal scrollbare Steig-Auswahl (ersetzt den Widget-Inhalt, wie die GPS-Haltestellenauswahl). */
+    @Composable
+    private fun PlatformPickerLayout(platforms: List<PlatformOption>, activePlatform: String?) {
+        val context = LocalContext.current
+        Column(modifier = GlanceModifier.fillMaxSize().padding(8.dp)) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = context.getString(R.string.platform_picker_title),
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                )
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_close),
+                    contentDescription = context.getString(R.string.widget_picker_close),
+                    modifier = GlanceModifier.size(28.dp).padding(2.dp)
+                        .clickable(actionRunCallback<ClosePlatformPickerAction>()),
+                    colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
+                )
+            }
+            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                item {
+                    PlatformPickerRow(
+                        label = null, color = null,
+                        title = context.getString(R.string.platform_all), subtitle = null,
+                        isActive = activePlatform == null, platformId = ""
+                    )
+                }
+                items(platforms, itemId = { it.id.hashCode().toLong() }) { p ->
+                    PlatformPickerRow(
+                        label = p.label, color = p.color,
+                        title = p.lines.joinToString("  "),
+                        subtitle = p.destinations.take(3).joinToString(", ").takeIf { it.isNotBlank() }?.let { "→ $it" },
+                        isActive = activePlatform == p.id, platformId = p.id
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun PlatformPickerRow(
+        label: String?,
+        color: de.dhde.hannover.departures.widget.data.LineColor?,
+        title: String,
+        subtitle: String?,
+        isActive: Boolean,
+        platformId: String
+    ) {
+        Column(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp)) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth()
+                    .cornerRadius(8.dp)
+                    .background(ColorProvider(if (isActive) UestraColors.TealSurface else UestraColors.SegmentInactive))
+                    .clickable(actionRunCallback<PickPlatformAction>(actionParametersOf(PickPlatformAction.KEY_PLATFORM to platformId)))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (label != null && color != null) {
+                    val (bg, fg) = UestraColors.lineColors(color)
+                    Box(
+                        modifier = GlanceModifier.width(40.dp).height(28.dp).cornerRadius(6.dp).background(ColorProvider(bg)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(label, style = TextStyle(color = ColorProvider(fg), fontSize = 13.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                    }
+                    Spacer(modifier = GlanceModifier.width(10.dp))
+                }
+                Column(modifier = GlanceModifier.defaultWeight()) {
+                    Text(title, style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                    if (subtitle != null) {
+                        Text(subtitle, style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 12.sp), maxLines = 1)
+                    }
+                }
+            }
         }
     }
 
@@ -1189,19 +1310,24 @@ class DeparturesWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.defaultWeight()
             )
 
-            Text(
-                text = context.getString(R.string.widget_footer_unofficial),
-                style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 10.sp),
-                modifier = GlanceModifier.padding(start = 4.dp)
-            )
-
-            Text(
-                text = "↗",
-                style = TextStyle(color = ColorProvider(UestraColors.Teal), fontSize = 14.sp, fontWeight = FontWeight.Bold),
+            // „Inoffiziell ↗“ als EINE Tippfläche (vorher war nur der kleine Pfeil klickbar).
+            Row(
                 modifier = GlanceModifier
-                    .padding(start = 8.dp, end = 2.dp)
+                    .cornerRadius(6.dp)
                     .clickable(actionStartActivity(openAppIntent))
-            )
+                    .padding(start = 6.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = context.getString(R.string.widget_footer_unofficial),
+                    style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 10.sp)
+                )
+                Text(
+                    text = "↗",
+                    style = TextStyle(color = ColorProvider(UestraColors.Teal), fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                    modifier = GlanceModifier.padding(start = 6.dp)
+                )
+            }
         }
     }
 }

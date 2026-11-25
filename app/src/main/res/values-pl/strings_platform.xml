@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="platform_button">Peron</string>
+    <string name="platform_picker_title">Wybierz peron</string>
+    <string name="platform_all">Wszystkie perony</string>
+</resources>
