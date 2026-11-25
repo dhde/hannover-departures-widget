@@ -20,10 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.dhde.hannover.departures.widget.ui.UestraColors
+import de.dhde.hannover.departures.widget.ui.transportTypeLabel
 import de.dhde.hannover.departures.widget.R
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -60,16 +63,16 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     if (showDuplicatesWarning) {
         AlertDialog(
             onDismissRequest = { showDuplicatesWarning = false },
-            title = { Text("Warnung", color = UestraColors.AccentRed) },
-            text = { Text("Achtung: Wenn du diese Option ausschaltest, werden alle mehrfach angelegten Haltestellen gelöscht. Möchtest du fortfahren?", color = UestraColors.TextMain) },
+            title = { Text(stringResource(R.string.opt_dup_warning_title), color = UestraColors.AccentRed) },
+            text = { Text(stringResource(R.string.opt_dup_warning_text), color = UestraColors.TextMain) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { repo.setAllowDuplicates(false) }
                     showDuplicatesWarning = false
-                }) { Text("Deaktivieren", color = UestraColors.AccentRed) }
+                }) { Text(stringResource(R.string.opt_dup_warning_confirm), color = UestraColors.AccentRed) }
             },
             dismissButton = {
-                TextButton(onClick = { showDuplicatesWarning = false }) { Text("Abbrechen", color = UestraColors.TextSub) }
+                TextButton(onClick = { showDuplicatesWarning = false }) { Text(stringResource(R.string.opt_cancel), color = UestraColors.TextSub) }
             },
             containerColor = UestraColors.CardBg,
             titleContentColor = UestraColors.Teal
@@ -79,8 +82,8 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     if (showResetConfirm) {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
-            title = { Text("Zurücksetzen", color = UestraColors.AccentRed) },
-            text = { Text("Setzt alle Einstellungen auf die Standardwerte zurück. Mehrfach angelegte Haltestellen werden dabei entfernt. Ausgeblendete Meldungen bleiben erhalten.", color = UestraColors.TextMain) },
+            title = { Text(stringResource(R.string.opt_reset_title), color = UestraColors.AccentRed) },
+            text = { Text(stringResource(R.string.opt_reset_text), color = UestraColors.TextMain) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -102,9 +105,9 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         repo.setClockFormat(de.dhde.hannover.departures.widget.data.TimeFormat.DEFAULT_CLOCK)
                     }
                     showResetConfirm = false
-                }) { Text("Zurücksetzen", color = UestraColors.AccentRed) }
+                }) { Text(stringResource(R.string.opt_reset_title), color = UestraColors.AccentRed) }
             },
-            dismissButton = { TextButton(onClick = { showResetConfirm = false }) { Text("Abbrechen", color = UestraColors.TextSub) } },
+            dismissButton = { TextButton(onClick = { showResetConfirm = false }) { Text(stringResource(R.string.opt_cancel), color = UestraColors.TextSub) } },
             containerColor = UestraColors.CardBg, titleContentColor = UestraColors.AccentRed
         )
     }
@@ -140,7 +143,8 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { AddWidgetButton(context) }
-        item { OptionsGroupHeader("Anzeige") }
+        item { OptionsGroupHeader(stringResource(R.string.opt_group_display)) }
+        item { LanguageCard() }
         item { TransportTypesCard(transportTypes, repo, scope) }
         item { MessageFilterRow(ignoredCount = ignoredMessages.size) { showMessageSheet = true } }
         item {
@@ -162,7 +166,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
             val kf = clockFormat
             if (cf != null && kf != null) TimeFormatCard(cf, kf, repo, scope)
         }
-        item { OptionsGroupHeader("Größe & Layout") }
+        item { OptionsGroupHeader(stringResource(R.string.opt_group_layout)) }
         item {
             FavoritesLayoutCard(
                 favoritesHeight = favoritesHeight,
@@ -177,10 +181,10 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
             )
         }
         item { FilterHeightCard(filterHeight, repo, scope) }
-        item { OptionsGroupHeader("Verhalten") }
+        item { OptionsGroupHeader(stringResource(R.string.opt_group_behavior)) }
         item { ApiRefreshCard(autoRefreshOnInteraction, repo, scope) }
         item { RefreshOnScreenOnCard(refreshOnScreenOn, repo, scope) }
-        item { OptionsGroupHeader("Standort") }
+        item { OptionsGroupHeader(stringResource(R.string.opt_group_location)) }
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -188,7 +192,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "Anzahl Kandidaten beim GPS-Klick: ${localNearestCount.roundToInt()}",
+                        text = stringResource(R.string.opt_nearest_count_label, localNearestCount.roundToInt()),
                         color = UestraColors.TextMain,
                         fontSize = 14.sp
                     )
@@ -206,14 +210,14 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
                         )
                     )
                     Text(
-                        text = "Beim Klick auf das GPS-Icon erscheinen die ${localNearestCount.roundToInt()} nächsten Haltestellen zur Auswahl.",
+                        text = pluralStringResource(R.plurals.opt_nearest_count_desc, localNearestCount.roundToInt(), localNearestCount.roundToInt()),
                         color = UestraColors.TextSub,
                         fontSize = 12.sp
                     )
                 }
             }
         }
-        item { OptionsGroupHeader("Erweitert") }
+        item { OptionsGroupHeader(stringResource(R.string.opt_group_advanced)) }
         item {
             AdvancedCard(
                 allowDuplicates = allowDuplicates,
@@ -230,7 +234,7 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Auf Standard zurücksetzen")
+                Text(stringResource(R.string.opt_reset_button))
             }
         }
     }
@@ -289,7 +293,7 @@ private fun AddWidgetButton(context: android.content.Context) {
         ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Widget zum Startbildschirm hinzufügen", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.opt_add_widget), fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(8.dp))
     }
@@ -307,7 +311,7 @@ private fun TransportTypesCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Wähle aus, welche Verkehrsmittel angezeigt werden sollen", color = UestraColors.TextSub, fontSize = 12.sp)
+            Text(stringResource(R.string.opt_transport_desc), color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(12.dp))
             val allTypes = listOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus")
             allTypes.forEach { type ->
@@ -326,7 +330,7 @@ private fun TransportTypesCard(
                         colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(type, color = UestraColors.TextMain, fontSize = 14.sp)
+                    Text(transportTypeLabel(type)?.let { stringResource(it) } ?: type, color = UestraColors.TextMain, fontSize = 14.sp)
                 }
             }
         }
@@ -345,9 +349,9 @@ private fun MessageFilterRow(ignoredCount: Int, onClick: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Meldungen ausblenden", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(stringResource(R.string.opt_messages_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(
-                    if (ignoredCount > 0) "$ignoredCount ausgeblendet" else "Wiederkehrende Meldungen verwalten",
+                    if (ignoredCount > 0) stringResource(R.string.opt_messages_ignored_count, ignoredCount) else stringResource(R.string.opt_messages_manage),
                     color = UestraColors.TextSub, fontSize = 12.sp
                 )
             }
@@ -373,14 +377,14 @@ private fun MessageFilterSheetContent(
             .verticalScroll(rememberScrollState())
             .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
     ) {
-        Text("Meldungen ausblenden", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Text("Wiederkehrende Meldungen, die du nicht mehr sehen willst.", color = UestraColors.TextSub, fontSize = 12.sp)
+        Text(stringResource(R.string.opt_messages_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(stringResource(R.string.opt_messages_sheet_desc), color = UestraColors.TextSub, fontSize = 12.sp)
         if (ignoredMessages.isNotEmpty()) {
             TextButton(
                 onClick = { scope.launch { repo.setIgnoredMessages(emptySet()) } },
                 modifier = Modifier.align(Alignment.End)
             ) {
-                Text("Alle wieder einblenden (${ignoredMessages.size})", color = UestraColors.Teal)
+                Text(stringResource(R.string.opt_messages_unhide_all, ignoredMessages.size), color = UestraColors.Teal)
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -405,13 +409,12 @@ private fun MessageFilterSheetContent(
             .sortedByDescending { it.value.effectiveStartMillis }
         if (filterableMessages.isEmpty()) {
             Text(
-                "Noch keine ausblendbaren Meldungen. Meldungen lassen sich ausblenden, sobald sie " +
-                "länger als einen Tag bestehen. Lade das Widget einige Male neu.",
+                stringResource(R.string.opt_messages_none),
                 color = UestraColors.TextSub, fontSize = 12.sp
             )
         } else {
             Text(
-                "Wähle aus, welche länger bestehenden Meldungen ausgeblendet werden sollen:",
+                stringResource(R.string.opt_messages_choose),
                 color = UestraColors.TextSub, fontSize = 12.sp
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -439,7 +442,7 @@ private fun MessageFilterSheetContent(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(entry.content, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
                         val ageDays = ((nowMillis - entry.effectiveStartMillis) / oneDayMillis).coerceAtLeast(1)
-                        Text("seit $ageDays Tag(en)", color = UestraColors.TextSub, fontSize = 11.sp)
+                        Text(pluralStringResource(R.plurals.opt_messages_age_days, ageDays.toInt(), ageDays.toInt()), color = UestraColors.TextSub, fontSize = 11.sp)
                     }
                     IconButton(
                         onClick = {
@@ -455,7 +458,7 @@ private fun MessageFilterSheetContent(
                     ) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = "Meldung entfernen",
+                            contentDescription = stringResource(R.string.opt_messages_remove),
                             tint = UestraColors.IconMuted,
                             modifier = Modifier.size(18.dp)
                         )
@@ -469,7 +472,7 @@ private fun MessageFilterSheetContent(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
                     Text(
-                        text = if (showAll) "Weniger anzeigen" else "Alle ${filterableMessages.size} anzeigen",
+                        text = if (showAll) stringResource(R.string.opt_messages_show_less) else stringResource(R.string.opt_messages_show_all, filterableMessages.size),
                         color = UestraColors.Teal
                     )
                 }
@@ -496,8 +499,8 @@ private fun FavoritesLayoutCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Favoriten pro Zeile", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Anzahl der Schnellwahl-Tasten pro Zeile (0 bis 5)", color = UestraColors.TextSub, fontSize = 12.sp)
+            Text(stringResource(R.string.opt_fav_per_row_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(stringResource(R.string.opt_fav_per_row_desc), color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Slider(
                 value = localMaxFavs,
@@ -511,11 +514,11 @@ private fun FavoritesLayoutCard(
                     inactiveTrackColor = UestraColors.Divider
                 )
             )
-            Text("${localMaxFavs.roundToInt()} Knöpfe pro Zeile", color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+            Text(pluralStringResource(R.plurals.opt_fav_per_row_value, localMaxFavs.roundToInt(), localMaxFavs.roundToInt()), color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
-            Text("Zeilen für Favoriten", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Anzahl der Zeilen für Schnellwahl-Tasten (1 bis 3)", color = UestraColors.TextSub, fontSize = 12.sp)
+            Text(stringResource(R.string.opt_fav_rows_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(stringResource(R.string.opt_fav_rows_desc), color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Slider(
                 value = localMaxFavRows,
@@ -529,17 +532,17 @@ private fun FavoritesLayoutCard(
                     inactiveTrackColor = UestraColors.Divider
                 )
             )
-            Text("${localMaxFavRows.roundToInt()} Zeilen", color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+            Text(pluralStringResource(R.plurals.opt_rows_count, localMaxFavRows.roundToInt(), localMaxFavRows.roundToInt()), color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
 
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
 
 
-            Text("Höhe der Favoriten-Buttons", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Wähle die visuelle Größe aus", color = UestraColors.TextSub, fontSize = 12.sp)
+            Text(stringResource(R.string.opt_fav_height_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(stringResource(R.string.opt_size_choose), color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
             SizeOptionList(
-                options = listOf("KOMPAKT" to "Kompakt", "STANDARD" to "Standard", "GROSS" to "Groß"),
+                options = listOf("KOMPAKT" to stringResource(R.string.opt_size_compact), "STANDARD" to stringResource(R.string.opt_size_standard), "GROSS" to stringResource(R.string.opt_size_large)),
                 selected = favoritesHeight,
                 onSelect = { scope.launch { repo.setFavoritesHeight(it) } }
             ) { mode ->
@@ -561,11 +564,11 @@ private fun FilterHeightCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Höhe der Filter-Buttons", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Wähle die visuelle Größe aus", color = UestraColors.TextSub, fontSize = 12.sp)
+            Text(stringResource(R.string.opt_filter_height_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(stringResource(R.string.opt_size_choose), color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
             SizeOptionList(
-                options = listOf("KOMPAKT" to "Kompakt", "STANDARD" to "Standard", "GROSS" to "Groß"),
+                options = listOf("KOMPAKT" to stringResource(R.string.opt_size_compact), "STANDARD" to stringResource(R.string.opt_size_standard), "GROSS" to stringResource(R.string.opt_size_large)),
                 selected = filterHeight,
                 onSelect = { scope.launch { repo.setFilterHeight(it) } }
             ) { mode ->
@@ -602,10 +605,9 @@ private fun RefreshOnScreenOnCard(
                     .padding(vertical = 4.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Refresh beim Display-An", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.opt_screen_on_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
-                        "Wenn aktiv: Sobald das Display angeht, holt das Widget " +
-                        "neue Daten von der API (gedrosselt: max. alle 60 Sek.).",
+                        stringResource(R.string.opt_screen_on_desc),
                         color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                     )
                 }
@@ -640,11 +642,9 @@ private fun ApiRefreshCard(
                     .padding(vertical = 4.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("API-Refresh bei Zeitumschaltung", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.opt_api_refresh_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
-                        "Wenn aktiv: Beim Umschalten zwischen Minuten und Uhrzeit werden " +
-                        "neue Daten von der API geladen (falls älter als 60 Sek.). " +
-                        "Standard: AUS (nur Redraw, kein Netzwerkaufruf).",
+                        stringResource(R.string.opt_api_refresh_desc),
                         color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                     )
                 }
@@ -686,9 +686,9 @@ private fun GroupDeparturesCard(
                     .padding(vertical = 4.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Abfahrten gruppieren", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.opt_group_departures_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
-                        "Fasst nachfolgende Abfahrten derselben Linie und Richtung in einer Zeile zusammen.",
+                        stringResource(R.string.opt_group_departures_desc),
                         color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                     )
                 }
@@ -702,8 +702,8 @@ private fun GroupDeparturesCard(
 
                 if (!groupDepartures) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Maximale Abfahrten", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Zeilen im Widget (1 bis 15, 15 = unbegrenzt)", color = UestraColors.TextSub, fontSize = 12.sp)
+                    Text(stringResource(R.string.opt_max_rows_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.opt_max_rows_desc), color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Slider(
                         value = localMaxRows,
@@ -717,12 +717,12 @@ private fun GroupDeparturesCard(
                             inactiveTrackColor = UestraColors.Divider
                         )
                     )
-                    val rowLabel = if (localMaxRows.roundToInt() >= 15) "Unbegrenzt" else "${localMaxRows.roundToInt()} Zeilen"
+                    val rowLabel = if (localMaxRows.roundToInt() >= 15) stringResource(R.string.opt_max_rows_unlimited) else pluralStringResource(R.plurals.opt_rows_count, localMaxRows.roundToInt(), localMaxRows.roundToInt())
                     Text(rowLabel, color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
                 } else {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Zusätzliche Abfahrten pro Linie", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Anzahl weiterer Abfahrten, die klein neben der Hauptzeit angezeigt werden (0 bis 5)", color = UestraColors.TextSub, fontSize = 12.sp)
+                    Text(stringResource(R.string.opt_grouped_count_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.opt_grouped_count_desc), color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Slider(
                         value = localMaxGroupedDepartures,
@@ -736,12 +736,12 @@ private fun GroupDeparturesCard(
                             inactiveTrackColor = UestraColors.Divider
                         )
                     )
-                    Text("${localMaxGroupedDepartures.roundToInt()} weitere Abfahrten", color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
+                    Text(pluralStringResource(R.plurals.opt_grouped_count_value, localMaxGroupedDepartures.roundToInt(), localMaxGroupedDepartures.roundToInt()), color = UestraColors.TextMain, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.End))
 
                     HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
-                    Text("Schriftgröße der Folge-Abfahrten", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Größe der kleinen Zeitangaben neben der Hauptabfahrt", color = UestraColors.TextSub, fontSize = 12.sp)
+                    Text(stringResource(R.string.opt_grouped_font_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.opt_grouped_font_desc), color = UestraColors.TextSub, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     val sampleMain = remember {
                         de.dhde.hannover.departures.widget.api.FlatDeparture(
@@ -756,7 +756,7 @@ private fun GroupDeparturesCard(
                         listOf(9L, 14L, 21L, 28L).map { m -> sampleMain.copy(departureTime = java.time.Instant.now().plusSeconds(m * 60).toString()) }
                     }
                     SizeOptionList(
-                        options = listOf("KLEIN" to "Klein", "STANDARD" to "Standard", "GROSS" to "Groß"),
+                        options = listOf("KLEIN" to stringResource(R.string.opt_size_small), "STANDARD" to stringResource(R.string.opt_size_standard), "GROSS" to stringResource(R.string.opt_size_large)),
                         selected = groupedFontSize,
                         onSelect = { scope.launch { repo.setGroupedFontSize(it) } }
                     ) { mode ->
@@ -794,9 +794,9 @@ private fun AdvancedCard(
                     .padding(vertical = 4.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Haltestellen duplizieren", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.opt_duplicates_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
-                        "Erlaubt es, dieselbe Haltestelle mehrfach anzulegen, um unterschiedliche Filter (z.B. Richtung Home / City) zu speichern.",
+                        stringResource(R.string.opt_duplicates_desc),
                         color = UestraColors.TextSub, fontSize = 12.sp, lineHeight = 18.sp
                     )
                 }

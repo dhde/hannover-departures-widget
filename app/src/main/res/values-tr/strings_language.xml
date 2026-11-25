@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lang_title">Dil</string>
+    <string name="lang_desc">Uygulama ve widget için geçerlidir.</string>
+    <string name="lang_system">Sistem dili</string>
+</resources>

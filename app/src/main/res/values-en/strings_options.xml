@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="opt_cancel">Cancel</string>
+
+    <string name="opt_group_display">Display</string>
+    <string name="opt_group_layout">Size &amp; layout</string>
+    <string name="opt_group_behavior">Behaviour</string>
+    <string name="opt_group_location">Location</string>
+    <string name="opt_group_advanced">Advanced</string>
+
+    <string name="opt_dup_warning_title">Warning</string>
+    <string name="opt_dup_warning_text">Caution: if you turn this option off, all duplicate stops will be deleted. Do you want to continue?</string>
+    <string name="opt_dup_warning_confirm">Disable</string>
+
+    <string name="opt_reset_title">Reset</string>
+    <string name="opt_reset_text">Resets all settings to their defaults. Duplicate stops will be removed. Hidden alerts are kept.</string>
+    <string name="opt_reset_button">Reset to defaults</string>
+
+    <string name="opt_add_widget">Add widget to home screen</string>
+
+    <string name="opt_transport_desc">Choose which modes of transport to show</string>
+
+    <string name="opt_nearest_count_label">GPS candidates: %1$d</string>
+    <plurals name="opt_nearest_count_desc">
+        <item quantity="one">Tapping the GPS icon offers the nearest stop (%1$d) to choose from.</item>
+        <item quantity="other">Tapping the GPS icon offers the %1$d nearest stops to choose from.</item>
+    </plurals>
+
+    <string name="opt_messages_title">Hide alerts</string>
+    <string name="opt_messages_ignored_count" tools:ignore="PluralsCandidate">%1$d hidden</string>
+    <string name="opt_messages_manage">Manage recurring alerts</string>
+    <string name="opt_messages_sheet_desc">Recurring alerts you no longer want to see.</string>
+    <string name="opt_messages_unhide_all">Show all again (%1$d)</string>
+    <string name="opt_messages_none">No hideable alerts yet. Alerts can be hidden once they have lasted longer than a day. Reload the widget a few times.</string>
+    <string name="opt_messages_choose">Choose which long-running alerts to hide:</string>
+    <plurals name="opt_messages_age_days">
+        <item quantity="one">for %1$d day</item>
+        <item quantity="other">for %1$d days</item>
+    </plurals>
+    <string name="opt_messages_remove">Remove alert</string>
+    <string name="opt_messages_show_less">Show less</string>
+    <string name="opt_messages_show_all" tools:ignore="PluralsCandidate">Show all %1$d</string>
+
+    <string name="opt_fav_per_row_title">Favourites per row</string>
+    <string name="opt_fav_per_row_desc">Number of shortcut buttons per row (0 to 5)</string>
+    <plurals name="opt_fav_per_row_value">
+        <item quantity="one">%1$d button per row</item>
+        <item quantity="other">%1$d buttons per row</item>
+    </plurals>
+    <string name="opt_fav_rows_title">Favourite rows</string>
+    <string name="opt_fav_rows_desc">Number of rows for shortcut buttons (1 to 3)</string>
+    <plurals name="opt_rows_count">
+        <item quantity="one">%1$d row</item>
+        <item quantity="other">%1$d rows</item>
+    </plurals>
+    <string name="opt_fav_height_title">Favourite button height</string>
+    <string name="opt_filter_height_title">Filter button height</string>
+    <string name="opt_size_choose">Choose the visual size</string>
+
+    <string name="opt_size_compact">Compact</string>
+    <string name="opt_size_standard">Standard</string>
+    <string name="opt_size_large">Large</string>
+    <string name="opt_size_small">Small</string>
+
+    <string name="opt_screen_on_title">Refresh on screen-on</string>
+    <string name="opt_screen_on_desc">When on: as soon as the screen turns on, the widget fetches new data from the API (throttled: max. every 60 s).</string>
+    <string name="opt_api_refresh_title">API refresh on time toggle</string>
+    <string name="opt_api_refresh_desc">When on: switching between minutes and clock time loads new data from the API (if older than 60 s). Default: OFF (redraw only, no network call).</string>
+
+    <string name="opt_group_departures_title">Group departures</string>
+    <string name="opt_group_departures_desc">Combines subsequent departures of the same line and direction into one row.</string>
+    <string name="opt_max_rows_title">Maximum departures</string>
+    <string name="opt_max_rows_desc">Rows in the widget (1 to 15, 15 = unlimited)</string>
+    <string name="opt_max_rows_unlimited">Unlimited</string>
+    <string name="opt_grouped_count_title">Extra departures per line</string>
+    <string name="opt_grouped_count_desc">Number of further departures shown small next to the main time (0 to 5)</string>
+    <plurals name="opt_grouped_count_value">
+        <item quantity="one">%1$d more departure</item>
+        <item quantity="other">%1$d more departures</item>
+    </plurals>
+    <string name="opt_grouped_font_title">Follow-up departure font size</string>
+    <string name="opt_grouped_font_desc">Size of the small times next to the main departure</string>
+
+    <string name="opt_duplicates_title">Duplicate stops</string>
+    <string name="opt_duplicates_desc">Lets you add the same stop more than once to save different filters (e.g. towards Home / City).</string>
+
+    <string name="opt_time_title">Time format</string>
+    <string name="opt_time_desc">Tapping the time switches between countdown and clock time</string>
+    <string name="opt_time_countdown">Countdown</string>
+    <string name="opt_time_countdown_help">{m} minutes · {s} seconds · {ss} seconds, two digits\n[ … ] is dropped if the values inside are 0\nSeconds only in the last 2 minutes</string>
+    <string name="opt_time_clock">Clock time</string>
+    <string name="opt_time_clock_help">HH hour · mm minute · ss second · a AM/PM\nFixed text in \'quotes\', e.g. \'at\' HH:mm</string>
+    <string name="opt_time_custom">Custom format…</string>
+    <string name="opt_time_pattern">Pattern</string>
+    <string name="opt_time_preview">Preview: %1$s</string>
+    <string name="opt_time_invalid">Invalid format – the last saved one stays active</string>
+</resources>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="opt_cancel">Отмена</string>
+
+    <string name="opt_group_display">Отображение</string>
+    <string name="opt_group_layout">Размер &amp; макет</string>
+    <string name="opt_group_behavior">Поведение</string>
+    <string name="opt_group_location">Местоположение</string>
+    <string name="opt_group_advanced">Дополнительно</string>
+
+    <string name="opt_dup_warning_title">Внимание</string>
+    <string name="opt_dup_warning_text">Внимание: если выключить эту опцию, все дубликаты остановок будут удалены. Продолжить?</string>
+    <string name="opt_dup_warning_confirm">Выключить</string>
+
+    <string name="opt_reset_title">Сброс</string>
+    <string name="opt_reset_text">Сбрасывает все настройки на значения по умолчанию. Дубликаты остановок при этом удаляются. Скрытые объявления сохраняются.</string>
+    <string name="opt_reset_button">Сбросить настройки</string>
+
+    <string name="opt_add_widget">Добавить виджет на главный экран</string>
+
+    <string name="opt_transport_desc">Выбери, какой транспорт показывать</string>
+
+    <string name="opt_nearest_count_label">Вариантов при нажатии GPS: %1$d</string>
+    <plurals name="opt_nearest_count_desc">
+        <item quantity="one">При нажатии на значок GPS для выбора показываются ближайшие остановки (макс.: %1$d).</item>
+        <item quantity="few">При нажатии на значок GPS для выбора показываются ближайшие остановки (макс.: %1$d).</item>
+        <item quantity="many">При нажатии на значок GPS для выбора показываются ближайшие остановки (макс.: %1$d).</item>
+        <item quantity="other">При нажатии на значок GPS для выбора показываются ближайшие остановки (макс.: %1$d).</item>
+    </plurals>
+
+    <string name="opt_messages_title">Скрыть объявления</string>
+    <string name="opt_messages_ignored_count" tools:ignore="PluralsCandidate">Скрыто: %1$d</string>
+    <string name="opt_messages_manage">Повторяющиеся объявления</string>
+    <string name="opt_messages_sheet_desc">Повторяющиеся объявления, которые ты больше не хочешь видеть.</string>
+    <string name="opt_messages_unhide_all">Показать все снова (%1$d)</string>
+    <string name="opt_messages_none">Пока нет объявлений, которые можно скрыть. Скрыть объявление можно, если оно висит дольше суток. Обнови виджет несколько раз.</string>
+    <string name="opt_messages_choose">Выбери, какие долгие объявления скрыть:</string>
+    <plurals name="opt_messages_age_days">
+        <item quantity="one">уже %1$d день</item>
+        <item quantity="few">уже %1$d дня</item>
+        <item quantity="many">уже %1$d дней</item>
+        <item quantity="other">уже %1$d дня</item>
+    </plurals>
+    <string name="opt_messages_remove">Удалить объявление</string>
+    <string name="opt_messages_show_less">Свернуть</string>
+    <string name="opt_messages_show_all" tools:ignore="PluralsCandidate">Показать все (%1$d)</string>
+
+    <string name="opt_fav_per_row_title">Избранное в строке</string>
+    <string name="opt_fav_per_row_desc">Кнопок быстрого выбора в строке (0–5)</string>
+    <plurals name="opt_fav_per_row_value">
+        <item quantity="one">Кнопок в строке: %1$d</item>
+        <item quantity="few">Кнопок в строке: %1$d</item>
+        <item quantity="many">Кнопок в строке: %1$d</item>
+        <item quantity="other">Кнопок в строке: %1$d</item>
+    </plurals>
+    <string name="opt_fav_rows_title">Строки избранного</string>
+    <string name="opt_fav_rows_desc">Число строк кнопок быстрого выбора (1–3)</string>
+    <plurals name="opt_rows_count">
+        <item quantity="one">Строк: %1$d</item>
+        <item quantity="few">Строк: %1$d</item>
+        <item quantity="many">Строк: %1$d</item>
+        <item quantity="other">Строк: %1$d</item>
+    </plurals>
+    <string name="opt_fav_height_title">Высота кнопок избранного</string>
+    <string name="opt_filter_height_title">Высота кнопок фильтра</string>
+    <string name="opt_size_choose">Выбери размер</string>
+
+    <string name="opt_size_compact">Компактно</string>
+    <string name="opt_size_standard">Стандарт</string>
+    <string name="opt_size_large">Крупно</string>
+    <string name="opt_size_small">Мелко</string>
+
+    <string name="opt_screen_on_title">Обновлять при включении экрана</string>
+    <string name="opt_screen_on_desc">Если включено: при включении экрана виджет загружает новые данные из API (не чаще раза в 60 с).</string>
+    <string name="opt_api_refresh_title">Обновлять API при смене времени</string>
+    <string name="opt_api_refresh_desc">Если включено: при переключении между минутами и временем загружаются новые данные из API (если старше 60 с). По умолчанию: ВЫКЛ (только перерисовка, без сети).</string>
+
+    <string name="opt_group_departures_title">Группировать отправления</string>
+    <string name="opt_group_departures_desc">Объединяет следующие отправления одной линии и направления в одну строку.</string>
+    <string name="opt_max_rows_title">Макс. отправлений</string>
+    <string name="opt_max_rows_desc">Строк в виджете (1–15, 15 = без ограничений)</string>
+    <string name="opt_max_rows_unlimited">Без ограничений</string>
+    <string name="opt_grouped_count_title">Доп. отправления на линию</string>
+    <string name="opt_grouped_count_desc">Сколько следующих отправлений мелко показывать рядом с основным временем (0–5)</string>
+    <plurals name="opt_grouped_count_value">
+        <item quantity="one">Ещё отправлений: %1$d</item>
+        <item quantity="few">Ещё отправлений: %1$d</item>
+        <item quantity="many">Ещё отправлений: %1$d</item>
+        <item quantity="other">Ещё отправлений: %1$d</item>
+    </plurals>
+    <string name="opt_grouped_font_title">Размер шрифта следующих отправлений</string>
+    <string name="opt_grouped_font_desc">Размер мелкого времени рядом с основным отправлением</string>
+
+    <string name="opt_duplicates_title">Дубликаты остановок</string>
+    <string name="opt_duplicates_desc">Позволяет добавить одну остановку несколько раз, чтобы сохранить разные фильтры (напр. направление Дом / Центр).</string>
+
+    <string name="opt_time_title">Формат времени</string>
+    <string name="opt_time_desc">Нажатие на время переключает обратный отсчёт и часы</string>
+    <string name="opt_time_countdown">Обратный отсчёт</string>
+    <string name="opt_time_countdown_help">{m} минуты · {s} секунды · {ss} секунды двумя цифрами\n[ … ] скрывается, если значения внутри равны 0\nСекунды только в последние 2 минуты</string>
+    <string name="opt_time_clock">Время</string>
+    <string name="opt_time_clock_help">HH час · mm минута · ss секунда · a AM/PM\nПостоянный текст в \'кавычках\', напр. HH:mm \'ч\'</string>
+    <string name="opt_time_custom">Свой формат…</string>
+    <string name="opt_time_pattern">Шаблон</string>
+    <string name="opt_time_preview">Превью: %1$s</string>
+    <string name="opt_time_invalid">Неверный формат – действует последний сохранённый</string>
+</resources>

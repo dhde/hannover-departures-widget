@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_type_tram">Tram</string>
+    <string name="common_type_bus">Bus</string>
+    <string name="common_type_sbahn">S-Bahn</string>
+    <string name="common_type_db">DB</string>
+    <string name="common_type_fernbus">Coach</string>
+    <string name="common_unknown">Unknown</string>
+    <string name="common_messages">Alerts</string>
+    <string name="common_messages_title">Alerts: %1$s</string>
+    <string name="common_line_colon">Line %1$s:</string>
+    <string name="common_time_now">now</string>
+    <string name="common_time_gone">gone?</string>
+</resources>

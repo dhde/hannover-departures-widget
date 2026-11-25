@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_loading">Yükleniyor...</string>
+    <string name="widget_error_timeout">Zaman aşımı</string>
+    <string name="widget_error_connection">Bağlantı başarısız</string>
+    <string name="widget_header_gps_nearest">GPS ile en yakın durak</string>
+    <string name="widget_header_refresh">Yenile</string>
+    <string name="widget_empty_reload">Yeniden yükle</string>
+    <string name="widget_empty_no_departures">Kalkış yok</string>
+    <string name="widget_empty_tap_to_reload">Yenilemek için dokun</string>
+    <string name="widget_departure_cancelled">Sefer iptal</string>
+    <string name="widget_filter_only_bus">Sadece otobüs</string>
+    <string name="widget_filter_only_tram">Sadece tramvay</string>
+    <string name="widget_filter_all_types">Tüm türler</string>
+    <string name="widget_picker_title">Durak seç</string>
+    <string name="widget_picker_close">Kapat</string>
+    <string name="widget_picker_auto_follow">Otomatik takip</string>
+    <string name="widget_picker_no_location">Konum kullanılamıyor</string>
+    <string name="widget_picker_no_stations">Bu filtre için durak yok</string>
+    <string name="widget_picker_distance_m">%1$d m</string>
+    <string name="widget_footer_updated">Güncel: %1$s</string>
+    <string name="widget_footer_updated_stale">Güncel: %1$s (Eski ⚠️)</string>
+    <string name="widget_footer_unofficial">Resmî değil</string>
+</resources>

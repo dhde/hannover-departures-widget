@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="main_loading">Загрузка...</string>
+    <string name="main_save">Сохранить</string>
+    <string name="main_cancel">Отмена</string>
+    <string name="main_line_label">Линия %1$s</string>
+
+    <string name="main_nav_dashboard">Отправления</string>
+    <string name="main_nav_search">Поиск</string>
+    <string name="main_nav_favorites">Избранное</string>
+    <string name="main_nav_options">Настройки</string>
+    <string name="main_nav_help">Помощь</string>
+    <string name="main_nav_debug">Debug</string>
+
+    <string name="main_topbar_preview_station">Превью виджета · %1$s</string>
+    <string name="main_topbar_active_station">Активна: %1$s</string>
+
+    <string name="main_messages_locked">скрыть можно только с завтра</string>
+    <string name="main_messages_to_app">В приложение</string>
+    <string name="main_messages_leave">Выйти</string>
+
+    <string name="main_preview_label">Превью виджета</string>
+    <string name="main_preview_last_update">Обновлено: %1$s</string>
+    <string name="main_preview_info">Инфо</string>
+    <string name="main_preview_gps">GPS – ближайшая остановка</string>
+    <string name="main_preview_refresh">Обновить</string>
+    <string name="main_preview_cancelled">Рейс отменён</string>
+
+    <string name="main_picker_title">Выбор остановки</string>
+    <string name="main_picker_filter_enable">Включить фильтр</string>
+    <string name="main_picker_show_all">Показать все</string>
+    <string name="main_picker_auto_follow">Авто-слежение</string>
+    <string name="main_picker_request_permission">Запросить разрешение</string>
+    <string name="main_picker_no_stations_filter">Нет остановок для этого фильтра</string>
+    <string name="main_picker_permission_missing">Нет доступа к местоположению</string>
+    <string name="main_picker_permission_denied">Разрешение не выдано</string>
+    <string name="main_picker_location_unavailable">Местоположение недоступно</string>
+    <string name="main_picker_no_stations_nearby">Поблизости нет остановок</string>
+
+    <string name="main_search_section">Поиск остановки</string>
+    <string name="main_search_placeholder">напр. Kröpcke, Roderbruch…</string>
+    <string name="main_search_results">Результаты</string>
+    <string name="main_search_failed">Ошибка поиска: %1$s</string>
+    <string name="main_search_active">АКТИВНА</string>
+    <string name="main_search_fav_remove">Убрать из избранного</string>
+    <string name="main_search_fav_add">В избранное</string>
+
+    <string name="main_fav_section">Моё избранное</string>
+    <string name="main_fav_empty">Избранного пока нет. Найди остановку и нажми ⭐.</string>
+    <string name="main_fav_alias_title">Псевдоним для %1$s</string>
+    <string name="main_fav_alias_placeholder">напр. Дом, Работа...</string>
+    <string name="main_fav_move">Переместить</string>
+    <string name="main_fav_edit_alias">Изменить псевдоним</string>
+    <string name="main_fav_filter_lines">Фильтр линий</string>
+    <string name="main_fav_duplicate">Дублировать</string>
+    <string name="main_fav_delete">Удалить</string>
+
+    <string name="main_line_filter_title">Фильтр линий: %1$s</string>
+    <string name="main_line_filter_empty">Сейчас не удалось найти линии для этой остановки.</string>
+
+    <string name="main_help_support_section">Поддержка &amp; исходный код</string>
+    <string name="main_help_donate">Угостить кофе</string>
+    <string name="main_help_source_github">Исходный код на GitHub</string>
+    <string name="main_help_features_section">Функции виджета</string>
+    <string name="main_help_interaction_section">Управление &amp; обновления</string>
+    <string name="main_help_legal_title">Правовая информация</string>
+    <string name="main_help_legal_text">Это неофициальное приложение. Оно никак не связано с ÜSTRA Hannoversche Verkehrsbetriebe AG или GVH. Все данные получены через публичные интерфейсы. Используй на свой страх и риск.</string>
+    <string name="main_help_version">Версия %1$s</string>
+    <string name="main_help_debug_enabled">Режим отладки включён</string>
+    <string name="main_help_debug_disabled">Режим отладки выключен</string>
+
+    <string name="main_help_messages_title">Объявления &amp; фильтр</string>
+    <string name="main_help_messages_desc">Нажми на золотую «i» слева вверху виджета, чтобы прочитать актуальные объявления и сбои. Объявления, которые висят дольше суток (напр. долгие стройки или информация о транспорте), можно скрыть в настройках.</string>
+    <string name="main_help_quick_title">Быстрый выбор избранного</string>
+    <string name="main_help_quick_desc">Используй кнопки быстрого выбора внизу виджета или нажми на название остановки вверху, чтобы переключать остановки.</string>
+    <string name="main_help_platforms_title">Платформы &amp; фильтр</string>
+    <string name="main_help_platforms_desc">Нажми на платформу (напр. «#1», «#17»), чтобы видеть только отправления оттуда. Цвет показывает линии, которые там ходят. Всё, что отправляется с одной платформы, едет в одном направлении. Нажми ещё раз, чтобы снова видеть все.</string>
+    <string name="main_help_size_title">Размер</string>
+    <string name="main_help_size_desc">В настройках можно задать размер кнопок фильтра и избранного (\'КОМПАКТНО\', \'СТАНДАРТ\', \'КРУПНО\'), если тебе удобнее большие кнопки.</string>
+    <string name="main_help_time_title">Отображение времени</string>
+    <string name="main_help_time_desc">Нажми в виджете на время отправления, чтобы переключаться между обратным отсчётом (минуты) и точным временем. (Совет: в настройках можно выбрать, переключаться офлайн или обновлять данные через API).</string>
+    <string name="main_help_time_desc_short">Нажми в виджете на время отправления, чтобы переключаться между обратным отсчётом (минуты) и точным временем.</string>
+    <string name="main_help_refresh_title">Обновление</string>
+    <string name="main_help_refresh_desc">Ради экономии батареи и трафика виджет не загружает данные в фоне. Чтобы получить актуальные данные и задержки из API, нажми на маленькую стрелку обновления справа вверху.</string>
+    <string name="main_help_refresh_desc_legacy">Виджет сам обновляется примерно каждые 15 минут. Для мгновенных данных нажми на маленькую стрелку обновления справа вверху.</string>
+    <string name="main_help_gps_title">Поиск по GPS</string>
+    <string name="main_help_gps_desc">Нажми на значок местоположения, и виджет автоматически покажет отправления с ближайшей остановки. При каждом обновлении позиция определяется заново, так что виджет следует за тобой в пути.</string>
+</resources>

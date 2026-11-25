@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lang_title">Język</string>
+    <string name="lang_desc">Dotyczy aplikacji i widżetu.</string>
+    <string name="lang_system">Język systemu</string>
+</resources>

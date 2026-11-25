@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_loading">Ładowanie...</string>
+
+    <string name="widget_error_timeout">Przekroczono czas</string>
+    <string name="widget_error_connection">Błąd połączenia</string>
+
+    <string name="widget_header_gps_nearest">Najbliższy przystanek (GPS)</string>
+    <string name="widget_header_refresh">Odśwież</string>
+
+    <string name="widget_empty_reload">Odśwież</string>
+    <string name="widget_empty_no_departures">Brak odjazdów</string>
+    <string name="widget_empty_tap_to_reload">Dotknij, by odświeżyć</string>
+    <string name="widget_departure_cancelled">Kurs odwołany</string>
+
+    <string name="widget_filter_only_bus">Tylko autobus</string>
+    <string name="widget_filter_only_tram">Tylko tramwaj</string>
+    <string name="widget_filter_all_types">Wszystkie</string>
+
+    <string name="widget_picker_title">Wybierz przystanek</string>
+    <string name="widget_picker_close">Zamknij</string>
+    <string name="widget_picker_auto_follow">Auto-śledzenie</string>
+    <string name="widget_picker_no_location">Lokalizacja niedostępna</string>
+    <string name="widget_picker_no_stations">Brak przystanków dla tego filtra</string>
+    <string name="widget_picker_distance_m">%1$d m</string>
+
+    <string name="widget_footer_updated">Stan: %1$s</string>
+    <string name="widget_footer_updated_stale">Stan: %1$s (nieaktualne ⚠️)</string>
+    <string name="widget_footer_unofficial">Nieoficjalna</string>
+</resources>

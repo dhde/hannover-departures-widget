@@ -7,9 +7,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.dhde.hannover.departures.widget.R
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.ui.UestraColors
@@ -30,27 +32,24 @@ fun TimeFormatCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Zeitformat", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Tippen auf die Zeit wechselt zwischen Countdown und Uhrzeit", color = UestraColors.TextSub, fontSize = 12.sp)
+            Text(stringResource(R.string.opt_time_title), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(stringResource(R.string.opt_time_desc), color = UestraColors.TextSub, fontSize = 12.sp)
             Spacer(modifier = Modifier.height(8.dp))
             FormatPicker(
-                title = "Countdown",
+                title = stringResource(R.string.opt_time_countdown),
                 presets = TimeFormat.COUNTDOWN_PRESETS,
                 current = countdownFormat,
-                help = "{m} Minuten · {s} Sekunden · {ss} Sekunden zweistellig\n" +
-                    "[ … ] entfällt, wenn die Werte darin 0 sind\n" +
-                    "Sekunden erst in den letzten 2 Minuten",
+                help = stringResource(R.string.opt_time_countdown_help),
                 isValid = TimeFormat::isValidCountdownPattern,
                 preview = { p -> listOf(462L, 102L, 35L).joinToString(" · ") { TimeFormat.formatCountdown(p, it) } },
                 onSave = { scope.launch { repo.setCountdownFormat(it) } }
             )
             Spacer(modifier = Modifier.height(12.dp))
             FormatPicker(
-                title = "Uhrzeit",
+                title = stringResource(R.string.opt_time_clock),
                 presets = TimeFormat.CLOCK_PRESETS,
                 current = clockFormat,
-                help = "HH Stunde · mm Minute · ss Sekunde · a AM/PM\n" +
-                    "Fester Text in 'Anführungszeichen', z. B. HH:mm 'Uhr'",
+                help = stringResource(R.string.opt_time_clock_help),
                 isValid = TimeFormat::isValidClockPattern,
                 preview = { p -> TimeFormat.formatClock(p, Instant.now()) },
                 onSave = { scope.launch { repo.setClockFormat(it) } }
@@ -102,7 +101,7 @@ private fun FormatPicker(
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(selected = customMode, onClick = selectCustom, colors = radioColors)
-        Text("Eigenes Format…", color = UestraColors.TextMain, fontSize = 14.sp)
+        Text(stringResource(R.string.opt_time_custom), color = UestraColors.TextMain, fontSize = 14.sp)
     }
     if (customMode) {
         val valid = isValid(text)
@@ -111,12 +110,12 @@ private fun FormatPicker(
             onValueChange = { text = it; if (isValid(it)) save(it) },
             isError = !valid,
             singleLine = true,
-            label = { Text("Muster") },
+            label = { Text(stringResource(R.string.opt_time_pattern)) },
             modifier = Modifier.fillMaxWidth()
         )
         Text(help, color = UestraColors.TextSub, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
         Text(
-            text = if (valid) "Vorschau: ${preview(text)}" else "Ungültiges Format – das zuletzt gespeicherte bleibt aktiv",
+            text = if (valid) stringResource(R.string.opt_time_preview, preview(text)) else stringResource(R.string.opt_time_invalid),
             color = if (valid) UestraColors.Teal else UestraColors.AccentRed,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 4.dp)

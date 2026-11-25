@@ -11,6 +11,7 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.appwidget.action.ActionCallback
 import com.google.gson.Gson
+import de.dhde.hannover.departures.widget.R
 import de.dhde.hannover.departures.widget.api.*
 import de.dhde.hannover.departures.widget.data.DeparturesCache
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
@@ -130,7 +131,7 @@ class RefreshAction : ActionCallback {
                         }
                     }
                     if (success == null) {
-                        session.setErrorState("Zeitüberschreitung") // Timeout
+                        session.setErrorState(de.dhde.hannover.departures.widget.data.AppLocale.wrap(context).getString(R.string.widget_error_timeout)) // Timeout
                     }
                 } catch (e: CancellationException) {
                     // Glance kann den ActionCallback-Scope bei Widget-Rerender killen.
@@ -139,7 +140,7 @@ class RefreshAction : ActionCallback {
                     throw e
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    session.setErrorState("Verbindung fehlgeschlagen")
+                    session.setErrorState(de.dhde.hannover.departures.widget.data.AppLocale.wrap(context).getString(R.string.widget_error_connection))
                 } finally {
                     session.setRefreshing(false)
                     DeparturesWidget().updateAll(context)

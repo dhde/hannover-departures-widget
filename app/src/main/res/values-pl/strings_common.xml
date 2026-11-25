@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_type_tram">Tramwaj</string>
+    <string name="common_type_bus">Autobus</string>
+    <string name="common_type_sbahn">S-Bahn</string>
+    <string name="common_type_db">DB</string>
+    <string name="common_type_fernbus">Autobus dalekobieżny</string>
+    <string name="common_unknown">Nieznany</string>
+    <string name="common_messages">Komunikaty</string>
+    <string name="common_messages_title">Komunikaty: %1$s</string>
+    <string name="common_line_colon">Linia %1$s:</string>
+    <string name="common_time_now">teraz</string>
+    <string name="common_time_gone">odjechał?</string>
+</resources>

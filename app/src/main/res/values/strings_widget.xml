@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texte des Homescreen-Widgets (Glance). Standardsprache Deutsch; Übersetzungen in values-<lang>/. -->
+<resources>
+    <!-- Allgemein / Laden -->
+    <string name="widget_loading">Laden...</string>
+
+    <!-- Fehlermeldungen (werden beim Setzen aufgelöst und als Text in DataStore gespeichert) -->
+    <string name="widget_error_timeout">Zeitüberschreitung</string>
+    <string name="widget_error_connection">Verbindung fehlgeschlagen</string>
+
+    <!-- Kopfzeile -->
+    <string name="widget_header_gps_nearest">Nächste Haltestelle per GPS</string>
+    <string name="widget_header_refresh">Aktualisieren</string>
+
+    <!-- Abfahrtsliste -->
+    <string name="widget_empty_reload">Neu laden</string>
+    <string name="widget_empty_no_departures">Keine Abfahrten</string>
+    <string name="widget_empty_tap_to_reload">Tippen zum Neuladen</string>
+    <string name="widget_departure_cancelled">Fahrt entfällt</string>
+
+    <!-- Filter-Schalter -->
+    <string name="widget_filter_only_bus">Nur Bus</string>
+    <string name="widget_filter_only_tram">Nur Bahn</string>
+    <string name="widget_filter_all_types">Alle Typen</string>
+
+    <!-- Stationsauswahl (Picker) -->
+    <string name="widget_picker_title">Station wählen</string>
+    <string name="widget_picker_close">Schließen</string>
+    <string name="widget_picker_auto_follow">Auto-Folgen</string>
+    <string name="widget_picker_no_location">Standort nicht verfügbar</string>
+    <string name="widget_picker_no_stations">Keine Stationen für diesen Filter</string>
+    <string name="widget_picker_distance_m">%1$d m</string>
+
+    <!-- Fußzeile -->
+    <string name="widget_footer_updated">Stand: %1$s</string>
+    <string name="widget_footer_updated_stale">Stand: %1$s (Veraltet ⚠️)</string>
+    <string name="widget_footer_unofficial">Inoffiziell</string>
+</resources>

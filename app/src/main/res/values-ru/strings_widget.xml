@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_loading">Загрузка...</string>
+    <string name="widget_error_timeout">Тайм-аут</string>
+    <string name="widget_error_connection">Нет соединения</string>
+    <string name="widget_header_gps_nearest">Ближайшая остановка по GPS</string>
+    <string name="widget_header_refresh">Обновить</string>
+    <string name="widget_empty_reload">Обновить</string>
+    <string name="widget_empty_no_departures">Нет отправлений</string>
+    <string name="widget_empty_tap_to_reload">Нажми, чтобы обновить</string>
+    <string name="widget_departure_cancelled">Рейс отменён</string>
+    <string name="widget_filter_only_bus">Автобусы</string>
+    <string name="widget_filter_only_tram">Трамваи</string>
+    <string name="widget_filter_all_types">Все виды</string>
+    <string name="widget_picker_title">Выбор остановки</string>
+    <string name="widget_picker_close">Закрыть</string>
+    <string name="widget_picker_auto_follow">Авто-слежение</string>
+    <string name="widget_picker_no_location">Местоположение недоступно</string>
+    <string name="widget_picker_no_stations">Нет остановок для этого фильтра</string>
+    <string name="widget_picker_distance_m">%1$d m</string>
+    <string name="widget_footer_updated">Данные: %1$s</string>
+    <string name="widget_footer_updated_stale">Данные: %1$s (устарели ⚠️)</string>
+    <string name="widget_footer_unofficial">Неофициально</string>
+</resources>

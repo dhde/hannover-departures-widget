@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
+import de.dhde.hannover.departures.widget.R
 import com.google.gson.reflect.TypeToken
 import de.dhde.hannover.departures.widget.api.MsgItem
 import kotlinx.coroutines.flow.*
@@ -131,7 +132,7 @@ class FavoritesRepository(private val context: Context) {
 
     /** Findet den Alias oder Namen für die aktuell aktive Station. */
     val effectiveStationName: Flow<String> = combine(activeFavoriteUniqueId, activeStationName, favoritesFlow) { uniqueId, official, favs ->
-        favs.find { it.safeUniqueId == uniqueId }?.alias ?: official ?: "Unbekannt"
+        favs.find { it.safeUniqueId == uniqueId }?.alias ?: official ?: context.getString(R.string.common_unknown)
     }
 
     suspend fun setActiveStation(uniqueId: String, name: String) {

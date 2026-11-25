@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texte der App-Oberfläche (MainActivity). Standardsprache Deutsch; Übersetzungen in values-<lang>/. -->
+<resources>
+    <!-- Allgemein -->
+    <string name="main_loading">Laden...</string>
+    <string name="main_save">Speichern</string>
+    <string name="main_cancel">Abbrechen</string>
+    <string name="main_line_label">Linie %1$s</string>
+
+    <!-- Navigation -->
+    <string name="main_nav_dashboard">Abfahrten</string>
+    <string name="main_nav_search">Suchen</string>
+    <string name="main_nav_favorites">Favoriten</string>
+    <string name="main_nav_options">Optionen</string>
+    <string name="main_nav_help">Hilfe</string>
+    <string name="main_nav_debug">Debug</string>
+
+    <!-- Top-Bar -->
+    <string name="main_topbar_preview_station">Widget Vorschau · %1$s</string>
+    <string name="main_topbar_active_station">Aktiv: %1$s</string>
+
+    <!-- Meldungs-Dialog -->
+    <string name="main_messages_locked">erst ab morgen ausblendbar</string>
+    <string name="main_messages_to_app">Zur App</string>
+    <string name="main_messages_leave">Verlassen</string>
+
+    <!-- Dashboard / Widget-Vorschau -->
+    <string name="main_preview_label">Widget Vorschau</string>
+    <string name="main_preview_last_update">Letztes Update: %1$s</string>
+    <string name="main_preview_info">Info</string>
+    <string name="main_preview_gps">GPS – nächste Haltestelle</string>
+    <string name="main_preview_refresh">Aktualisieren</string>
+    <string name="main_preview_cancelled">Fahrt entfällt</string>
+
+    <!-- Stations-Picker (GPS) -->
+    <string name="main_picker_title">Station wählen</string>
+    <string name="main_picker_filter_enable">Filter aktivieren</string>
+    <string name="main_picker_show_all">Alle anzeigen</string>
+    <string name="main_picker_auto_follow">Auto-Folgen</string>
+    <string name="main_picker_request_permission">Berechtigung anfordern</string>
+    <string name="main_picker_no_stations_filter">Keine Stationen für diesen Filter</string>
+    <string name="main_picker_permission_missing">Standort-Berechtigung fehlt</string>
+    <string name="main_picker_permission_denied">Berechtigung wurde nicht erteilt</string>
+    <string name="main_picker_location_unavailable">Standort nicht verfügbar</string>
+    <string name="main_picker_no_stations_nearby">Keine Stationen in der Nähe</string>
+
+    <!-- Suche -->
+    <string name="main_search_section">Haltestelle suchen</string>
+    <string name="main_search_placeholder">z.B. Kröpcke, Roderbruch…</string>
+    <string name="main_search_results">Ergebnisse</string>
+    <string name="main_search_failed">Suche fehlgeschlagen: %1$s</string>
+    <string name="main_search_active">AKTIV</string>
+    <string name="main_search_fav_remove">Favorit entfernen</string>
+    <string name="main_search_fav_add">Favorit hinzufügen</string>
+
+    <!-- Favoriten -->
+    <string name="main_fav_section">Meine Favoriten</string>
+    <string name="main_fav_empty">Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.</string>
+    <string name="main_fav_alias_title">Alias für %1$s</string>
+    <string name="main_fav_alias_placeholder">z.B. Zuhause, Arbeit...</string>
+    <string name="main_fav_move">Verschieben</string>
+    <string name="main_fav_edit_alias">Alias bearbeiten</string>
+    <string name="main_fav_filter_lines">Linien filtern</string>
+    <string name="main_fav_duplicate">Duplizieren</string>
+    <string name="main_fav_delete">Löschen</string>
+
+    <!-- Linienfilter-Dialog -->
+    <string name="main_line_filter_title">Linien filtern: %1$s</string>
+    <string name="main_line_filter_empty">Konnte aktuell keine Linien für diese Station finden.</string>
+
+    <!-- Hilfe -->
+    <string name="main_help_support_section">Unterstützen &amp; Quellcode</string>
+    <string name="main_help_donate">Kaffee spenden</string>
+    <string name="main_help_source_github">Quellcode auf GitHub</string>
+    <string name="main_help_features_section">Widget-Funktionen</string>
+    <string name="main_help_interaction_section">Interaktion &amp; Updates</string>
+    <string name="main_help_legal_title">Rechtlicher Hinweis</string>
+    <string name="main_help_legal_text">Dies ist eine inoffizielle App. Sie steht in keiner Verbindung zur ÜSTRA Hannoversche Verkehrsbetriebe AG oder dem GVH. Alle Daten werden über öffentliche Schnittstellen bezogen. Nutzung auf eigene Gefahr.</string>
+    <string name="main_help_version">Version %1$s</string>
+    <string name="main_help_debug_enabled">Debug-Modus aktiviert</string>
+    <string name="main_help_debug_disabled">Debug-Modus deaktiviert</string>
+
+    <string name="main_help_messages_title">Info-Meldungen &amp; Filter</string>
+    <string name="main_help_messages_desc">Tippe auf das goldene \'i\' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen. Meldungen, die länger als einen Tag bestehen (z.B. dauerhafte Baustellen oder Fahrzeug-Hinweise), lassen sich in den Optionen ausblenden.</string>
+    <string name="main_help_quick_title">Favoriten-Schnellwahl</string>
+    <string name="main_help_quick_desc">Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten.</string>
+    <string name="main_help_platforms_title">Steige &amp; Filter</string>
+    <string name="main_help_platforms_desc">Tippe auf einen Steig (z.B. „#1“, „#17“), um nur Abfahrten von dort zu zeigen. Die Farbe zeigt die Linien, die dort fahren. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle.</string>
+    <string name="main_help_size_title">Größenanpassung</string>
+    <string name="main_help_size_desc">Du kannst in den Optionen die visuelle Größe der Filter- und Favoriten-Buttons (\'KOMPAKT\', \'STANDARD\', \'GROSS\') einstellen, falls du größere Klickflächen bevorzugst.</string>
+    <string name="main_help_time_title">Zeit-Ansicht</string>
+    <string name="main_help_time_desc">Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten. (Tipp: In den Optionen kannst du einstellen, ob dabei offline umgeschaltet wird oder die API aktualisiert werden soll).</string>
+    <string name="main_help_time_desc_short">Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten.</string>
+    <string name="main_help_refresh_title">Aktualisierung</string>
+    <string name="main_help_refresh_desc">Das Widget lädt aus Strom- und Datenspargründen keine Daten im Hintergrund. Um aktuelle Echtzeitdaten und Verspätungen der API abzurufen, tippe auf den kleinen Refresh-Pfeil oben rechts.</string>
+    <string name="main_help_refresh_desc_legacy">Das Widget frischt sich ca. alle 15 Minuten selbst auf. Für sofortige Echtzeitdaten tippe auf den kleinen Refresh-Pfeil oben rechts.</string>
+    <string name="main_help_gps_title">GPS-Suche</string>
+    <string name="main_help_gps_desc">Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt. Bei jedem Aktualisieren wird die Position neu bestimmt, sodass die Anzeige dir folgt, während du unterwegs bist.</string>
+</resources>
