@@ -39,6 +39,10 @@ import de.dhde.hannover.departures.widget.data.PlatformOption
 import de.dhde.hannover.departures.widget.data.availablePlatforms
 import de.dhde.hannover.departures.widget.data.effectivePlatform
 import de.dhde.hannover.departures.widget.data.platformMatches
+import de.dhde.hannover.departures.widget.data.platformChipsFit
+import de.dhde.hannover.departures.widget.data.lineColor
+import de.dhde.hannover.departures.widget.data.PLATFORM_CHIP_GAP_DP
+import de.dhde.hannover.departures.widget.data.PLATFORM_CHIP_PADDING_DP
 import de.dhde.hannover.departures.widget.data.FavoriteStation
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.DeparturesCache
@@ -70,12 +74,11 @@ import android.content.Intent
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.CircularProgressIndicator
 
 /** Ergebnis des Abfahrts-Filters: gefilterte Abfahrten und die tatsächlich gezeigten Zeilen. */
-/** Mehr Steig-Chips passen nicht neben die Verkehrsmittel-Buttons (Glance scrollt nicht). */
-internal const val MAX_PLATFORM_CHIPS = 4
-
 internal data class VisibleDepartures(
     val filtered: List<FlatDeparture>,
     /** Hauptabfahrt + gruppierte Folgeabfahrten, chronologisch und auf maxRows begrenzt. */
@@ -133,7 +136,7 @@ internal fun visibleDepartures(
     .filter { TimeFormat.isStillVisible(it.departureTime) }
 
     // Steig-Filter: nur Steige anbieten, die nach den übrigen Filtern noch vorkommen.
-    val platforms = availablePlatforms(prefiltered.map { it.platformId to it.platformLabel })
+    val platforms = availablePlatforms(prefiltered)
     val activePlatform = effectivePlatform(platformState, platforms)
     val filtered = prefiltered.filter { platformMatches(it.platformId, activePlatform) }
 
@@ -265,6 +268,9 @@ class DeparturesWidget : GlanceAppWidget() {
     companion object {
         private val gson = Gson()
     }
+
+    // Exact: LocalSize liefert die echte Widget-Breite (für die Steig-Chips, siehe FilterSegmentedRow).
+    override val sizeMode = SizeMode.Exact
 
     // Wir verzichten komplett auf GlanceStateDefinition, um den 
     // Bug-behafteten updateAppWidgetState-Mechanismus zu umgehen.
@@ -1010,23 +1016,8 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun LineBadge(line: String, isBus: Boolean) {
-        val (bgColor, textColor) = if (isBus) {
-            val isSprintH = line.length == 3 && line[0] in '3'..'9' && line.substring(1) == "00"
-            // sprintH Linien (300, 400, 500, 600, 700, 800, 900) sind Magenta
-            if (isSprintH) {
-                UestraColors.SprintMagenta to Color.White
-            } else {
-                UestraColors.LineRed to Color.White // Standard ÜSTRA-Rot für andere Busse
-            }
-        } else {
-            when (line) {
-                "1", "2", "8" -> UestraColors.LineRed to Color.White     // B-Strecke (Rot)
-                "3", "7", "9", "13" -> UestraColors.LineBlue to Color.White // A-Strecke (Blau)
-                "4", "5", "6", "11" -> UestraColors.LineYellow to Color.Black // C-Strecke (Gelb)
-                "10", "17" -> UestraColors.LineGreen to Color.White    // D-Strecke (Grün)
-                else -> Color.Gray to Color.White
-            }
-        }
+        // Gleiche Farbquelle wie die Steig-Chips (lineColor).
+        val (bgColor, textColor) = UestraColors.lineColors(lineColor(line, isBus))
 
         val width = if (line.length >= 4) 42.dp else 34.dp
         Box(
@@ -1055,9 +1046,12 @@ class DeparturesWidget : GlanceAppWidget() {
         activePlatform: String?,
         filterHeight: String = "STANDARD"
     ) {
-        // Steig-Auswahl nur sinnvoll, wenn es mehr als einen Steig gibt. Glance kann nicht
-        // horizontal scrollen → auf MAX_PLATFORM_CHIPS begrenzen (an großen Halten zuerst per Tab eingrenzen).
-        val showPlatformGroup = platforms.size in 2..MAX_PLATFORM_CHIPS
+        val (vertPadding, iconSize) = segmentMetrics(filterHeight)
+        // Glance kann nicht scrollen: Chips nur, wenn ALLE neben die Bus/Bahn-Buttons passen.
+        // Frei = Widgetbreite − Außenpadding (2×8) − zwei Icon-Buttons (Icon + 2×6) − Abstände.
+        val vehicleDp = 2 * (iconSize.value.toInt() + 12) + 2
+        val availableDp = LocalSize.current.width.value.toInt() - 16 - vehicleDp - 8
+        val showPlatformGroup = platformChipsFit(platforms.map { it.label }, availableDp)
 
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -1081,13 +1075,42 @@ class DeparturesWidget : GlanceAppWidget() {
             if (showPlatformGroup) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     platforms.forEachIndexed { index, p ->
-                        if (index > 0) Spacer(modifier = GlanceModifier.width(2.dp))
-                        SegmentButton(null, p.label, activePlatform == p.id, UestraColors.Teal, filterHeight) {
-                            actionRunCallback<ChangePlatformAction>(actionParametersOf(ChangePlatformAction.KEY_PLATFORM to p.id))
-                        }
+                        if (index > 0) Spacer(modifier = GlanceModifier.width(PLATFORM_CHIP_GAP_DP.dp))
+                        PlatformChip(p, activePlatform == p.id, iconSize + vertPadding * 2)
                     }
                 }
             }
+        }
+    }
+
+    /** Vertikales Padding und Icongröße der Filter-Buttons je Höheneinstellung. */
+    private fun segmentMetrics(filterHeight: String) = when (filterHeight) {
+        "KOMPAKT" -> 2.dp to 16.dp
+        "GROSS" -> 7.dp to 24.dp
+        else -> 4.dp to 20.dp
+    }
+
+    /**
+     * Steig-Chip „#<Nr>" in der Linienfarbe der dort fahrenden Linien.
+     * Aktiv: voll eingefärbt; inaktiv: gedimmt (Farbe mit 35 % Deckkraft), damit die Strecke erkennbar bleibt.
+     */
+    @Composable
+    private fun PlatformChip(p: PlatformOption, isActive: Boolean, height: androidx.compose.ui.unit.Dp) {
+        val (bg, fg) = UestraColors.lineColors(p.color)
+        Box(
+            modifier = GlanceModifier
+                .height(height)
+                .cornerRadius(6.dp)
+                .background(ColorProvider(if (isActive) bg else bg.copy(alpha = 0.35f)))
+                .clickable(actionRunCallback<ChangePlatformAction>(actionParametersOf(ChangePlatformAction.KEY_PLATFORM to p.id)))
+                .padding(horizontal = PLATFORM_CHIP_PADDING_DP.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = p.label,
+                style = TextStyle(color = ColorProvider(if (isActive) fg else Color.White), fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1
+            )
         }
     }
 
@@ -1103,11 +1126,7 @@ class DeparturesWidget : GlanceAppWidget() {
         val bgColor = if (isActive) activeColor else UestraColors.SegmentInactive
         val contentColor = if (isActive) Color.White else Color.Gray
 
-        val (vertPadding, iconSize) = when (filterHeight) {
-            "KOMPAKT" -> 2.dp to 16.dp
-            "GROSS" -> 7.dp to 24.dp
-            else -> 4.dp to 20.dp
-        }
+        val (vertPadding, iconSize) = segmentMetrics(filterHeight)
 
         Box(
             modifier = GlanceModifier

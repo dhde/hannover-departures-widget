@@ -190,7 +190,7 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
                 }.getOrNull()
             } else null
             FlatDeparture(
-                line = line, lineId = lineId, destination = destination?.removePrefix("Hannover/")?.trim(), number = number,
+                line = line, lineId = lineId, destination = cleanDestination(destination), number = number,
                 transportTypes = types,
                 departureTime = dept,
                 plannedTime = event.plannedTime,
@@ -206,6 +206,19 @@ fun DepartureItem.toFlatRows(cutoffSeconds: Long = 60): List<FlatDeparture> {
         .filterNotNull()
 }
 
+
+/**
+ * Fahrtziel wie auf der Anzeigetafel: „Hannover/" (Stadtbahn) bzw. „Hannover " (Bus) vorne weg.
+ * Ein Ziel, das nur „Hannover" heißt, bleibt stehen.
+ */
+fun cleanDestination(raw: String?): String? {
+    val s = raw?.trim() ?: return null
+    return when {
+        s.startsWith("Hannover/") -> s.removePrefix("Hannover/").trim()
+        s.startsWith("Hannover ") -> s.removePrefix("Hannover ").trim()
+        else -> s
+    }
+}
 
 /**
  * Modell für die neue Haltestellensuche via /stops

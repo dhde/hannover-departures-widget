@@ -30,6 +30,6 @@ class GsonTest {
         val cached = Gson().fromJson(Gson().toJson(enriched.first()), DepartureItem::class.java)
         val row = cached.toFlatRows().single()
         assertEquals("de:03241:2021:3:2023", row.platformId)
-        assertEquals("Bus 1", row.platformLabel)
+        assertEquals("#1", row.platformLabel)
     }
 }
