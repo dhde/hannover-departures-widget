@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_type_tram">Трамвай</string>
+    <string name="common_type_bus">Автобус</string>
+    <string name="common_type_sbahn">S-Bahn</string>
+    <string name="common_type_db">DB</string>
+    <string name="common_type_fernbus">Міжміський автобус</string>
+    <string name="common_unknown">Невідомо</string>
+    <string name="common_messages">Оголошення</string>
+    <string name="common_messages_title">Оголошення: %1$s</string>
+    <string name="common_line_colon">Лінія %1$s:</string>
+    <string name="common_time_now">зараз</string>
+    <string name="common_time_gone">поїхав?</string>
+</resources>

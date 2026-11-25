@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lang_title">Мова</string>
+    <string name="lang_desc">Діє для застосунку та віджета.</string>
+    <string name="lang_system">Мова системи</string>
+</resources>

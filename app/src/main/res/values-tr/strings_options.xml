@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="opt_cancel">İptal</string>
+
+    <string name="opt_group_display">Görünüm</string>
+    <string name="opt_group_layout">Boyut &amp; düzen</string>
+    <string name="opt_group_behavior">Davranış</string>
+    <string name="opt_group_location">Konum</string>
+    <string name="opt_group_advanced">Gelişmiş</string>
+
+    <string name="opt_dup_warning_title">Uyarı</string>
+    <string name="opt_dup_warning_text">Dikkat: Bu seçeneği kapatırsan, birden fazla eklenmiş tüm duraklar silinir. Devam etmek istiyor musun?</string>
+    <string name="opt_dup_warning_confirm">Devre dışı bırak</string>
+
+    <string name="opt_reset_title">Sıfırla</string>
+    <string name="opt_reset_text">Tüm ayarları varsayılan değerlere döndürür. Birden fazla eklenmiş duraklar kaldırılır. Gizlenen duyurular korunur.</string>
+    <string name="opt_reset_button">Varsayılana sıfırla</string>
+
+    <string name="opt_add_widget">Widget\'ı ana ekrana ekle</string>
+
+    <string name="opt_transport_desc">Hangi ulaşım araçlarının gösterileceğini seç</string>
+
+    <string name="opt_nearest_count_label">GPS tıklamasında aday sayısı: %1$d</string>
+    <plurals name="opt_nearest_count_desc">
+        <item quantity="one">GPS simgesine tıklayınca en yakın %1$d durak seçim için gösterilir.</item>
+        <item quantity="other">GPS simgesine tıklayınca en yakın %1$d durak seçim için gösterilir.</item>
+    </plurals>
+
+    <string name="opt_messages_title">Duyuruları gizle</string>
+    <string name="opt_messages_ignored_count" tools:ignore="PluralsCandidate">%1$d gizli</string>
+    <string name="opt_messages_manage">Tekrarlayan duyuruları yönet</string>
+    <string name="opt_messages_sheet_desc">Artık görmek istemediğin tekrarlayan duyurular.</string>
+    <string name="opt_messages_unhide_all">Tümünü yeniden göster (%1$d)</string>
+    <string name="opt_messages_none">Henüz gizlenebilir duyuru yok. Duyurular bir günden uzun sürünce gizlenebilir. Widget\'ı birkaç kez yenile.</string>
+    <string name="opt_messages_choose">Uzun süren hangi duyuruların gizleneceğini seç:</string>
+    <plurals name="opt_messages_age_days">
+        <item quantity="one">%1$d gündür</item>
+        <item quantity="other">%1$d gündür</item>
+    </plurals>
+    <string name="opt_messages_remove">Duyuruyu kaldır</string>
+    <string name="opt_messages_show_less">Daha az göster</string>
+    <string name="opt_messages_show_all" tools:ignore="PluralsCandidate">Tümünü göster (%1$d)</string>
+
+    <string name="opt_fav_per_row_title">Satır başına favori</string>
+    <string name="opt_fav_per_row_desc">Satır başına hızlı seçim tuşu sayısı (0 – 5)</string>
+    <plurals name="opt_fav_per_row_value">
+        <item quantity="one">Satır başına %1$d düğme</item>
+        <item quantity="other">Satır başına %1$d düğme</item>
+    </plurals>
+    <string name="opt_fav_rows_title">Favori satırları</string>
+    <string name="opt_fav_rows_desc">Hızlı seçim tuşları için satır sayısı (1 – 3)</string>
+    <plurals name="opt_rows_count">
+        <item quantity="one">%1$d satır</item>
+        <item quantity="other">%1$d satır</item>
+    </plurals>
+    <string name="opt_fav_height_title">Favori düğmelerinin yüksekliği</string>
+    <string name="opt_filter_height_title">Filtre düğmelerinin yüksekliği</string>
+    <string name="opt_size_choose">Görsel boyutu seç</string>
+
+    <string name="opt_size_compact">Kompakt</string>
+    <string name="opt_size_standard">Standart</string>
+    <string name="opt_size_large">Büyük</string>
+    <string name="opt_size_small">Küçük</string>
+
+    <string name="opt_screen_on_title">Ekran açılınca yenile</string>
+    <string name="opt_screen_on_desc">Etkinse: Ekran açılır açılmaz widget API\'den yeni veri alır (sınırlı: en fazla 60 sn\'de bir).</string>
+    <string name="opt_api_refresh_title">Saat geçişinde API yenileme</string>
+    <string name="opt_api_refresh_desc">Etkinse: Dakika ile saat arasında geçişte API\'den yeni veri yüklenir (60 sn\'den eskiyse). Varsayılan: KAPALI (sadece yeniden çizim, ağ isteği yok).</string>
+
+    <string name="opt_group_departures_title">Kalkışları grupla</string>
+    <string name="opt_group_departures_desc">Aynı hat ve yöndeki sonraki kalkışları tek satırda birleştirir.</string>
+    <string name="opt_max_rows_title">En fazla kalkış</string>
+    <string name="opt_max_rows_desc">Widget\'taki satırlar (1 – 15, 15 = sınırsız)</string>
+    <string name="opt_max_rows_unlimited">Sınırsız</string>
+    <string name="opt_grouped_count_title">Hat başına ek kalkış</string>
+    <string name="opt_grouped_count_desc">Ana saatin yanında küçük gösterilen ek kalkış sayısı (0 – 5)</string>
+    <plurals name="opt_grouped_count_value">
+        <item quantity="one">%1$d ek kalkış</item>
+        <item quantity="other">%1$d ek kalkış</item>
+    </plurals>
+    <string name="opt_grouped_font_title">Sonraki kalkışların yazı boyutu</string>
+    <string name="opt_grouped_font_desc">Ana kalkışın yanındaki küçük saatlerin boyutu</string>
+
+    <string name="opt_duplicates_title">Durakları çoğalt</string>
+    <string name="opt_duplicates_desc">Farklı filtreleri (örn. Ev / Şehir yönü) kaydetmek için aynı durağı birden fazla eklemene izin verir.</string>
+
+    <string name="opt_time_title">Saat biçimi</string>
+    <string name="opt_time_desc">Saate dokunmak geri sayım ile saat arasında geçiş yapar</string>
+    <string name="opt_time_countdown">Geri sayım</string>
+    <string name="opt_time_countdown_help">{m} dakika · {s} saniye · {ss} iki haneli saniye\n[ … ] içindeki değerler 0 ise gösterilmez\nSaniyeler sadece son 2 dakikada</string>
+    <string name="opt_time_clock">Saat</string>
+    <string name="opt_time_clock_help">HH saat · mm dakika · ss saniye · a AM/PM\nSabit metin \'tırnak\' içinde, örn. \'saat\' HH:mm</string>
+    <string name="opt_time_custom">Özel biçim…</string>
+    <string name="opt_time_pattern">Desen</string>
+    <string name="opt_time_preview">Önizleme: %1$s</string>
+    <string name="opt_time_invalid">Geçersiz biçim – son kaydedilen etkin kalır</string>
+</resources>

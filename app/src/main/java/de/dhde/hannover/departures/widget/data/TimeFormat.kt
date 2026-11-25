@@ -120,14 +120,17 @@ object TimeFormat {
         clockPattern: String,
         isWarning: Boolean,
         now: Instant = Instant.now(),
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: ZoneId = ZoneId.systemDefault(),
+        // Lokalisierte Texte kommen vom Aufrufer (R.string.common_time_now/_gone); Defaults für JVM-Tests.
+        nowLabel: String = "jetzt",
+        goneLabel: String = "evtl. weg?"
     ): String {
         val dep = parse(isoTime) ?: return "?"
         if (normalizeMode(mode) == MODE_CLOCK) return formatClock(clockPattern, dep, zone)
         val secs = Duration.between(now, dep).seconds
         // Ohne Sekunden im Muster gilt die letzte Minute als "jetzt" (wie bis v1.9.7), statt "0 Min"
         val departingNow = secs <= 0 || (secs < 60 && !showsSeconds(mode, countdownPattern))
-        return if (departingNow) (if (isWarning) "evtl. weg?" else "jetzt") else formatCountdown(countdownPattern, secs)
+        return if (departingNow) (if (isWarning) goneLabel else nowLabel) else formatCountdown(countdownPattern, secs)
     }
 
     /** Kurzzeile der gruppierten Folgeabfahrten – bewusst fest und kompakt. */

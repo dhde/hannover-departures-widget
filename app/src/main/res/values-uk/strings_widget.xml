@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_loading">Завантаження...</string>
+    <string name="widget_error_timeout">Час очікування минув</string>
+    <string name="widget_error_connection">Помилка з’єднання</string>
+    <string name="widget_header_gps_nearest">Найближча зупинка за GPS</string>
+    <string name="widget_header_refresh">Оновити</string>
+    <string name="widget_empty_reload">Оновити</string>
+    <string name="widget_empty_no_departures">Немає відправлень</string>
+    <string name="widget_empty_tap_to_reload">Торкнися, щоб оновити</string>
+    <string name="widget_departure_cancelled">Рейс скасовано</string>
+    <string name="widget_filter_only_bus">Лише автобус</string>
+    <string name="widget_filter_only_tram">Лише трамвай</string>
+    <string name="widget_filter_all_types">Усі види</string>
+    <string name="widget_picker_title">Обери зупинку</string>
+    <string name="widget_picker_close">Закрити</string>
+    <string name="widget_picker_auto_follow">Авто-стеження</string>
+    <string name="widget_picker_no_location">Місцезнаходження недоступне</string>
+    <string name="widget_picker_no_stations">Немає зупинок для цього фільтра</string>
+    <string name="widget_picker_distance_m">%1$d m</string>
+    <string name="widget_footer_updated">Стан: %1$s</string>
+    <string name="widget_footer_updated_stale">Стан: %1$s (застаріло ⚠️)</string>
+    <string name="widget_footer_unofficial">Неофіційно</string>
+</resources>

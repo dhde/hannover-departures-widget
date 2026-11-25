@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lang_title">Language</string>
+    <string name="lang_desc">Applies to the app and the widget.</string>
+    <string name="lang_system">System language</string>
+</resources>

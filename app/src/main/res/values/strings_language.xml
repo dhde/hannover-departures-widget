@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sprachauswahl (Optionen). Sprachnamen selbst kommen aus AppLocale.nativeName(). -->
+<resources>
+    <string name="lang_title">Sprache</string>
+    <string name="lang_desc">Gilt für App und Widget.</string>
+    <string name="lang_system">Systemsprache</string>
+</resources>

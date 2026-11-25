@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lang_title">Язык</string>
+    <string name="lang_desc">Действует для приложения и виджета.</string>
+    <string name="lang_system">Язык системы</string>
+</resources>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="main_loading">Loading...</string>
+    <string name="main_save">Save</string>
+    <string name="main_cancel">Cancel</string>
+    <string name="main_line_label">Line %1$s</string>
+
+    <string name="main_nav_dashboard">Departures</string>
+    <string name="main_nav_search">Search</string>
+    <string name="main_nav_favorites">Favourites</string>
+    <string name="main_nav_options">Settings</string>
+    <string name="main_nav_help">Help</string>
+    <string name="main_nav_debug">Debug</string>
+
+    <string name="main_topbar_preview_station">Widget preview · %1$s</string>
+    <string name="main_topbar_active_station">Active: %1$s</string>
+
+    <string name="main_messages_locked">can be hidden from tomorrow</string>
+    <string name="main_messages_to_app">Open app</string>
+    <string name="main_messages_leave">Close</string>
+
+    <string name="main_preview_label">Widget preview</string>
+    <string name="main_preview_last_update">Last update: %1$s</string>
+    <string name="main_preview_info">Info</string>
+    <string name="main_preview_gps">GPS – nearest stop</string>
+    <string name="main_preview_refresh">Refresh</string>
+    <string name="main_preview_cancelled">Cancelled</string>
+
+    <string name="main_picker_title">Choose stop</string>
+    <string name="main_picker_filter_enable">Enable filter</string>
+    <string name="main_picker_show_all">Show all</string>
+    <string name="main_picker_auto_follow">Auto-follow</string>
+    <string name="main_picker_request_permission">Grant permission</string>
+    <string name="main_picker_no_stations_filter">No stops for this filter</string>
+    <string name="main_picker_permission_missing">Location permission missing</string>
+    <string name="main_picker_permission_denied">Permission was not granted</string>
+    <string name="main_picker_location_unavailable">Location unavailable</string>
+    <string name="main_picker_no_stations_nearby">No stops nearby</string>
+
+    <string name="main_search_section">Search stop</string>
+    <string name="main_search_placeholder">e.g. Kröpcke, Roderbruch…</string>
+    <string name="main_search_results">Results</string>
+    <string name="main_search_failed">Search failed: %1$s</string>
+    <string name="main_search_active">ACTIVE</string>
+    <string name="main_search_fav_remove">Remove favourite</string>
+    <string name="main_search_fav_add">Add favourite</string>
+
+    <string name="main_fav_section">My favourites</string>
+    <string name="main_fav_empty">No favourites yet. Search for a stop and tap ⭐.</string>
+    <string name="main_fav_alias_title">Alias for %1$s</string>
+    <string name="main_fav_alias_placeholder">e.g. Home, Work...</string>
+    <string name="main_fav_move">Move</string>
+    <string name="main_fav_edit_alias">Edit alias</string>
+    <string name="main_fav_filter_lines">Filter lines</string>
+    <string name="main_fav_duplicate">Duplicate</string>
+    <string name="main_fav_delete">Delete</string>
+
+    <string name="main_line_filter_title">Filter lines: %1$s</string>
+    <string name="main_line_filter_empty">Couldn\'t find any lines for this stop right now.</string>
+
+    <string name="main_help_support_section">Support &amp; source code</string>
+    <string name="main_help_donate">Buy me a coffee</string>
+    <string name="main_help_source_github">Source code on GitHub</string>
+    <string name="main_help_features_section">Widget features</string>
+    <string name="main_help_interaction_section">Interaction &amp; updates</string>
+    <string name="main_help_legal_title">Legal notice</string>
+    <string name="main_help_legal_text">This is an unofficial app. It is not affiliated with ÜSTRA Hannoversche Verkehrsbetriebe AG or GVH. All data is obtained via public interfaces. Use at your own risk.</string>
+    <string name="main_help_version">Version %1$s</string>
+    <string name="main_help_debug_enabled">Debug mode enabled</string>
+    <string name="main_help_debug_disabled">Debug mode disabled</string>
+
+    <string name="main_help_messages_title">Alerts &amp; filters</string>
+    <string name="main_help_messages_desc">Tap the golden \'i\' at the top left of the widget to read current alerts and disruptions. Alerts that last longer than a day (e.g. long-term roadworks or vehicle notices) can be hidden in the settings.</string>
+    <string name="main_help_quick_title">Favourite shortcuts</string>
+    <string name="main_help_quick_desc">Use the shortcut buttons at the bottom of the widget or tap the stop name at the top to switch between stops.</string>
+    <string name="main_help_platforms_title">Platforms &amp; filters</string>
+    <string name="main_help_platforms_desc">Tap a platform (e.g. “#1”, “#17”) to show only departures from there. The colour shows the lines serving it. Everything leaving from the same platform goes in the same direction. Tap again to show all.</string>
+    <string name="main_help_size_title">Size</string>
+    <string name="main_help_size_desc">In the settings you can change the size of the filter and favourite buttons (\'COMPACT\', \'STANDARD\', \'LARGE\') if you prefer larger tap targets.</string>
+    <string name="main_help_time_title">Time display</string>
+    <string name="main_help_time_desc">Tap a departure time in the widget to switch between countdown (minutes) and exact time. (Tip: in the settings you can choose whether this switches offline or refreshes from the API.)</string>
+    <string name="main_help_time_desc_short">Tap a departure time in the widget to switch between countdown (minutes) and exact time.</string>
+    <string name="main_help_refresh_title">Refreshing</string>
+    <string name="main_help_refresh_desc">To save battery and data, the widget doesn\'t load data in the background. To get current real-time data and delays from the API, tap the small refresh arrow at the top right.</string>
+    <string name="main_help_refresh_desc_legacy">The widget refreshes itself about every 15 minutes. For instant real-time data, tap the small refresh arrow at the top right.</string>
+    <string name="main_help_gps_title">GPS search</string>
+    <string name="main_help_gps_desc">Tap the location icon to have the widget automatically show departures from the nearest stop. Your position is updated on every refresh, so the display follows you while you\'re on the move.</string>
+</resources>

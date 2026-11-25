@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texte des Optionen-Screens (OptionsScreen.kt, TimeFormatCard.kt). Standardsprache Deutsch. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Allgemein -->
+    <string name="opt_cancel">Abbrechen</string>
+
+    <!-- Gruppen-Überschriften (werden zur Anzeige in Großbuchstaben umgewandelt) -->
+    <string name="opt_group_display">Anzeige</string>
+    <string name="opt_group_layout">Größe &amp; Layout</string>
+    <string name="opt_group_behavior">Verhalten</string>
+    <string name="opt_group_location">Standort</string>
+    <string name="opt_group_advanced">Erweitert</string>
+
+    <!-- Dialog: Duplikate deaktivieren -->
+    <string name="opt_dup_warning_title">Warnung</string>
+    <string name="opt_dup_warning_text">Achtung: Wenn du diese Option ausschaltest, werden alle mehrfach angelegten Haltestellen gelöscht. Möchtest du fortfahren?</string>
+    <string name="opt_dup_warning_confirm">Deaktivieren</string>
+
+    <!-- Zurücksetzen -->
+    <string name="opt_reset_title">Zurücksetzen</string>
+    <string name="opt_reset_text">Setzt alle Einstellungen auf die Standardwerte zurück. Mehrfach angelegte Haltestellen werden dabei entfernt. Ausgeblendete Meldungen bleiben erhalten.</string>
+    <string name="opt_reset_button">Auf Standard zurücksetzen</string>
+
+    <!-- Widget hinzufügen -->
+    <string name="opt_add_widget">Widget zum Startbildschirm hinzufügen</string>
+
+    <!-- Verkehrsmittel -->
+    <string name="opt_transport_desc">Wähle aus, welche Verkehrsmittel angezeigt werden sollen</string>
+
+    <!-- Standort -->
+    <string name="opt_nearest_count_label">Anzahl Kandidaten beim GPS-Klick: %1$d</string>
+    <plurals name="opt_nearest_count_desc">
+        <item quantity="one">Beim Klick auf das GPS-Icon erscheint die nächste Haltestelle (%1$d) zur Auswahl.</item>
+        <item quantity="other">Beim Klick auf das GPS-Icon erscheinen die %1$d nächsten Haltestellen zur Auswahl.</item>
+    </plurals>
+
+    <!-- Meldungen ausblenden -->
+    <string name="opt_messages_title">Meldungen ausblenden</string>
+    <string name="opt_messages_ignored_count" tools:ignore="PluralsCandidate">%1$d ausgeblendet</string>
+    <string name="opt_messages_manage">Wiederkehrende Meldungen verwalten</string>
+    <string name="opt_messages_sheet_desc">Wiederkehrende Meldungen, die du nicht mehr sehen willst.</string>
+    <string name="opt_messages_unhide_all">Alle wieder einblenden (%1$d)</string>
+    <string name="opt_messages_none">Noch keine ausblendbaren Meldungen. Meldungen lassen sich ausblenden, sobald sie länger als einen Tag bestehen. Lade das Widget einige Male neu.</string>
+    <string name="opt_messages_choose">Wähle aus, welche länger bestehenden Meldungen ausgeblendet werden sollen:</string>
+    <plurals name="opt_messages_age_days">
+        <item quantity="one">seit %1$d Tag</item>
+        <item quantity="other">seit %1$d Tagen</item>
+    </plurals>
+    <string name="opt_messages_remove">Meldung entfernen</string>
+    <string name="opt_messages_show_less">Weniger anzeigen</string>
+    <string name="opt_messages_show_all" tools:ignore="PluralsCandidate">Alle %1$d anzeigen</string>
+
+    <!-- Favoriten-Layout -->
+    <string name="opt_fav_per_row_title">Favoriten pro Zeile</string>
+    <string name="opt_fav_per_row_desc">Anzahl der Schnellwahl-Tasten pro Zeile (0 bis 5)</string>
+    <plurals name="opt_fav_per_row_value">
+        <item quantity="one">%1$d Knopf pro Zeile</item>
+        <item quantity="other">%1$d Knöpfe pro Zeile</item>
+    </plurals>
+    <string name="opt_fav_rows_title">Zeilen für Favoriten</string>
+    <string name="opt_fav_rows_desc">Anzahl der Zeilen für Schnellwahl-Tasten (1 bis 3)</string>
+    <plurals name="opt_rows_count">
+        <item quantity="one">%1$d Zeile</item>
+        <item quantity="other">%1$d Zeilen</item>
+    </plurals>
+    <string name="opt_fav_height_title">Höhe der Favoriten-Buttons</string>
+    <string name="opt_filter_height_title">Höhe der Filter-Buttons</string>
+    <string name="opt_size_choose">Wähle die visuelle Größe aus</string>
+
+    <!-- Größen-Optionen (Anzeige; die Speicherwerte KOMPAKT/STANDARD/GROSS/KLEIN bleiben unverändert) -->
+    <string name="opt_size_compact">Kompakt</string>
+    <string name="opt_size_standard">Standard</string>
+    <string name="opt_size_large">Groß</string>
+    <string name="opt_size_small">Klein</string>
+
+    <!-- Verhalten -->
+    <string name="opt_screen_on_title">Refresh beim Display-An</string>
+    <string name="opt_screen_on_desc">Wenn aktiv: Sobald das Display angeht, holt das Widget neue Daten von der API (gedrosselt: max. alle 60 Sek.).</string>
+    <string name="opt_api_refresh_title">API-Refresh bei Zeitumschaltung</string>
+    <string name="opt_api_refresh_desc">Wenn aktiv: Beim Umschalten zwischen Minuten und Uhrzeit werden neue Daten von der API geladen (falls älter als 60 Sek.). Standard: AUS (nur Redraw, kein Netzwerkaufruf).</string>
+
+    <!-- Abfahrten gruppieren -->
+    <string name="opt_group_departures_title">Abfahrten gruppieren</string>
+    <string name="opt_group_departures_desc">Fasst nachfolgende Abfahrten derselben Linie und Richtung in einer Zeile zusammen.</string>
+    <string name="opt_max_rows_title">Maximale Abfahrten</string>
+    <string name="opt_max_rows_desc">Zeilen im Widget (1 bis 15, 15 = unbegrenzt)</string>
+    <string name="opt_max_rows_unlimited">Unbegrenzt</string>
+    <string name="opt_grouped_count_title">Zusätzliche Abfahrten pro Linie</string>
+    <string name="opt_grouped_count_desc">Anzahl weiterer Abfahrten, die klein neben der Hauptzeit angezeigt werden (0 bis 5)</string>
+    <plurals name="opt_grouped_count_value">
+        <item quantity="one">%1$d weitere Abfahrt</item>
+        <item quantity="other">%1$d weitere Abfahrten</item>
+    </plurals>
+    <string name="opt_grouped_font_title">Schriftgröße der Folge-Abfahrten</string>
+    <string name="opt_grouped_font_desc">Größe der kleinen Zeitangaben neben der Hauptabfahrt</string>
+
+    <!-- Erweitert -->
+    <string name="opt_duplicates_title">Haltestellen duplizieren</string>
+    <string name="opt_duplicates_desc">Erlaubt es, dieselbe Haltestelle mehrfach anzulegen, um unterschiedliche Filter (z.B. Richtung Home / City) zu speichern.</string>
+
+    <!-- Zeitformat (TimeFormatCard) -->
+    <string name="opt_time_title">Zeitformat</string>
+    <string name="opt_time_desc">Tippen auf die Zeit wechselt zwischen Countdown und Uhrzeit</string>
+    <string name="opt_time_countdown">Countdown</string>
+    <string name="opt_time_countdown_help">{m} Minuten · {s} Sekunden · {ss} Sekunden zweistellig\n[ … ] entfällt, wenn die Werte darin 0 sind\nSekunden erst in den letzten 2 Minuten</string>
+    <string name="opt_time_clock">Uhrzeit</string>
+    <string name="opt_time_clock_help">HH Stunde · mm Minute · ss Sekunde · a AM/PM\nFester Text in \'Anführungszeichen\', z. B. HH:mm \'Uhr\'</string>
+    <string name="opt_time_custom">Eigenes Format…</string>
+    <string name="opt_time_pattern">Muster</string>
+    <string name="opt_time_preview">Vorschau: %1$s</string>
+    <string name="opt_time_invalid">Ungültiges Format – das zuletzt gespeicherte bleibt aktiv</string>
+</resources>

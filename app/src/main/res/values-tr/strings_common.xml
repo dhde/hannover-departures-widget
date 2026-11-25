@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_type_tram">Tramvay</string>
+    <string name="common_type_bus">Otobüs</string>
+    <string name="common_type_sbahn">S-Bahn</string>
+    <string name="common_type_db">DB</string>
+    <string name="common_type_fernbus">Şehirlerarası otobüs</string>
+    <string name="common_unknown">Bilinmiyor</string>
+    <string name="common_messages">Duyurular</string>
+    <string name="common_messages_title">Duyurular: %1$s</string>
+    <string name="common_line_colon">Hat %1$s:</string>
+    <string name="common_time_now">şimdi</string>
+    <string name="common_time_gone">gitti mi?</string>
+</resources>

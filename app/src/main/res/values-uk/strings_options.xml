@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="opt_cancel">Скасувати</string>
+
+    <string name="opt_group_display">Відображення</string>
+    <string name="opt_group_layout">Розмір &amp; макет</string>
+    <string name="opt_group_behavior">Поведінка</string>
+    <string name="opt_group_location">Геолокація</string>
+    <string name="opt_group_advanced">Додатково</string>
+
+    <string name="opt_dup_warning_title">Попередження</string>
+    <string name="opt_dup_warning_text">Увага: якщо вимкнеш цю опцію, усі дубльовані зупинки буде видалено. Продовжити?</string>
+    <string name="opt_dup_warning_confirm">Вимкнути</string>
+
+    <string name="opt_reset_title">Скидання</string>
+    <string name="opt_reset_text">Скидає всі налаштування до стандартних. Дубльовані зупинки при цьому видаляються. Приховані оголошення зберігаються.</string>
+    <string name="opt_reset_button">Скинути до стандартних</string>
+
+    <string name="opt_add_widget">Додати віджет на головний екран</string>
+
+    <string name="opt_transport_desc">Обери, які види транспорту показувати</string>
+
+    <string name="opt_nearest_count_label">Кандидатів при натисканні GPS: %1$d</string>
+    <plurals name="opt_nearest_count_desc">
+        <item quantity="one">Після натискання значка GPS для вибору з’являться найближчі зупинки (кількість: %1$d).</item>
+        <item quantity="few">Після натискання значка GPS для вибору з’являться найближчі зупинки (кількість: %1$d).</item>
+        <item quantity="many">Після натискання значка GPS для вибору з’являться найближчі зупинки (кількість: %1$d).</item>
+        <item quantity="other">Після натискання значка GPS для вибору з’являться найближчі зупинки (кількість: %1$d).</item>
+    </plurals>
+
+    <string name="opt_messages_title">Приховати оголошення</string>
+    <string name="opt_messages_ignored_count" tools:ignore="PluralsCandidate">Приховано: %1$d</string>
+    <string name="opt_messages_manage">Керувати повторюваними оголошеннями</string>
+    <string name="opt_messages_sheet_desc">Повторювані оголошення, які ти більше не хочеш бачити.</string>
+    <string name="opt_messages_unhide_all">Показати всі знову (%1$d)</string>
+    <string name="opt_messages_none">Поки немає оголошень, які можна приховати. Оголошення можна приховати, якщо вони діють довше одного дня. Онови віджет кілька разів.</string>
+    <string name="opt_messages_choose">Обери, які тривалі оголошення приховати:</string>
+    <plurals name="opt_messages_age_days">
+        <item quantity="one">вже %1$d день</item>
+        <item quantity="few">вже %1$d дні</item>
+        <item quantity="many">вже %1$d днів</item>
+        <item quantity="other">вже %1$d дня</item>
+    </plurals>
+    <string name="opt_messages_remove">Видалити оголошення</string>
+    <string name="opt_messages_show_less">Показати менше</string>
+    <string name="opt_messages_show_all" tools:ignore="PluralsCandidate">Показати всі (%1$d)</string>
+
+    <string name="opt_fav_per_row_title">Обране в рядку</string>
+    <string name="opt_fav_per_row_desc">Кількість кнопок швидкого вибору в рядку (від 0 до 5)</string>
+    <plurals name="opt_fav_per_row_value">
+        <item quantity="one">Кнопок у рядку: %1$d</item>
+        <item quantity="few">Кнопок у рядку: %1$d</item>
+        <item quantity="many">Кнопок у рядку: %1$d</item>
+        <item quantity="other">Кнопок у рядку: %1$d</item>
+    </plurals>
+    <string name="opt_fav_rows_title">Рядки для обраного</string>
+    <string name="opt_fav_rows_desc">Кількість рядків для кнопок швидкого вибору (від 1 до 3)</string>
+    <plurals name="opt_rows_count">
+        <item quantity="one">Рядків: %1$d</item>
+        <item quantity="few">Рядків: %1$d</item>
+        <item quantity="many">Рядків: %1$d</item>
+        <item quantity="other">Рядків: %1$d</item>
+    </plurals>
+    <string name="opt_fav_height_title">Висота кнопок обраного</string>
+    <string name="opt_filter_height_title">Висота кнопок фільтра</string>
+    <string name="opt_size_choose">Обери візуальний розмір</string>
+
+    <string name="opt_size_compact">Компактно</string>
+    <string name="opt_size_standard">Стандарт</string>
+    <string name="opt_size_large">Великі</string>
+    <string name="opt_size_small">Малі</string>
+
+    <string name="opt_screen_on_title">Оновлення при ввімкненні екрана</string>
+    <string name="opt_screen_on_desc">Якщо увімкнено: щойно екран вмикається, віджет отримує нові дані з API (не частіше ніж раз на 60 с).</string>
+    <string name="opt_api_refresh_title">Оновлення API при перемиканні часу</string>
+    <string name="opt_api_refresh_desc">Якщо увімкнено: при перемиканні між хвилинами й часом завантажуються нові дані з API (якщо вони старші за 60 с). Стандартно: ВИМК. (лише перемальовування, без мережі).</string>
+
+    <string name="opt_group_departures_title">Групувати відправлення</string>
+    <string name="opt_group_departures_desc">Об’єднує наступні відправлення тієї ж лінії й напрямку в один рядок.</string>
+    <string name="opt_max_rows_title">Максимум відправлень</string>
+    <string name="opt_max_rows_desc">Рядки у віджеті (від 1 до 15, 15 = без обмежень)</string>
+    <string name="opt_max_rows_unlimited">Без обмежень</string>
+    <string name="opt_grouped_count_title">Додаткові відправлення на лінію</string>
+    <string name="opt_grouped_count_desc">Кількість наступних відправлень, що показуються дрібно біля основного часу (від 0 до 5)</string>
+    <plurals name="opt_grouped_count_value">
+        <item quantity="one">Ще відправлень: %1$d</item>
+        <item quantity="few">Ще відправлень: %1$d</item>
+        <item quantity="many">Ще відправлень: %1$d</item>
+        <item quantity="other">Ще відправлень: %1$d</item>
+    </plurals>
+    <string name="opt_grouped_font_title">Розмір шрифту наступних відправлень</string>
+    <string name="opt_grouped_font_desc">Розмір дрібних позначок часу біля основного відправлення</string>
+
+    <string name="opt_duplicates_title">Дублювати зупинки</string>
+    <string name="opt_duplicates_desc">Дозволяє додавати ту саму зупинку кілька разів, щоб зберігати різні фільтри (напр. напрямок Дім / Центр).</string>
+
+    <string name="opt_time_title">Формат часу</string>
+    <string name="opt_time_desc">Торкання часу перемикає між відліком і годинником</string>
+    <string name="opt_time_countdown">Відлік</string>
+    <string name="opt_time_countdown_help">{m} хвилини · {s} секунди · {ss} секунди двома цифрами\n[ … ] зникає, якщо значення в ньому 0\nСекунди лише в останні 2 хвилини</string>
+    <string name="opt_time_clock">Годинник</string>
+    <string name="opt_time_clock_help">HH година · mm хвилина · ss секунда · a AM/PM\nСталий текст в \'лапках\', напр. HH:mm \'год\'</string>
+    <string name="opt_time_custom">Власний формат…</string>
+    <string name="opt_time_pattern">Шаблон</string>
+    <string name="opt_time_preview">Перегляд: %1$s</string>
+    <string name="opt_time_invalid">Неправильний формат – діє останній збережений</string>
+</resources>

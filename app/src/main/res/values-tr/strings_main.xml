@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="main_loading">Yükleniyor...</string>
+    <string name="main_save">Kaydet</string>
+    <string name="main_cancel">İptal</string>
+    <string name="main_line_label">Hat %1$s</string>
+
+    <string name="main_nav_dashboard">Kalkışlar</string>
+    <string name="main_nav_search">Ara</string>
+    <string name="main_nav_favorites">Favoriler</string>
+    <string name="main_nav_options">Ayarlar</string>
+    <string name="main_nav_help">Yardım</string>
+    <string name="main_nav_debug">Debug</string>
+
+    <string name="main_topbar_preview_station">Widget önizleme · %1$s</string>
+    <string name="main_topbar_active_station">Aktif: %1$s</string>
+
+    <string name="main_messages_locked">ancak yarından itibaren gizlenebilir</string>
+    <string name="main_messages_to_app">Uygulamaya git</string>
+    <string name="main_messages_leave">Çık</string>
+
+    <string name="main_preview_label">Widget önizleme</string>
+    <string name="main_preview_last_update">Son güncelleme: %1$s</string>
+    <string name="main_preview_info">Bilgi</string>
+    <string name="main_preview_gps">GPS – en yakın durak</string>
+    <string name="main_preview_refresh">Yenile</string>
+    <string name="main_preview_cancelled">Sefer iptal</string>
+
+    <string name="main_picker_title">Durak seç</string>
+    <string name="main_picker_filter_enable">Filtreyi etkinleştir</string>
+    <string name="main_picker_show_all">Tümünü göster</string>
+    <string name="main_picker_auto_follow">Otomatik takip</string>
+    <string name="main_picker_request_permission">İzin iste</string>
+    <string name="main_picker_no_stations_filter">Bu filtre için durak yok</string>
+    <string name="main_picker_permission_missing">Konum izni yok</string>
+    <string name="main_picker_permission_denied">İzin verilmedi</string>
+    <string name="main_picker_location_unavailable">Konum kullanılamıyor</string>
+    <string name="main_picker_no_stations_nearby">Yakında durak yok</string>
+
+    <string name="main_search_section">Durak ara</string>
+    <string name="main_search_placeholder">örn. Kröpcke, Roderbruch…</string>
+    <string name="main_search_results">Sonuçlar</string>
+    <string name="main_search_failed">Arama başarısız: %1$s</string>
+    <string name="main_search_active">AKTİF</string>
+    <string name="main_search_fav_remove">Favoriden çıkar</string>
+    <string name="main_search_fav_add">Favorilere ekle</string>
+
+    <string name="main_fav_section">Favorilerim</string>
+    <string name="main_fav_empty">Henüz favori yok. Bir durak ara ve ⭐\'a dokun.</string>
+    <string name="main_fav_alias_title">%1$s için takma ad</string>
+    <string name="main_fav_alias_placeholder">örn. Ev, İş...</string>
+    <string name="main_fav_move">Taşı</string>
+    <string name="main_fav_edit_alias">Takma adı düzenle</string>
+    <string name="main_fav_filter_lines">Hatları filtrele</string>
+    <string name="main_fav_duplicate">Çoğalt</string>
+    <string name="main_fav_delete">Sil</string>
+
+    <string name="main_line_filter_title">Hatları filtrele: %1$s</string>
+    <string name="main_line_filter_empty">Şu anda bu durak için hat bulunamadı.</string>
+
+    <string name="main_help_support_section">Destek &amp; kaynak kodu</string>
+    <string name="main_help_donate">Kahve ısmarla</string>
+    <string name="main_help_source_github">GitHub\'da kaynak kodu</string>
+    <string name="main_help_features_section">Widget özellikleri</string>
+    <string name="main_help_interaction_section">Etkileşim &amp; güncellemeler</string>
+    <string name="main_help_legal_title">Yasal uyarı</string>
+    <string name="main_help_legal_text">Bu resmî olmayan bir uygulamadır. ÜSTRA Hannoversche Verkehrsbetriebe AG veya GVH ile hiçbir bağlantısı yoktur. Tüm veriler herkese açık arayüzlerden alınır. Kullanım riski sana aittir.</string>
+    <string name="main_help_version">Sürüm %1$s</string>
+    <string name="main_help_debug_enabled">Debug modu etkin</string>
+    <string name="main_help_debug_disabled">Debug modu devre dışı</string>
+
+    <string name="main_help_messages_title">Bilgi duyuruları &amp; filtre</string>
+    <string name="main_help_messages_desc">Güncel duyuruları ve aksaklıkları okumak için widget\'ın sol üstündeki altın renkli \'i\'ye dokun. Bir günden uzun süren duyurular (örn. uzun süreli inşaat çalışmaları veya araç bilgileri) Ayarlar\'dan gizlenebilir.</string>
+    <string name="main_help_quick_title">Favori hızlı seçimi</string>
+    <string name="main_help_quick_desc">Duraklar arasında geçiş yapmak için widget\'ın en altındaki hızlı seçim tuşlarını kullan ya da üstteki durak adına dokun.</string>
+    <string name="main_help_platforms_title">Peronlar &amp; filtre</string>
+    <string name="main_help_platforms_desc">Yalnızca oradan kalkışları görmek için bir perona dokun (örn. „#1“, „#17“). Renk, oradan geçen hatları gösterir. Aynı perondan kalkan her şey aynı yöne gider. Tekrar dokununca yine tümü görünür.</string>
+    <string name="main_help_size_title">Boyut ayarı</string>
+    <string name="main_help_size_desc">Daha büyük dokunma alanları istersen, Ayarlar\'dan filtre ve favori düğmelerinin görsel boyutunu (\'KOMPAKT\', \'STANDART\', \'BÜYÜK\') ayarlayabilirsin.</string>
+    <string name="main_help_time_title">Saat görünümü</string>
+    <string name="main_help_time_desc">Geri sayım (dakika) ile tam saat arasında geçiş yapmak için widget\'ta bir kalkış saatine dokun. (İpucu: Ayarlar\'da geçişin çevrimdışı mı olacağını yoksa API\'nin mi güncelleneceğini seçebilirsin.)</string>
+    <string name="main_help_time_desc_short">Geri sayım (dakika) ile tam saat arasında geçiş yapmak için widget\'ta bir kalkış saatine dokun.</string>
+    <string name="main_help_refresh_title">Güncelleme</string>
+    <string name="main_help_refresh_desc">Widget, pil ve veri tasarrufu için arka planda veri yüklemez. API\'den güncel gerçek zamanlı verileri ve gecikmeleri almak için sağ üstteki küçük yenileme okuna dokun.</string>
+    <string name="main_help_refresh_desc_legacy">Widget kendini yaklaşık 15 dakikada bir yeniler. Anında gerçek zamanlı veri için sağ üstteki küçük yenileme okuna dokun.</string>
+    <string name="main_help_gps_title">GPS araması</string>
+    <string name="main_help_gps_desc">Widget\'ın en yakın duraktaki kalkışları otomatik göstermesi için konum simgesine dokun. Her yenilemede konum yeniden belirlenir; böylece yoldayken görünüm seni takip eder.</string>
+</resources>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_loading">Loading...</string>
+
+    <string name="widget_error_timeout">Timeout</string>
+    <string name="widget_error_connection">Connection failed</string>
+
+    <string name="widget_header_gps_nearest">Nearest stop via GPS</string>
+    <string name="widget_header_refresh">Refresh</string>
+
+    <string name="widget_empty_reload">Reload</string>
+    <string name="widget_empty_no_departures">No departures</string>
+    <string name="widget_empty_tap_to_reload">Tap to reload</string>
+    <string name="widget_departure_cancelled">Cancelled</string>
+
+    <string name="widget_filter_only_bus">Bus only</string>
+    <string name="widget_filter_only_tram">Tram only</string>
+    <string name="widget_filter_all_types">All types</string>
+
+    <string name="widget_picker_title">Choose stop</string>
+    <string name="widget_picker_close">Close</string>
+    <string name="widget_picker_auto_follow">Auto-follow</string>
+    <string name="widget_picker_no_location">Location unavailable</string>
+    <string name="widget_picker_no_stations">No stops for this filter</string>
+    <string name="widget_picker_distance_m">%1$d m</string>
+
+    <string name="widget_footer_updated">As of: %1$s</string>
+    <string name="widget_footer_updated_stale">As of: %1$s (stale ⚠️)</string>
+    <string name="widget_footer_unofficial">Unofficial</string>
+</resources>

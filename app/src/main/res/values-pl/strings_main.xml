@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="main_loading">Ładowanie...</string>
+    <string name="main_save">Zapisz</string>
+    <string name="main_cancel">Anuluj</string>
+    <string name="main_line_label">Linia %1$s</string>
+
+    <string name="main_nav_dashboard">Odjazdy</string>
+    <string name="main_nav_search">Szukaj</string>
+    <string name="main_nav_favorites">Ulubione</string>
+    <string name="main_nav_options">Ustawienia</string>
+    <string name="main_nav_help">Pomoc</string>
+    <string name="main_nav_debug">Debug</string>
+
+    <string name="main_topbar_preview_station">Podgląd widżetu · %1$s</string>
+    <string name="main_topbar_active_station">Aktywny: %1$s</string>
+
+    <string name="main_messages_locked">ukrycie możliwe od jutra</string>
+    <string name="main_messages_to_app">Do aplikacji</string>
+    <string name="main_messages_leave">Wyjdź</string>
+
+    <string name="main_preview_label">Podgląd widżetu</string>
+    <string name="main_preview_last_update">Ostatnia aktualizacja: %1$s</string>
+    <string name="main_preview_info">Info</string>
+    <string name="main_preview_gps">GPS – najbliższy przystanek</string>
+    <string name="main_preview_refresh">Odśwież</string>
+    <string name="main_preview_cancelled">Kurs odwołany</string>
+
+    <string name="main_picker_title">Wybierz przystanek</string>
+    <string name="main_picker_filter_enable">Włącz filtr</string>
+    <string name="main_picker_show_all">Pokaż wszystkie</string>
+    <string name="main_picker_auto_follow">Auto-śledzenie</string>
+    <string name="main_picker_request_permission">Poproś o uprawnienie</string>
+    <string name="main_picker_no_stations_filter">Brak przystanków dla tego filtra</string>
+    <string name="main_picker_permission_missing">Brak uprawnienia do lokalizacji</string>
+    <string name="main_picker_permission_denied">Nie przyznano uprawnienia</string>
+    <string name="main_picker_location_unavailable">Lokalizacja niedostępna</string>
+    <string name="main_picker_no_stations_nearby">Brak przystanków w pobliżu</string>
+
+    <string name="main_search_section">Szukaj przystanku</string>
+    <string name="main_search_placeholder">np. Kröpcke, Roderbruch…</string>
+    <string name="main_search_results">Wyniki</string>
+    <string name="main_search_failed">Błąd wyszukiwania: %1$s</string>
+    <string name="main_search_active">AKTYWNY</string>
+    <string name="main_search_fav_remove">Usuń z ulubionych</string>
+    <string name="main_search_fav_add">Dodaj do ulubionych</string>
+
+    <string name="main_fav_section">Moje ulubione</string>
+    <string name="main_fav_empty">Brak ulubionych. Wyszukaj przystanek i dotknij ⭐.</string>
+    <string name="main_fav_alias_title">Alias dla %1$s</string>
+    <string name="main_fav_alias_placeholder">np. Dom, Praca...</string>
+    <string name="main_fav_move">Przenieś</string>
+    <string name="main_fav_edit_alias">Edytuj alias</string>
+    <string name="main_fav_filter_lines">Filtruj linie</string>
+    <string name="main_fav_duplicate">Duplikuj</string>
+    <string name="main_fav_delete">Usuń</string>
+
+    <string name="main_line_filter_title">Filtruj linie: %1$s</string>
+    <string name="main_line_filter_empty">Nie znaleziono teraz linii dla tego przystanku.</string>
+
+    <string name="main_help_support_section">Wsparcie &amp; kod źródłowy</string>
+    <string name="main_help_donate">Postaw kawę</string>
+    <string name="main_help_source_github">Kod źródłowy na GitHub</string>
+    <string name="main_help_features_section">Funkcje widżetu</string>
+    <string name="main_help_interaction_section">Obsługa &amp; aktualizacje</string>
+    <string name="main_help_legal_title">Informacja prawna</string>
+    <string name="main_help_legal_text">To nieoficjalna aplikacja. Nie jest powiązana z ÜSTRA Hannoversche Verkehrsbetriebe AG ani z GVH. Wszystkie dane pochodzą z publicznych interfejsów. Korzystasz na własne ryzyko.</string>
+    <string name="main_help_version">Wersja %1$s</string>
+    <string name="main_help_debug_enabled">Tryb debugowania włączony</string>
+    <string name="main_help_debug_disabled">Tryb debugowania wyłączony</string>
+
+    <string name="main_help_messages_title">Komunikaty &amp; filtry</string>
+    <string name="main_help_messages_desc">Dotknij złotego \'i\' w lewym górnym rogu widżetu, aby przeczytać aktualne komunikaty i utrudnienia. Komunikaty trwające dłużej niż dzień (np. długie remonty lub informacje o pojazdach) możesz ukryć w ustawieniach.</string>
+    <string name="main_help_quick_title">Szybki wybór ulubionych</string>
+    <string name="main_help_quick_desc">Użyj przycisków szybkiego wyboru na dole widżetu lub dotknij nazwy przystanku u góry, aby przełączać przystanki.</string>
+    <string name="main_help_platforms_title">Perony &amp; filtry</string>
+    <string name="main_help_platforms_desc">Dotknij peronu (np. „#1”, „#17”), aby pokazać tylko odjazdy z niego. Kolor pokazuje linie, które tam kursują. Wszystko, co odjeżdża z tego samego peronu, jedzie w tym samym kierunku. Ponowne dotknięcie znów pokazuje wszystko.</string>
+    <string name="main_help_size_title">Rozmiar</string>
+    <string name="main_help_size_desc">W ustawieniach możesz zmienić wielkość przycisków filtrów i ulubionych (\'KOMPAKTOWY\', \'STANDARDOWY\', \'DUŻY\'), jeśli wolisz większe pola dotyku.</string>
+    <string name="main_help_time_title">Widok czasu</string>
+    <string name="main_help_time_desc">Dotknij czasu odjazdu w widżecie, aby przełączać między odliczaniem (minuty) a dokładną godziną. (Wskazówka: w ustawieniach wybierzesz, czy przełączanie działa offline, czy odświeża dane z API).</string>
+    <string name="main_help_time_desc_short">Dotknij czasu odjazdu w widżecie, aby przełączać między odliczaniem (minuty) a dokładną godziną.</string>
+    <string name="main_help_refresh_title">Aktualizacja</string>
+    <string name="main_help_refresh_desc">Aby oszczędzać baterię i dane, widżet nie pobiera danych w tle. Aby pobrać aktualne dane na żywo i opóźnienia z API, dotknij małej strzałki odświeżania w prawym górnym rogu.</string>
+    <string name="main_help_refresh_desc_legacy">Widżet odświeża się sam mniej więcej co 15 minut. Aby od razu pobrać dane na żywo, dotknij małej strzałki odświeżania w prawym górnym rogu.</string>
+    <string name="main_help_gps_title">Wyszukiwanie GPS</string>
+    <string name="main_help_gps_desc">Dotknij ikony lokalizacji, aby widżet automatycznie pokazywał odjazdy z najbliższego przystanku. Przy każdym odświeżeniu pozycja jest ustalana na nowo, więc widok podąża za tobą w drodze.</string>
+</resources>

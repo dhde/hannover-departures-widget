@@ -77,6 +77,8 @@ import kotlinx.coroutines.launch
 import androidx.glance.appwidget.updateAll
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import de.dhde.hannover.departures.widget.ui.transportTypeLabel
 
 import android.content.Intent
 
@@ -89,6 +91,11 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* permission result handled silently */ }
+
+    // Android 8–12: gewählte App-Sprache anwenden (ab 13 macht das System das selbst).
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(de.dhde.hannover.departures.widget.data.AppLocale.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -180,7 +187,7 @@ class MainActivity : ComponentActivity() {
                                         val nowMillis = System.currentTimeMillis()
                                         data.groupedMsgs.forEach { (line, lineMsgs) ->
                                             Text(
-                                                text = "Linie $line:",
+                                                text = stringResource(R.string.common_line_colon, line),
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -203,7 +210,7 @@ class MainActivity : ComponentActivity() {
                                                     if (isFresh) {
                                                         Icon(
                                                             Icons.Default.Lock,
-                                                            contentDescription = "erst ab morgen ausblendbar",
+                                                            contentDescription = stringResource(R.string.main_messages_locked),
                                                             tint = UestraColors.TextSub,
                                                             modifier = Modifier.padding(top = 10.dp, start = 4.dp).size(18.dp)
                                                         )
@@ -231,7 +238,7 @@ class MainActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.End
                                 ) {
                                     TextButton(onClick = { infoDialogState = null }) {
-                                        Text("Zur App", color = UestraColors.TextSub, fontWeight = FontWeight.Bold)
+                                        Text(stringResource(R.string.main_messages_to_app), color = UestraColors.TextSub, fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Button(
@@ -241,7 +248,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = UestraColors.AccentRed)
                                     ) {
-                                        Text("Verlassen", color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text(stringResource(R.string.main_messages_leave), color = Color.White, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -259,7 +266,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == "de.dhde.hannover.departures.SHOW_INFO") {
-            val title = intent.getStringExtra("info_title") ?: "Meldungen"
+            val title = intent.getStringExtra("info_title") ?: getString(R.string.common_messages)
             val msgsJson = intent.getStringExtra("info_msgs_json")
             if (msgsJson != null) {
                 // Structured JSON: List<LineMessages> = [{line, messages:[{id,content,startMillis}]}, ...]
@@ -283,20 +290,20 @@ class MainActivity : ComponentActivity() {
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
-enum class AppScreen(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    DASHBOARD("Abfahrten", Icons.Default.Dashboard),
-    SEARCH("Suchen", Icons.Default.Search),
-    FAVORITES("Favoriten", Icons.Default.Star),
-    OPTIONS("Optionen", Icons.Default.Settings),
-    HELP("Hilfe", Icons.Default.Info),
-    DEBUG("Debug", Icons.Default.BugReport)
+enum class AppScreen(val labelRes: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    DASHBOARD(R.string.main_nav_dashboard, Icons.Default.Dashboard),
+    SEARCH(R.string.main_nav_search, Icons.Default.Search),
+    FAVORITES(R.string.main_nav_favorites, Icons.Default.Star),
+    OPTIONS(R.string.main_nav_options, Icons.Default.Settings),
+    HELP(R.string.main_nav_help, Icons.Default.Info),
+    DEBUG(R.string.main_nav_debug, Icons.Default.BugReport)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
-    val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
+    val activeStationName by repo.effectiveStationName.collectAsState(initial = stringResource(R.string.main_loading))
     val context = LocalContext.current
     val sessionStore = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
     val debugMode by sessionStore.debugModeFlow().collectAsState(initial = false)
@@ -310,13 +317,13 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
                 title = {
                 Column {
                     Text(
-                        "Hannover Abfahrten Stadtbahnen",
+                        stringResource(R.string.app_name),
                         fontWeight = FontWeight.Bold,
                         fontSize   = 18.sp,
                         color      = UestraColors.TextMain
                     )
                     Text(
-                        text = if (currentScreen == AppScreen.DASHBOARD) "Widget Vorschau · $activeStationName" else "Aktiv: $activeStationName",
+                        text = if (currentScreen == AppScreen.DASHBOARD) stringResource(R.string.main_topbar_preview_station, activeStationName) else stringResource(R.string.main_topbar_active_station, activeStationName),
                         fontSize = 12.sp,
                         color    = if (currentScreen == AppScreen.DASHBOARD) UestraColors.Amber else UestraColors.Teal,
                         fontWeight = FontWeight.Medium
@@ -330,8 +337,8 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
             NavigationBar(containerColor = UestraColors.CardBg) {
                 visibleScreens.forEach { screen ->
                     NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = { Text(screen.label) },
+                        icon = { Icon(screen.icon, contentDescription = stringResource(screen.labelRes)) },
+                        label = { Text(stringResource(screen.labelRes)) },
                         selected = currentScreen == screen,
                         onClick = { currentScreen = screen },
                         colors = NavigationBarItemDefaults.colors(
@@ -364,6 +371,8 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
 fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    // Konfigurationsbewusst (Sprachwechsel): Ressourcen über LocalResources statt LocalContext.
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val session = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
 
     var showPickerSheet by remember { mutableStateOf(false) }
@@ -391,7 +400,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 val loc = de.dhde.hannover.departures.widget.widget.getBestLocation(context)
                 if (loc == null) {
                     pickerLocation = null
-                    pickerError = "Standort nicht verfügbar"
+                    pickerError = resources.getString(R.string.main_picker_location_unavailable)
                 } else {
                     pickerLocation = loc.latitude to loc.longitude
                     val count = repo.getNearestCountNow()
@@ -402,12 +411,12 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                         stops = stops, userLat = loc.latitude, userLon = loc.longitude,
                         count = count, transportFilter = filter
                     )
-                    if (pickerCandidates.isEmpty()) pickerError = "Keine Stationen in der Nähe"
+                    if (pickerCandidates.isEmpty()) pickerError = resources.getString(R.string.main_picker_no_stations_nearby)
                 }
                 pickerLoading = false
             }
         } else {
-            pickerError = "Berechtigung wurde nicht erteilt"
+            pickerError = resources.getString(R.string.main_picker_permission_denied)
             pickerLoading = false
         }
     }
@@ -416,7 +425,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
 
     val activeStationId by repo.activeStationId.collectAsState(initial = null)
     val activeFavoriteUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
-    val activeStationName by repo.effectiveStationName.collectAsState(initial = "Laden...")
+    val activeStationName by repo.effectiveStationName.collectAsState(initial = stringResource(R.string.main_loading))
     val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
     
     val maxFavorites by repo.maxFavoritesFlow.collectAsState(initial = 3)
@@ -557,7 +566,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Widget Vorschau",
+                stringResource(R.string.main_preview_label),
                 color = UestraColors.TextSub,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
@@ -590,7 +599,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                 isRefreshing = isLoading,
                 hasMessages = hasMessages,
                 gpsActive = gpsModeActive,
-                onInfoClick = { onInfoClick(InfoDialogData(title = "Meldungen: $activeStationName", groupedMsgs = groupedMessagesList)) },
+                onInfoClick = { onInfoClick(InfoDialogData(title = resources.getString(R.string.common_messages_title, activeStationName), groupedMsgs = groupedMessagesList)) },
                 onGps = {
                     scope.launch {
                         showPickerSheet = true
@@ -602,13 +611,13 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                         val fine = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                         val coarse = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                         if (!fine && !coarse) {
-                            pickerError = "Standort-Berechtigung fehlt"
+                            pickerError = resources.getString(R.string.main_picker_permission_missing)
                             pickerLoading = false
                         } else {
                             val loc = de.dhde.hannover.departures.widget.widget.getBestLocation(context)
                             if (loc == null) {
                                 pickerLocation = null
-                                pickerError = "Standort nicht verfügbar"
+                                pickerError = resources.getString(R.string.main_picker_location_unavailable)
                             } else {
                                 pickerLocation = loc.latitude to loc.longitude
                                 val count = repo.getNearestCountNow()
@@ -619,7 +628,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                                     stops = stops, userLat = loc.latitude, userLon = loc.longitude,
                                     count = count, transportFilter = filter
                                 )
-                                if (pickerCandidates.isEmpty()) pickerError = "Keine Stationen in der Nähe"
+                                if (pickerCandidates.isEmpty()) pickerError = resources.getString(R.string.main_picker_no_stations_nearby)
                             }
                             pickerLoading = false
                         }
@@ -712,7 +721,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             if (lastUpdate != null) {
                 val formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss").withZone(java.time.ZoneId.systemDefault())
                 Text(
-                    text = "Letztes Update: ${formatter.format(lastUpdate)}",
+                    text = stringResource(R.string.main_preview_last_update, formatter.format(lastUpdate)),
                     color = Color.Gray,
                     fontSize = 10.sp,
                     modifier = Modifier.padding(top = 4.dp).align(Alignment.End)
@@ -742,7 +751,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
             }
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Station wählen", color = UestraColors.TextMain, fontSize = 16.sp,
+                    Text(stringResource(R.string.main_picker_title), color = UestraColors.TextMain, fontSize = 16.sp,
                         modifier = Modifier.weight(1f))
                     if (currentGlobalFilter.value != TransportFilter.ALL) {
                         TextButton(onClick = {
@@ -766,7 +775,7 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                                 }
                             }
                         }) {
-                            Text(if (pickerFilterOverride) "Filter aktivieren" else "Alle anzeigen",
+                            Text(if (pickerFilterOverride) stringResource(R.string.main_picker_filter_enable) else stringResource(R.string.main_picker_show_all),
                                 color = if (pickerFilterOverride) UestraColors.TextSub else UestraColors.Teal)
                         }
                     }
@@ -794,16 +803,17 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                         tint = UestraColors.GpsBlue,
                         modifier = Modifier.size(18.dp).padding(end = 8.dp)
                     )
-                    Text("Auto-Folgen", color = UestraColors.GpsBlue,
+                    Text(stringResource(R.string.main_picker_auto_follow), color = UestraColors.GpsBlue,
                         fontSize = 16.sp, fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f))
                 }
                 HorizontalDivider(color = UestraColors.TextSub.copy(alpha = 0.2f))
                 Spacer(Modifier.height(8.dp))
 
+                val permissionMissingText = stringResource(R.string.main_picker_permission_missing)
                 when {
                     pickerLoading -> CircularProgressIndicator(color = UestraColors.Teal)
-                    pickerError == "Standort-Berechtigung fehlt" -> {
+                    pickerError == permissionMissingText -> {
                         Column {
                             Text(pickerError!!, color = UestraColors.TextSub)
                             Spacer(Modifier.height(8.dp))
@@ -818,12 +828,12 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
                                     )
                                 )
                             }) {
-                                Text("Berechtigung anfordern", color = UestraColors.Teal)
+                                Text(stringResource(R.string.main_picker_request_permission), color = UestraColors.Teal)
                             }
                         }
                     }
                     pickerError != null -> Text(pickerError!!, color = UestraColors.TextSub)
-                    visible.isEmpty() -> Text("Keine Stationen für diesen Filter", color = UestraColors.TextSub)
+                    visible.isEmpty() -> Text(stringResource(R.string.main_picker_no_stations_filter), color = UestraColors.TextSub)
                     else -> LazyColumn {
                         items(visible) { c ->
                             Row(
@@ -883,7 +893,7 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
             ) {
                 Icon(
                     androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
-                    contentDescription = "Info",
+                    contentDescription = stringResource(R.string.main_preview_info),
                     tint = UestraColors.Amber,
                     modifier = Modifier.size(20.dp)
                 )
@@ -906,7 +916,7 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
         }
         Icon(
             bitmap = gpsBitmap,
-            contentDescription = "GPS – nächste Haltestelle",
+            contentDescription = stringResource(R.string.main_preview_gps),
             tint = if (gpsActive) UestraColors.GpsBlue else Color.Gray,
             modifier = Modifier.padding(end = 8.dp).size(20.dp).clickable { onGps() }
         )
@@ -918,7 +928,7 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
             }
             Icon(
                 bitmap = syncBitmap,
-                contentDescription = "Refresh",
+                contentDescription = stringResource(R.string.main_preview_refresh),
                 tint = Color.Gray,
                 modifier = Modifier.size(20.dp).clickable { onRefresh() }
             )
@@ -1044,7 +1054,7 @@ fun WidgetFlatDepartureRow(
             WidgetLineBadge(dep.lineShort, dep.isBus)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = dep.destination ?: "Unbekannt",
+                text = dep.destination ?: stringResource(R.string.common_unknown),
                 color = Color.White,
                 fontSize = 14.sp,
                 maxLines = 1,
@@ -1053,7 +1063,9 @@ fun WidgetFlatDepartureRow(
             )
 
             val timeText = TimeFormat.formatDepartureTime(
-                timeDisplayMode, dep.departureTime, countdownFormat, clockFormat, isWarning, now = now
+                timeDisplayMode, dep.departureTime, countdownFormat, clockFormat, isWarning, now = now,
+                nowLabel = stringResource(R.string.common_time_now),
+                goneLabel = stringResource(R.string.common_time_gone)
             )
 
             val hasDelay = (dep.delayMinutes ?: 0) > 0
@@ -1102,7 +1114,7 @@ fun WidgetFlatDepartureRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Fahrt entfällt",
+                    text = stringResource(R.string.main_preview_cancelled),
                     color = UestraColors.AccentRed,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -1285,6 +1297,9 @@ fun SearchScreen(repo: FavoritesRepository) {
     val activeStationId  by repo.activeStationId.collectAsState(initial = null)
 
     val context = LocalContext.current
+    // Konfigurationsbewusst (Sprachwechsel): Ressourcen über LocalResources statt LocalContext.
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val stopsRepo = remember { de.dhde.hannover.departures.widget.data.StopsRepository(context) }
 
     val lastLocation = remember {
@@ -1328,7 +1343,7 @@ fun SearchScreen(repo: FavoritesRepository) {
 
             results = stopsWithDistances.sortedWith(compareBy({ it.second ?: Float.MAX_VALUE }, { it.first.name })).take(5)
         } catch (e: Exception) {
-            searchError = "Suche fehlgeschlagen: ${e.message?.take(40)}"
+            searchError = resources.getString(R.string.main_search_failed, e.message?.take(40))
         } finally {
             isSearching = false
         }
@@ -1340,11 +1355,11 @@ fun SearchScreen(repo: FavoritesRepository) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            SectionLabel("Haltestelle suchen")
+            SectionLabel(stringResource(R.string.main_search_section))
             OutlinedTextField(
                 value         = query,
                 onValueChange = { query = it },
-                placeholder   = { Text("z.B. Kröpcke, Roderbruch…", color = UestraColors.TextSub) },
+                placeholder   = { Text(stringResource(R.string.main_search_placeholder), color = UestraColors.TextSub) },
                 leadingIcon   = {
                     if (isSearching)
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), color = UestraColors.Teal, strokeWidth = 2.dp)
@@ -1369,7 +1384,7 @@ fun SearchScreen(repo: FavoritesRepository) {
         }
 
         if (results.isNotEmpty()) {
-            item { SectionLabel("Ergebnisse") }
+            item { SectionLabel(stringResource(R.string.main_search_results)) }
             items(results) { item ->
                 val location = item.first
                 val dist = item.second
@@ -1378,7 +1393,7 @@ fun SearchScreen(repo: FavoritesRepository) {
 
                 val distText = dist?.let {
                     if (it >= 1000) {
-                        String.format(java.util.Locale.getDefault(), "%.1f km", it / 1000f)
+                        String.format(locale, "%.1f km", it / 1000f)
                     } else {
                         "${it.toInt()} m"
                     }
@@ -1444,11 +1459,11 @@ fun FavoritesScreen(repo: FavoritesRepository) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionLabel("Meine Favoriten") }
+        item { SectionLabel(stringResource(R.string.main_fav_section)) }
 
         if (listState.isEmpty()) {
             item {
-                Text("Noch keine Favoriten. Suche eine Haltestelle und tippe auf ⭐.", color = UestraColors.TextSub, fontSize = 13.sp)
+                Text(stringResource(R.string.main_fav_empty), color = UestraColors.TextSub, fontSize = 13.sp)
             }
         } else {
             itemsIndexed(listState, key = { _, it -> it.safeUniqueId }) { index, fav ->
@@ -1489,6 +1504,8 @@ fun FavoritesScreen(repo: FavoritesRepository) {
 @Composable
 fun HelpScreen() {
     val context = LocalContext.current
+    // Konfigurationsbewusst (Sprachwechsel): Ressourcen über LocalResources statt LocalContext.
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val scope = rememberCoroutineScope()
     val sessionStore = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
     val debugMode by sessionStore.debugModeFlow().collectAsState(initial = false)
@@ -1503,7 +1520,7 @@ fun HelpScreen() {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { SectionLabel("Unterstützen & Quellcode") }
+        item { SectionLabel(stringResource(R.string.main_help_support_section)) }
         item {
             val context = LocalContext.current
             val intentHandler = { url: String ->
@@ -1519,7 +1536,7 @@ fun HelpScreen() {
                 ) {
                     Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Black)
                     Spacer(Modifier.width(8.dp))
-                    Text("Kaffee spenden", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.main_help_donate), color = Color.Black, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
@@ -1530,15 +1547,15 @@ fun HelpScreen() {
                 ) {
                     Icon(Icons.Default.Search, contentDescription = null, tint = UestraColors.TextMain)
                     Spacer(Modifier.width(8.dp))
-                    Text("Quellcode auf GitHub", color = UestraColors.TextMain)
+                    Text(stringResource(R.string.main_help_source_github), color = UestraColors.TextMain)
                 }
             }
         }
         
-        item { SectionLabel("Widget-Funktionen") }
+        item { SectionLabel(stringResource(R.string.main_help_features_section)) }
         item { WidgetFeaturesCard() }
         
-        item { SectionLabel("Interaktion & Updates") }
+        item { SectionLabel(stringResource(R.string.main_help_interaction_section)) }
         item { InteractionCard() }
         
         item {
@@ -1549,14 +1566,14 @@ fun HelpScreen() {
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        "Rechtlicher Hinweis",
+                        stringResource(R.string.main_help_legal_title),
                         color = UestraColors.AccentRed,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Dies ist eine inoffizielle App. Sie steht in keiner Verbindung zur ÜSTRA Hannoversche Verkehrsbetriebe AG oder dem GVH. Alle Daten werden über öffentliche Schnittstellen bezogen. Nutzung auf eigene Gefahr.",
+                        stringResource(R.string.main_help_legal_text),
                         color = UestraColors.TextSub,
                         fontSize = 11.sp,
                         lineHeight = 16.sp
@@ -1566,7 +1583,7 @@ fun HelpScreen() {
         }
         item {
             Text(
-                text = "Version $versionName",
+                text = stringResource(R.string.main_help_version, versionName),
                 color = UestraColors.TextSub,
                 fontSize = 11.sp,
                 modifier = Modifier
@@ -1583,7 +1600,7 @@ fun HelpScreen() {
                                 sessionStore.setDebugMode(newState)
                                 android.widget.Toast.makeText(
                                     context,
-                                    if (newState) "Debug-Modus aktiviert" else "Debug-Modus deaktiviert",
+                                    if (newState) resources.getString(R.string.main_help_debug_enabled) else resources.getString(R.string.main_help_debug_disabled),
                                     android.widget.Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -1622,32 +1639,32 @@ private fun WidgetFeaturesCard() {
                 icon = {
                     Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info), null, tint = UestraColors.Amber, modifier = Modifier.size(20.dp))
                 },
-                title = "Info-Meldungen & Filter",
-                description = "Tippe auf das goldene 'i' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen. Meldungen, die länger als einen Tag bestehen (z.B. dauerhafte Baustellen oder Fahrzeug-Hinweise), lassen sich in den Optionen ausblenden."
+                title = stringResource(R.string.main_help_messages_title),
+                description = stringResource(R.string.main_help_messages_desc)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
                     Text("1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 },
-                title = "Favoriten-Schnellwahl",
-                description = "Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten."
+                title = stringResource(R.string.main_help_quick_title),
+                description = stringResource(R.string.main_help_quick_desc)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
                     Text("#1", color = UestraColors.LineBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 },
-                title = "Steige & Filter",
-                description = "Tippe auf einen Steig (z.B. „#1“, „#17“), um nur Abfahrten von dort zu zeigen. Die Farbe zeigt die Linien, die dort fahren. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
+                title = stringResource(R.string.main_help_platforms_title),
+                description = stringResource(R.string.main_help_platforms_desc)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
                     Icon(Icons.Default.Settings, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
-                title = "Größenanpassung",
-                description = "Du kannst in den Optionen die visuelle Größe der Filter- und Favoriten-Buttons ('KOMPAKT', 'STANDARD', 'GROSS') einstellen, falls du größere Klickflächen bevorzugst."
+                title = stringResource(R.string.main_help_size_title),
+                description = stringResource(R.string.main_help_size_desc)
             )
         }
     }
@@ -1665,24 +1682,24 @@ private fun InteractionCard() {
                 icon = {
                     Text("5", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 },
-                title = "Zeit-Ansicht",
-                description = "Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten. (Tipp: In den Optionen kannst du einstellen, ob dabei offline umgeschaltet wird oder die API aktualisiert werden soll)."
+                title = stringResource(R.string.main_help_time_title),
+                description = stringResource(R.string.main_help_time_desc)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
                     Icon(Icons.Default.Refresh, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
-                title = "Aktualisierung",
-                description = "Das Widget lädt aus Strom- und Datenspargründen keine Daten im Hintergrund. Um aktuelle Echtzeitdaten und Verspätungen der API abzurufen, tippe auf den kleinen Refresh-Pfeil oben rechts."
+                title = stringResource(R.string.main_help_refresh_title),
+                description = stringResource(R.string.main_help_refresh_desc)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = {
                     Icon(Icons.Default.LocationOn, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
-                title = "GPS-Suche",
-                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt. Bei jedem Aktualisieren wird die Position neu bestimmt, sodass die Anzeige dir folgt, während du unterwegs bist."
+                title = stringResource(R.string.main_help_gps_title),
+                description = stringResource(R.string.main_help_gps_desc)
             )
         }
     }
@@ -1744,14 +1761,14 @@ private fun SearchResultRow(
                 }
             }
             if (isActive) {
-                Text("AKTIV", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 10.sp, 
+                Text(stringResource(R.string.main_search_active), color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 10.sp, 
                     modifier = Modifier.background(UestraColors.Teal.copy(0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
                 Spacer(Modifier.width(8.dp))
             }
             IconButton(onClick = onToggleFav) {
                 Icon(
                     if (isFav) Icons.Filled.Star else Icons.Outlined.Star,
-                    contentDescription = if (isFav) "Favorit entfernen" else "Favorit hinzufügen",
+                    contentDescription = if (isFav) stringResource(R.string.main_search_fav_remove) else stringResource(R.string.main_search_fav_add),
                     tint = if (isFav) UestraColors.FavoriteGold else UestraColors.TextSub
                 )
             }
@@ -1782,12 +1799,12 @@ private fun FavoriteRow(
     if (showAliasDialog) {
         AlertDialog(
             onDismissRequest = { showAliasDialog = false },
-            title   = { Text("Alias für ${fav.name}") },
+            title   = { Text(stringResource(R.string.main_fav_alias_title, fav.name)) },
             text    = {
                 OutlinedTextField(
                     value = aliasText,
                     onValueChange = { aliasText = it },
-                    placeholder = { Text("z.B. Zuhause, Arbeit...") },
+                    placeholder = { Text(stringResource(R.string.main_fav_alias_placeholder)) },
                     singleLine = true
                 )
             },
@@ -1795,10 +1812,10 @@ private fun FavoriteRow(
                 TextButton(onClick = {
                     onAlias(aliasText)
                     showAliasDialog = false
-                }) { Text("Speichern") }
+                }) { Text(stringResource(R.string.main_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showAliasDialog = false }) { Text("Abbrechen") }
+                TextButton(onClick = { showAliasDialog = false }) { Text(stringResource(R.string.main_cancel)) }
             }
         )
     }
@@ -1832,7 +1849,7 @@ private fun FavoriteRow(
             // Real Drag Handle
             Icon(
                 Icons.Default.DragHandle,
-                contentDescription = "Verschieben",
+                contentDescription = stringResource(R.string.main_fav_move),
                 tint = if (dragOffset != 0f) UestraColors.Teal else UestraColors.TextSub,
                 modifier = Modifier
                     .size(32.dp)
@@ -1907,31 +1924,31 @@ private fun FavoriteRow(
                 Column(horizontalAlignment = Alignment.End) {
                     Row {
                         IconButton(onClick = { showAliasDialog = true }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Edit, "Alias bearbeiten", tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Edit, stringResource(R.string.main_fav_edit_alias), tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                         }
                         IconButton(onClick = onFilter, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) UestraColors.FavoriteGold else UestraColors.Teal, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.FilterList, stringResource(R.string.main_fav_filter_lines), tint = if (fav.filteredLines != null) UestraColors.FavoriteGold else UestraColors.Teal, modifier = Modifier.size(20.dp))
                         }
                     }
                     Row {
                         IconButton(onClick = onDuplicate, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Add, "Duplizieren", tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Add, stringResource(R.string.main_fav_duplicate), tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                         }
                         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Delete, "Löschen", tint = UestraColors.AccentRed, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Delete, stringResource(R.string.main_fav_delete), tint = UestraColors.AccentRed, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.End) {
                     IconButton(onClick = { showAliasDialog = true }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Edit, "Alias bearbeiten", tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Edit, stringResource(R.string.main_fav_edit_alias), tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = onFilter, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.FilterList, "Linien filtern", tint = if (fav.filteredLines != null) UestraColors.FavoriteGold else UestraColors.Teal, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.FilterList, stringResource(R.string.main_fav_filter_lines), tint = if (fav.filteredLines != null) UestraColors.FavoriteGold else UestraColors.Teal, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Delete, "Löschen", tint = UestraColors.AccentRed, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Delete, stringResource(R.string.main_fav_delete), tint = UestraColors.AccentRed, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -1951,40 +1968,40 @@ private fun HelpCard() {
                 icon = { 
                     Text("1", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
                 },
-                title = "Favoriten-Schnellwahl",
-                description = "Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten."
+                title = stringResource(R.string.main_help_quick_title),
+                description = stringResource(R.string.main_help_quick_desc)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
                     Text("#1", color = UestraColors.LineBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 },
-                title = "Steige & Filter",
-                description = "Tippe auf einen Steig (z.B. „#1“, „#17“), um nur Abfahrten von dort zu zeigen. Die Farbe zeigt die Linien, die dort fahren. Alles, was vom selben Steig abfährt, fährt in dieselbe Richtung. Nochmal tippen zeigt wieder alle."
+                title = stringResource(R.string.main_help_platforms_title),
+                description = stringResource(R.string.main_help_platforms_desc)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
                     Text("5", color = UestraColors.Teal, fontWeight = FontWeight.Bold, fontSize = 18.sp) 
                 },
-                title = "Zeit-Ansicht",
-                description = "Tippe im Widget auf eine Abfahrtszeit, um zwischen Countdown (Minuten) und genauer Uhrzeit hin- und herzuschalten."
+                title = stringResource(R.string.main_help_time_title),
+                description = stringResource(R.string.main_help_time_desc_short)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
                     Icon(Icons.Default.Refresh, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
-                title = "Aktualisierung",
-                description = "Das Widget frischt sich ca. alle 15 Minuten selbst auf. Für sofortige Echtzeitdaten tippe auf den kleinen Refresh-Pfeil oben rechts."
+                title = stringResource(R.string.main_help_refresh_title),
+                description = stringResource(R.string.main_help_refresh_desc_legacy)
             )
             HorizontalDivider(color = UestraColors.Divider, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
             HelpItem(
                 icon = { 
                     Icon(Icons.Default.LocationOn, null, tint = UestraColors.Teal, modifier = Modifier.size(20.dp))
                 },
-                title = "GPS-Suche",
-                description = "Tippe auf das Standort-Icon, damit das Widget automatisch Abfahrten der nächstgelegenen Haltestelle anzeigt. Bei jedem Aktualisieren wird die Position neu bestimmt, sodass die Anzeige dir folgt, während du unterwegs bist."
+                title = stringResource(R.string.main_help_gps_title),
+                description = stringResource(R.string.main_help_gps_desc)
             )
         }
     }
@@ -2045,7 +2062,7 @@ fun LineFilterDialog(
         onDismissRequest = onDismiss,
         title = { 
             val titleName = fav.alias ?: fav.name.substringBefore(",")
-            Text("Linien filtern: $titleName", color = UestraColors.Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold) 
+            Text(stringResource(R.string.main_line_filter_title, titleName), color = UestraColors.Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold) 
         },
         text = {
             if (isLoading) {
@@ -2053,7 +2070,7 @@ fun LineFilterDialog(
                     CircularProgressIndicator(color = UestraColors.Teal)
                 }
             } else if (groups.isEmpty()) {
-                Text("Konnte aktuell keine Linien für diese Station finden.", color = UestraColors.TextSub)
+                Text(stringResource(R.string.main_line_filter_empty), color = UestraColors.TextSub)
             } else {
                 LazyColumn {
                     groups.forEach { (type, lines) ->
@@ -2072,7 +2089,7 @@ fun LineFilterDialog(
                                     colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                                 )
                                 Spacer(Modifier.width(12.dp))
-                                Text(type, color = UestraColors.Teal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text(transportTypeLabel(type)?.let { stringResource(it) } ?: type, color = UestraColors.Teal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         items(lines, key = { "line_$it" }) { line ->
@@ -2088,7 +2105,7 @@ fun LineFilterDialog(
                                     colors = CheckboxDefaults.colors(checkedColor = UestraColors.Teal, uncheckedColor = UestraColors.TextSub)
                                 )
                                 Spacer(Modifier.width(12.dp))
-                                Text("Linie $line", color = UestraColors.TextMain, fontSize = 16.sp)
+                                Text(stringResource(R.string.main_line_label, line), color = UestraColors.TextMain, fontSize = 16.sp)
                             }
                         }
                     }
@@ -2107,10 +2124,10 @@ fun LineFilterDialog(
                     }
                 },
                 enabled = hasLoaded
-            ) { Text("Speichern", color = UestraColors.Teal) }
+            ) { Text(stringResource(R.string.main_save), color = UestraColors.Teal) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Abbrechen", color = UestraColors.TextSub) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.main_cancel), color = UestraColors.TextSub) }
         },
         containerColor = UestraColors.CardBg,
         titleContentColor = UestraColors.Teal,

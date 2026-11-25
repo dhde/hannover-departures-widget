@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gemeinsame Texte. Standardsprache Deutsch; Übersetzungen in values-<lang>/. -->
+<resources>
+    <!-- Anzeigenamen der Verkehrsmittel. Die SPEICHERSCHLÜSSEL ("Stadtbahn", "Bus", …) bleiben deutsch,
+         übersetzt wird nur die Anzeige über transportTypeLabel(). -->
+    <string name="common_type_tram">Stadtbahn</string>
+    <string name="common_type_bus">Bus</string>
+    <string name="common_type_sbahn">S-Bahn</string>
+    <string name="common_type_db">DB</string>
+    <string name="common_type_fernbus">Fernbus</string>
+    <string name="common_unknown">Unbekannt</string>
+    <!-- Meldungs-Dialog (Widget und App) -->
+    <string name="common_messages">Meldungen</string>
+    <string name="common_messages_title">Meldungen: %1$s</string>
+    <string name="common_line_colon">Linie %1$s:</string>
+    <!-- Abfahrtszeit in der letzten Minute bzw. vermutlich schon abgefahren (Widget + App) -->
+    <string name="common_time_now">jetzt</string>
+    <string name="common_time_gone">evtl. weg?</string>
+</resources>

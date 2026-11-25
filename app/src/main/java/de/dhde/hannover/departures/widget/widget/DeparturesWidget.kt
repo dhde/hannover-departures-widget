@@ -281,7 +281,10 @@ class DeparturesWidget : GlanceAppWidget() {
         val session = WidgetSessionStore(context)
         val repo = FavoritesRepository(context)
 
+        // Android 8–12: Context mit gewählter App-Sprache für alle getString-Aufrufe im Widget.
+        val localized = de.dhde.hannover.departures.widget.data.AppLocale.wrap(context)
         provideContent {
+          androidx.compose.runtime.CompositionLocalProvider(LocalContext provides localized) {
             val stationIdState by repo.activeStationId.collectAsState(initial = DEFAULT_STATION_ID)
             val stationId = stationIdState ?: DEFAULT_STATION_ID
 
@@ -291,7 +294,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
             val favorites by repo.favoritesFlow.collectAsState(initial = emptyList())
 
-            val stationNameState by repo.effectiveStationName.collectAsState(initial = "Laden...")
+            val stationNameState by repo.effectiveStationName.collectAsState(initial = context.getString(R.string.widget_loading))
             val stationName = stationNameState
             val activeFavUniqueId by repo.activeFavoriteUniqueId.collectAsState(initial = null)
 
@@ -390,6 +393,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 pickerCandidatesJson = pickerCandidatesJson,
                 pickerFilterOverride = pickerFilterOverride
             )
+          }
         }
     }
 
@@ -425,6 +429,7 @@ class DeparturesWidget : GlanceAppWidget() {
         pickerCandidatesJson: String? = null,
         pickerFilterOverride: String? = null
     ) {
+        val context = LocalContext.current
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -464,7 +469,7 @@ class DeparturesWidget : GlanceAppWidget() {
             } else emptyList()
             val groupedMessages = groupedMessagesList
                 .joinToString("\n\n") { lm ->
-                    "Linie ${lm.line}:\n" + lm.messages.joinToString("\n") { it.content }
+                    context.getString(R.string.common_line_colon, lm.line) + "\n" + lm.messages.joinToString("\n") { it.content }
                 }
             val groupedMessagesJson = com.google.gson.Gson().toJson(groupedMessagesList)
 
@@ -499,17 +504,17 @@ class DeparturesWidget : GlanceAppWidget() {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Image(
                                 provider = ImageProvider(android.R.drawable.ic_popup_sync),
-                                contentDescription = "Neu laden",
+                                contentDescription = context.getString(R.string.widget_empty_reload),
                                 modifier = GlanceModifier.size(72.dp),
                                 colorFilter = ColorFilter.tint(ColorProvider(Color.Gray))
                             )
                             Spacer(modifier = GlanceModifier.height(8.dp))
                             Text(
-                                text = "Keine Abfahrten",
+                                text = context.getString(R.string.widget_empty_no_departures),
                                 style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 14.sp)
                             )
                             Text(
-                                text = "Tippen zum Neuladen",
+                                text = context.getString(R.string.widget_empty_tap_to_reload),
                                 style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 11.sp)
                             )
                         }
@@ -545,6 +550,7 @@ class DeparturesWidget : GlanceAppWidget() {
         filterOverride: String?,
         globalFilter: TransportFilter
     ) {
+        val context = LocalContext.current
         val candidates: List<StopCandidate> = if (candidatesJson.isNullOrBlank()) {
             emptyList()
         } else {
@@ -572,7 +578,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Station wählen",
+                    text = context.getString(R.string.widget_picker_title),
                     modifier = GlanceModifier.defaultWeight(),
                     style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 17.sp, fontWeight = FontWeight.Medium)
                 )
@@ -602,7 +608,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 Spacer(modifier = GlanceModifier.width(6.dp))
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_close),
-                    contentDescription = "Schließen",
+                    contentDescription = context.getString(R.string.widget_picker_close),
                     modifier = GlanceModifier.size(24.dp)
                         .clickable(actionRunCallback<ClosePickerAction>()),
                     colorFilter = ColorFilter.tint(ColorProvider(UestraColors.TextSub))
@@ -623,7 +629,7 @@ class DeparturesWidget : GlanceAppWidget() {
                     colorFilter = ColorFilter.tint(ColorProvider(UestraColors.GpsBlue))
                 )
                 Text(
-                    text = "Auto-Folgen",
+                    text = context.getString(R.string.widget_picker_auto_follow),
                     modifier = GlanceModifier.defaultWeight(),
                     style = TextStyle(color = ColorProvider(UestraColors.GpsBlue), fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 )
@@ -633,13 +639,13 @@ class DeparturesWidget : GlanceAppWidget() {
             when {
                 candidatesJson.isNullOrBlank() -> {
                     Text(
-                        "Standort nicht verfügbar",
+                        context.getString(R.string.widget_picker_no_location),
                         style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
                     )
                 }
                 candidates.isEmpty() -> {
                     Text(
-                        "Keine Stationen für diesen Filter",
+                        context.getString(R.string.widget_picker_no_stations),
                         style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 14.sp)
                     )
                 }
@@ -665,7 +671,7 @@ class DeparturesWidget : GlanceAppWidget() {
                                     style = TextStyle(color = ColorProvider(UestraColors.TextMain), fontSize = 16.sp, fontWeight = FontWeight.Medium)
                                 )
                                 Text(
-                                    text = "${c.distanceM} m",
+                                    text = context.getString(R.string.widget_picker_distance_m, c.distanceM),
                                     modifier = GlanceModifier.padding(end = 6.dp),
                                     style = TextStyle(color = ColorProvider(UestraColors.TextSub), fontSize = 13.sp)
                                 )
@@ -718,6 +724,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun Header(stationName: String, gpsModeActive: Boolean, isRefreshing: Boolean, hasMessages: Boolean = false, groupedMessages: String = "", groupedMessagesJson: String = "") {
+        val context = LocalContext.current
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -726,7 +733,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 val intent = Intent(LocalContext.current, de.dhde.hannover.departures.widget.MainActivity::class.java).apply {
                     action = "de.dhde.hannover.departures.SHOW_INFO"
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    putExtra("info_title", "Meldungen: $stationName")
+                    putExtra("info_title", context.getString(R.string.common_messages_title, stationName))
                     putExtra("info_msgs", groupedMessages)
                     putExtra("info_msgs_json", groupedMessagesJson)
                 }
@@ -738,7 +745,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 ) {
                     Image(
                         provider = ImageProvider(android.R.drawable.ic_dialog_info),
-                        contentDescription = "Meldungen",
+                        contentDescription = context.getString(R.string.common_messages),
                         modifier = GlanceModifier.size(20.dp),
                         colorFilter = ColorFilter.tint(ColorProvider(UestraColors.Amber))
                     )
@@ -767,7 +774,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
             Image(
                 provider = ImageProvider(android.R.drawable.ic_menu_mylocation),
-                contentDescription = "GPS Nearest Station",
+                contentDescription = context.getString(R.string.widget_header_gps_nearest),
                 modifier = GlanceModifier.padding(end = 8.dp).clickable(actionRunCallback<OpenPickerAction>()),
                 colorFilter = ColorFilter.tint(ColorProvider(gpsIconColor))
             )
@@ -793,7 +800,7 @@ class DeparturesWidget : GlanceAppWidget() {
             } else {
                 Image(
                     provider = ImageProvider(android.R.drawable.ic_popup_sync),
-                    contentDescription = "Refresh",
+                    contentDescription = context.getString(R.string.widget_header_refresh),
                     modifier = GlanceModifier.clickable(actionRunCallback<RefreshAction>(
                         actionParametersOf(RefreshAction.KEY_FORCE to true)
                     )),
@@ -900,10 +907,11 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun FilterToggleButton(tabState: TransportFilter) {
+        val context = LocalContext.current
         val (label, bgColor) = when (tabState) {
-            TransportFilter.BUS -> "Nur Bus" to UestraColors.AccentRed
-            TransportFilter.TRAM -> "Nur Bahn" to UestraColors.Teal
-            else -> "Alle Typen" to UestraColors.ChipNeutral
+            TransportFilter.BUS -> context.getString(R.string.widget_filter_only_bus) to UestraColors.AccentRed
+            TransportFilter.TRAM -> context.getString(R.string.widget_filter_only_tram) to UestraColors.Teal
+            else -> context.getString(R.string.widget_filter_all_types) to UestraColors.ChipNeutral
         }
         
         Box(
@@ -935,6 +943,7 @@ class DeparturesWidget : GlanceAppWidget() {
         countdownFormat: String = TimeFormat.DEFAULT_COUNTDOWN,
         clockFormat: String = TimeFormat.DEFAULT_CLOCK
     ) {
+        val context = LocalContext.current
         Column(
             modifier = GlanceModifier
                 .fillMaxWidth()
@@ -949,14 +958,16 @@ class DeparturesWidget : GlanceAppWidget() {
             LineBadge(departure.lineShort, departure.isBus)
             Spacer(modifier = GlanceModifier.width(8.dp))
             Text(
-                text = departure.destination ?: "Unbekannt",
+                text = departure.destination ?: context.getString(R.string.common_unknown),
                 style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp),
                 modifier = GlanceModifier.defaultWeight()
             )
 
 
             val timeText = TimeFormat.formatDepartureTime(
-                timeDisplayMode, departure.departureTime, countdownFormat, clockFormat, isWarning
+                timeDisplayMode, departure.departureTime, countdownFormat, clockFormat, isWarning,
+                nowLabel = context.getString(R.string.common_time_now),
+                goneLabel = context.getString(R.string.common_time_gone)
             )
 
             val hasDelay = (departure.delayMinutes ?: 0) > 0
@@ -1005,7 +1016,7 @@ class DeparturesWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Fahrt entfällt",
+                    text = context.getString(R.string.widget_departure_cancelled),
                     style = TextStyle(color = ColorProvider(UestraColors.AccentRed), fontSize = 12.sp, fontWeight = FontWeight.Bold),
                     modifier = GlanceModifier.padding(end = 8.dp)
                 )
@@ -1155,6 +1166,7 @@ class DeparturesWidget : GlanceAppWidget() {
 
     @Composable
     private fun Footer(lastUpdated: String, isStale: Boolean) {
+        val context = LocalContext.current
         val timeStr = if (lastUpdated.isNotEmpty()) {
             val instant = Instant.ofEpochMilli(lastUpdated.toLong())
             java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss").withZone(java.time.ZoneId.systemDefault()).format(instant)
@@ -1168,7 +1180,7 @@ class DeparturesWidget : GlanceAppWidget() {
             modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val footerText = if (isStale) "Stand: $timeStr (Veraltet ⚠️)" else "Stand: $timeStr"
+            val footerText = if (isStale) context.getString(R.string.widget_footer_updated_stale, timeStr) else context.getString(R.string.widget_footer_updated, timeStr)
             val footerColor = if (isStale) UestraColors.Warning else Color.Gray
 
             Text(
@@ -1178,7 +1190,7 @@ class DeparturesWidget : GlanceAppWidget() {
             )
 
             Text(
-                text = "Inoffiziell",
+                text = context.getString(R.string.widget_footer_unofficial),
                 style = TextStyle(color = ColorProvider(Color.Gray), fontSize = 10.sp),
                 modifier = GlanceModifier.padding(start = 4.dp)
             )

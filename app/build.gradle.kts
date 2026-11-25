@@ -9,6 +9,20 @@ android {
     namespace = "de.dhde.hannover.departures.widget"
     compileSdk = 37
 
+    // Erzeugt die Sprachliste für die Pro-App-Sprache von Android 13+ (Einstellungen → Apps → Sprache)
+    // automatisch aus den values-xx-Ordnern; Standardsprache steht in res/resources.properties.
+    androidResources {
+        generateLocaleConfig = true
+    }
+
+    // In-App-Sprachauswahl: Play darf die Sprachen im App-Bundle NICHT nach Gerätesprache aufteilen,
+    // sonst fehlen die Texte, wenn jemand in den Optionen eine andere Sprache wählt.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     defaultConfig {
         applicationId = "de.dhde.hannover.departures.widget"
         minSdk = 26
