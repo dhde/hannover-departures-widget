@@ -2,24 +2,25 @@
 set -e
 
 # Konfiguration
-TAG="v1.10.2"                   # Release-Tag (z. B. v1.0.0)
+TAG="v1.11.0"                   # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.10.2" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.11.0" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.10.2
+## Üstra Widget 1.11.0
 
-### 🚏 Steig-Chips für große Haltestellen
+### 🌍 Mehrsprachig
 
-In 1.10.1 fehlten an großen Haltestellen wie dem Kröpcke (9 Steige) die Steig-Chips, weil höchstens 4 vorgesehen waren.
+Die App und das Widget gibt es jetzt neben Deutsch auch auf **Englisch, Türkisch, Polnisch, Ukrainisch und Russisch**.
 
-- Die Chips zeigen jetzt die Steignummer mit „#“ davor (z.B. „#1“, „#17“), damit man sie nicht mit Liniennummern verwechselt.
-- Jeder Chip hat die Farbe der Linien, die dort abfahren: blau (3/7/9/13), rot (1/2/8 und Busse), gelb (4/5/6/11), grün (10/17), magenta (SprintH).
-- Bahn-Steige stehen vor den Bus-Steigen.
-- Das Widget zeigt die Chips, sobald alle in seine Breite passen. Ist das Widget zu schmal, mit dem Bus- oder Bahn-Tab eingrenzen oder das Widget breiter ziehen.
+- Standardmäßig folgt die App der Sprache des Handys.
+- In den Optionen unter „Darstellung“ lässt sich die Sprache auch direkt wählen, unabhängig von der Handysprache.
+- Ab Android 13 geht das auch über Einstellungen → Apps → Bus & Bahn Hannover Widget → Sprache.
 
-### 🪧 Fahrtziele wie auf der Anzeigetafel
+Die Übersetzungen sind neu. Wer einen holprigen Satz findet, kann gern ein Issue aufmachen.
 
-Bei Bussen stand „Hannover “ vor dem Ziel (z.B. „Hannover August-Holweg-Platz“). Das entfällt jetzt, wie schon bei der Stadtbahn.
+### Kleinigkeiten
+
+- „1 Zeile“ statt „1 Zeilen“ und ähnliche Einzahl/Mehrzahl-Formen in den Optionen korrigiert.
 NOTES
 )  # Optional: Release-Notizen
 
