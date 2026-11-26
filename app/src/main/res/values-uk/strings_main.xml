@@ -15,7 +15,6 @@
     <string name="main_topbar_preview_station">Перегляд віджета · %1$s</string>
     <string name="main_topbar_active_station">Активна: %1$s</string>
 
-    <string name="main_messages_locked">можна приховати лише з завтра</string>
     <string name="main_messages_to_app">До застосунку</string>
     <string name="main_messages_leave">Вийти</string>
 
@@ -70,7 +69,7 @@
     <string name="main_help_debug_disabled">Режим Debug вимкнено</string>
 
     <string name="main_help_messages_title">Оголошення &amp; фільтр</string>
-    <string name="main_help_messages_desc">Торкнися золотої «i» вгорі ліворуч у віджеті, щоб прочитати актуальні оголошення та збої. Оголошення, що діють довше одного дня (напр. тривалі ремонти чи примітки щодо транспорту), можна приховати в налаштуваннях.</string>
+    <string name="main_help_messages_desc">Торкнися золотої «i» вгорі ліворуч у віджеті, щоб прочитати актуальні оголошення та збої й приховати окремі. Приховані оголошення знову знайдеш у налаштуваннях у «Приховати оголошення» – або торкнися порожнього місця ліворуч від назви зупинки у віджеті.</string>
     <string name="main_help_quick_title">Швидкий вибір обраного</string>
     <string name="main_help_quick_desc">Використовуй кнопки швидкого вибору внизу віджета або торкнися назви зупинки вгорі, щоб перемикати зупинки.</string>
     <string name="main_help_platforms_title">Платформи &amp; фільтр</string>

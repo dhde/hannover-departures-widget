@@ -23,7 +23,7 @@ import de.dhde.hannover.departures.widget.data.TimeFormat
 import de.dhde.hannover.departures.widget.data.TrackedMessage
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.WidgetSessionStore
-import de.dhde.hannover.departures.widget.data.withPlatformNames
+import de.dhde.hannover.departures.widget.data.fetchDepartures
 import java.time.Instant
 import java.time.Duration
 import java.time.OffsetDateTime
@@ -88,14 +88,11 @@ class RefreshAction : ActionCallback {
                     // Wir führen den Netzwerk-Check in einem begrenzten Zeitfenster aus
                     val success = kotlinx.coroutines.withTimeoutOrNull(10000) {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            val api = UestraApi.create()
-                            de.dhde.hannover.departures.widget.debug.DebugLog.log("calling api.getDepartures for stationId=$stationId")
-                            val response = api.getDepartures(stationId, UestraApi.DEFAULT_DEP_SEQUENCE)
-                            de.dhde.hannover.departures.widget.debug.DebugLog.log("response received: stop=${response.stop}, departuresSize=${response.departures?.size}")
-                            de.dhde.hannover.departures.widget.debug.DebugLog.log("first departure JSON: ${Gson().toJson(response.departures?.firstOrNull())}")
-                            // Steig-Namen aus /stops anreichern (gecacht, 7 Tage) – für den Steig-Filter.
-                            val departures = response.departures
-                                ?.withPlatformNames(StopsRepository(context).platformNames(stationId))
+                            // Gewählter Steig → zusätzliche Steig-Abfrage für die volle Abfahrtsliste (siehe fetchDepartures).
+                            val platformId = FilterStateStore(context).getPlatformState(stationId)
+                            de.dhde.hannover.departures.widget.debug.DebugLog.log("fetchDepartures stationId=$stationId platform=$platformId")
+                            val departures = fetchDepartures(context, stationId, platformId)
+                            de.dhde.hannover.departures.widget.debug.DebugLog.log("response received: departuresSize=${departures?.size}")
                             if (departures != null) {
                                 cache.saveDepartures(stationId, Gson().toJson(departures))
                                 session.setErrorState("")
@@ -270,7 +267,8 @@ class ChangePlatformAction : ActionCallback {
         // Sofortiges UI-Feedback für Steigwechsel
         DeparturesWidget().updateAll(context)
 
-        RefreshAction.triggerUpdate(context)
+        // force: neuer Steig braucht die eigene Steig-Abfrage (volle Abfahrtsliste), nicht den 60-s-Cache.
+        RefreshAction.triggerUpdate(context, isForce = true)
     }
 }
 
@@ -304,6 +302,8 @@ class PickPlatformAction : ActionCallback {
         repo.getActiveFavoriteUniqueIdNow()?.let { repo.setFavoritePlatformFilter(it, platform) }
         WidgetSessionStore(context).setPlatformPickerOpen(false)
         DeparturesWidget().updateAll(context)
+        // Neuer Steig → eigene Steig-Abfrage für die volle Abfahrtsliste.
+        RefreshAction.triggerUpdate(context, isForce = true)
     }
 }
 

@@ -82,6 +82,9 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.CircularProgressIndicator
 
 /** Ergebnis des Abfahrts-Filters: gefilterte Abfahrten und die tatsächlich gezeigten Zeilen. */
+/** Beschriftung des Listen-Buttons hinter den Steig-Chips. */
+internal const val LIST_CHIP_LABEL = "▾"
+
 internal data class VisibleDepartures(
     val filtered: List<FlatDeparture>,
     /** Hauptabfahrt + gruppierte Folgeabfahrten, chronologisch und auf maxRows begrenzt. */
@@ -749,13 +752,34 @@ class DeparturesWidget : GlanceAppWidget() {
                     modifier = GlanceModifier
                         .size(36.dp)
                         .clickable(actionStartActivity(intent)),
-                    contentAlignment = Alignment.CenterStart
+                    contentAlignment = Alignment.Center
                 ) {
                     Image(
                         provider = ImageProvider(android.R.drawable.ic_dialog_info),
                         contentDescription = context.getString(R.string.common_messages),
                         modifier = GlanceModifier.size(20.dp),
                         colorFilter = ColorFilter.tint(ColorProvider(UestraColors.Amber))
+                    )
+                }
+            } else {
+                // Platz freihalten, damit der Name nicht springt. Tipp öffnet den Meldungsfilter
+                // in den Optionen, um ausgeblendete Meldungen wieder lesen/einblenden zu können.
+                val filterIntent = Intent(context, de.dhde.hannover.departures.widget.MainActivity::class.java).apply {
+                    action = de.dhde.hannover.departures.widget.MainActivity.ACTION_OPEN_MESSAGE_FILTER
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                // Graues (i) zeigt „keine Meldungen“ an.
+                Box(
+                    modifier = GlanceModifier
+                        .size(36.dp)
+                        .clickable(actionStartActivity(filterIntent)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        provider = ImageProvider(android.R.drawable.ic_dialog_info),
+                        contentDescription = context.getString(R.string.common_no_messages),
+                        modifier = GlanceModifier.size(20.dp),
+                        colorFilter = ColorFilter.tint(ColorProvider(UestraColors.IconMuted))
                     )
                 }
             }
@@ -1072,7 +1096,8 @@ class DeparturesWidget : GlanceAppWidget() {
         val buttonDp = iconSize.value.toInt() + 12               // Icon + 2×6 dp Padding
         val vehicleDp = 2 * buttonDp + 2
         val availableDp = LocalSize.current.width.value.toInt() - 16 - vehicleDp - buttonDp / 2
-        val chipsFit = platformChipsFit(platforms.map { it.label }, availableDp, minChipDp = buttonDp)
+        // „▾“ am Ende öffnet die Steig-Liste (Linien + Ziele) und zählt wie ein Chip mit.
+        val chipsFit = platformChipsFit(platforms.map { it.label } + LIST_CHIP_LABEL, availableDp, minChipDp = buttonDp)
         val chipHeight = iconSize + vertPadding * 2
 
         Row(
@@ -1096,9 +1121,15 @@ class DeparturesWidget : GlanceAppWidget() {
             // --- Gruppe STEIG (Rechts-bündig, dynamisch) ---
             if (chipsFit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // KEINE Spacer zwischen den Chips: Glance-Rows haben max. 10 Kinder und schneiden
+                    // den Rest still ab (6 Chips + 5 Spacer = 11 → #6 fehlte am Kröpcke). Abstand als Padding.
                     platforms.forEachIndexed { index, p ->
-                        if (index > 0) Spacer(modifier = GlanceModifier.width(PLATFORM_CHIP_GAP_DP.dp))
-                        PlatformChip(p, activePlatform == p.id, chipHeight, buttonDp.dp)
+                        Box(modifier = GlanceModifier.padding(start = if (index > 0) PLATFORM_CHIP_GAP_DP.dp else 0.dp)) {
+                            PlatformChip(p, activePlatform == p.id, chipHeight, buttonDp.dp)
+                        }
+                    }
+                    Box(modifier = GlanceModifier.padding(start = PLATFORM_CHIP_GAP_DP.dp)) {
+                        PlatformListChip(chipHeight, buttonDp.dp)
                     }
                 }
             } else if (platforms.size >= 2) {
@@ -1136,6 +1167,27 @@ class DeparturesWidget : GlanceAppWidget() {
             Text(
                 text = p.label,
                 style = TextStyle(color = ColorProvider(if (isActive) fg else Color.White), fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1
+            )
+        }
+    }
+
+    /** Kleiner „▾“-Button hinter den Steig-Chips: öffnet die Steig-Liste mit Linien und Zielen. */
+    @Composable
+    private fun PlatformListChip(height: androidx.compose.ui.unit.Dp, width: androidx.compose.ui.unit.Dp) {
+        val context = LocalContext.current
+        Box(
+            modifier = GlanceModifier
+                .width(width)
+                .height(height)
+                .cornerRadius(6.dp)
+                .background(ColorProvider(UestraColors.SegmentInactive))
+                .clickable(actionRunCallback<OpenPlatformPickerAction>()),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = LIST_CHIP_LABEL,
+                style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp, fontWeight = FontWeight.Bold),
                 maxLines = 1
             )
         }
@@ -1218,12 +1270,14 @@ class DeparturesWidget : GlanceAppWidget() {
         platformId: String
     ) {
         Column(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp)) {
+            // Feste Zeilenhöhe: „Alle Steige“ (ohne Kästchen/Untertitel) soll genauso hoch sein wie die Steig-Zeilen.
             Row(
                 modifier = GlanceModifier.fillMaxWidth()
+                    .height(60.dp)
                     .cornerRadius(8.dp)
                     .background(ColorProvider(if (isActive) UestraColors.TealSurface else UestraColors.SegmentInactive))
                     .clickable(actionRunCallback<PickPlatformAction>(actionParametersOf(PickPlatformAction.KEY_PLATFORM to platformId)))
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (label != null && color != null) {

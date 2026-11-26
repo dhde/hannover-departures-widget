@@ -14,6 +14,7 @@ import de.dhde.hannover.departures.widget.api.cleanDestination
 import de.dhde.hannover.departures.widget.data.availablePlatforms
 import de.dhde.hannover.departures.widget.data.effectivePlatform
 import de.dhde.hannover.departures.widget.data.platformLabel
+import de.dhde.hannover.departures.widget.data.platformLabels
 import de.dhde.hannover.departures.widget.data.platformMatches
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,7 +66,7 @@ class FiltersTest {
     @Test
     fun platformLabel_fallbacks() {
         // Unbekannter Steig → letztes ID-Segment; Name ohne Zahl → Name selbst
-        assertEquals("#2024", platformLabel("de:03241:2021:3:2024", emptyMap()))
+        assertNull(platformLabel("de:03241:2021:3:2024", emptyMap()))
         assertEquals("Nord", platformLabel("p", mapOf("p" to "Nord")))
         assertNull(platformLabel(null, emptyMap()))
         assertNull(platformLabel("", emptyMap()))
@@ -126,6 +127,22 @@ class FiltersTest {
         assertTrue(platformChipsFit(all, availableDp = 310, minChipDp = 32))
         // Ein einzelner Steig braucht keinen Filter
         assertFalse(platformChipsFit(listOf("#1"), availableDp = 500, minChipDp = 32))
+    }
+
+    @Test
+    fun platformChipsFit_neverMoreThanGlanceRowLimit() {
+        // Glance-Row: max. 10 Elemente – sonst schneidet Glance stillschweigend ab (Kröpcke-Bug)
+        val eleven = (1..11).map { "#$it" }
+        assertFalse(platformChipsFit(eleven, availableDp = 10_000, minChipDp = 32))
+        assertTrue(platformChipsFit(eleven.take(10), availableDp = 10_000, minChipDp = 32))
+    }
+
+    @Test
+    fun platformChipsFit_withListButton_maxNineChips() {
+        // Hinter den Chips sitzt der „▾“-Listen-Button und zählt mit → höchstens 9 Chips + Button
+        val nine = (1..9).map { "#$it" }
+        assertTrue(platformChipsFit(nine + "▾", availableDp = 10_000, minChipDp = 32))
+        assertFalse(platformChipsFit(nine + "#10" + "▾", availableDp = 10_000, minChipDp = 32))
     }
 
     @Test
@@ -207,5 +224,25 @@ class FiltersTest {
         val result = filterMessages(msgs, setOf("aufzug defekt"))
         assertFalse(result.any { it.id == "ems-1" })
         assertTrue(result.any { it.id == "ems-2" })
+    }
+
+    @Test
+    fun platformLabel_matchesByLastSegmentWhenAreaDiffers() {
+        // Noltemeyerbrücke: Abfahrt meldet Bereich 11, /stops Bereich 2.
+        val names = mapOf("de:03241:2171:2:2174" to "Bus 4", "de:03241:2171:1:2171" to "SB1")
+        assertEquals("#4", platformLabel("de:03241:2171:11:2174", names))
+    }
+
+    @Test
+    fun platformLabels_unknownGetSequentialNumbersNotIds() {
+        val names = mapOf("s:1" to "SB1", "s:2" to "SB2")
+        val labels = platformLabels(listOf("s:1", "x:9002", "s:2", "x:9001", null), names)
+        assertEquals("#1", labels["s:1"])
+        assertEquals("#2", labels["s:2"])
+        // unbekannt → nach ID sortiert hinter der höchsten bekannten Nummer
+        assertEquals("#3", labels["x:9001"])
+        assertEquals("#4", labels["x:9002"])
+        // offline (keine Namen) → 1..n
+        assertEquals(mapOf("x:9001" to "#1", "x:9002" to "#2"), platformLabels(listOf("x:9002", "x:9001"), emptyMap()))
     }
 }

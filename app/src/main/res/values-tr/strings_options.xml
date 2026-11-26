@@ -31,8 +31,9 @@
     <string name="opt_messages_manage">Tekrarlayan duyuruları yönet</string>
     <string name="opt_messages_sheet_desc">Artık görmek istemediğin tekrarlayan duyurular.</string>
     <string name="opt_messages_unhide_all">Tümünü yeniden göster (%1$d)</string>
-    <string name="opt_messages_none">Henüz gizlenebilir duyuru yok. Duyurular bir günden uzun sürünce gizlenebilir. Widget\'ı birkaç kez yenile.</string>
-    <string name="opt_messages_choose">Uzun süren hangi duyuruların gizleneceğini seç:</string>
+    <string name="opt_messages_none">Henüz duyuru görülmedi. Widget\'ı birkaç kez yenile.</string>
+    <string name="opt_messages_choose">Hangi duyuruların gizleneceğini seç:</string>
+    <string name="opt_messages_age_today">bugünden beri</string>
     <plurals name="opt_messages_age_days">
         <item quantity="one">%1$d gündür</item>
         <item quantity="other">%1$d gündür</item>

@@ -15,7 +15,6 @@
     <string name="main_topbar_preview_station">Widget preview · %1$s</string>
     <string name="main_topbar_active_station">Active: %1$s</string>
 
-    <string name="main_messages_locked">can be hidden from tomorrow</string>
     <string name="main_messages_to_app">Open app</string>
     <string name="main_messages_leave">Close</string>
 
@@ -70,7 +69,7 @@
     <string name="main_help_debug_disabled">Debug mode disabled</string>
 
     <string name="main_help_messages_title">Alerts &amp; filters</string>
-    <string name="main_help_messages_desc">Tap the golden \'i\' at the top left of the widget to read current alerts and disruptions. Alerts that last longer than a day (e.g. long-term roadworks or vehicle notices) can be hidden in the settings.</string>
+    <string name="main_help_messages_desc">Tap the golden \'i\' at the top left of the widget to read current alerts and disruptions and hide individual ones. Hidden alerts can be found again in the settings under “Hide alerts” – or tap the empty spot left of the stop name in the widget.</string>
     <string name="main_help_quick_title">Favourite shortcuts</string>
     <string name="main_help_quick_desc">Use the shortcut buttons at the bottom of the widget or tap the stop name at the top to switch between stops.</string>
     <string name="main_help_platforms_title">Platforms &amp; filters</string>

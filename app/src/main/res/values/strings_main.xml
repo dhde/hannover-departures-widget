@@ -20,7 +20,6 @@
     <string name="main_topbar_active_station">Aktiv: %1$s</string>
 
     <!-- Meldungs-Dialog -->
-    <string name="main_messages_locked">erst ab morgen ausblendbar</string>
     <string name="main_messages_to_app">Zur App</string>
     <string name="main_messages_leave">Verlassen</string>
 
@@ -81,7 +80,7 @@
     <string name="main_help_debug_disabled">Debug-Modus deaktiviert</string>
 
     <string name="main_help_messages_title">Info-Meldungen &amp; Filter</string>
-    <string name="main_help_messages_desc">Tippe auf das goldene \'i\' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen. Meldungen, die länger als einen Tag bestehen (z.B. dauerhafte Baustellen oder Fahrzeug-Hinweise), lassen sich in den Optionen ausblenden.</string>
+    <string name="main_help_messages_desc">Tippe auf das goldene \'i\' oben links im Widget, um aktuelle Meldungen und Störungen zu lesen und einzelne auszublenden. Ausgeblendete Meldungen findest du in den Optionen unter „Meldungen ausblenden“ wieder – oder tippe im Widget auf die freie Stelle links neben dem Haltestellennamen.</string>
     <string name="main_help_quick_title">Favoriten-Schnellwahl</string>
     <string name="main_help_quick_desc">Nutze die Schnellwahl-Tasten ganz unten im Widget oder tippe oben auf den Stationsnamen, um durch die Haltestellen zu schalten.</string>
     <string name="main_help_platforms_title">Steige &amp; Filter</string>

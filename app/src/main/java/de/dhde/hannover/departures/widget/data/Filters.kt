@@ -52,14 +52,41 @@ fun lineColor(line: String, isBus: Boolean): LineColor =
 private val NUMBER_REGEX = Regex("\\d+")
 
 /**
+ * /stops-Name eines Steigs. Die Abfahrten liefern die Steig-ID teils mit anderem Bereichs-Segment
+ * als /stops (Noltemeyerbrücke: Abfahrt „…:2171:11:2174", /stops „…:2171:2:2174" = „Bus 4").
+ * Das letzte Segment ist je Haltestelle eindeutig → Fallback-Zuordnung darüber.
+ */
+fun platformName(platformId: String, names: Map<String, String>): String? {
+    names[platformId]?.takeIf { it.isNotBlank() }?.let { return it }
+    val last = platformId.substringAfterLast(':')
+    return names.entries.firstOrNull { it.key.substringAfterLast(':') == last }?.value?.takeIf { it.isNotBlank() }
+}
+
+/**
  * Chip-Beschriftung eines Steigs: „#<Nummer>" aus dem /stops-Namen („#1/SB", „SB6", „Bus17", „Bus 1").
- * Das „#" grenzt den Steig von Liniennummern ab. Name ohne Zahl → Name; unbekannter Steig → letztes ID-Segment.
+ * Das „#" grenzt den Steig von Liniennummern ab. Name ohne Zahl → Name; unbekannter Steig → null
+ * (wird in [platformLabels] fortlaufend nummeriert).
  */
 fun platformLabel(platformId: String?, names: Map<String, String>): String? {
     if (platformId.isNullOrBlank()) return null
-    val name = names[platformId]?.takeIf { it.isNotBlank() }
-        ?: return "#${platformId.substringAfterLast(':')}"
+    val name = platformName(platformId, names) ?: return null
     return NUMBER_REGEX.find(name)?.let { "#${it.value}" } ?: name
+}
+
+/**
+ * Labels für alle Steige einer Antwort. Unbekannte Steige (nicht in /stops, z.B. offline) bekommen
+ * keine interne ID mehr („#2174"), sondern fortlaufende Nummern hinter der höchsten bekannten –
+ * sortiert nach Steig-ID, damit sie auf jedem Gerät gleich ausfallen.
+ */
+fun platformLabels(platformIds: Collection<String?>, names: Map<String, String>): Map<String, String> {
+    val ids = platformIds.filterNotNull().filter { it.isNotBlank() }.distinct()
+    val labels = ids.mapNotNull { id -> platformLabel(id, names)?.let { id to it } }.toMap().toMutableMap()
+    val maxKnown = (labels.values + names.values)
+        .mapNotNull { NUMBER_REGEX.find(it)?.value?.toIntOrNull() }
+        .filter { it < 1000 } // keine ID-artigen Nummern hochzählen
+        .maxOrNull() ?: 0
+    ids.filter { it !in labels }.sorted().forEachIndexed { i, id -> labels[id] = "#${maxKnown + i + 1}" }
+    return labels
 }
 
 /** Sortierschlüssel mit natürlicher Zahlensortierung („#2" vor „#10"). */
@@ -108,7 +135,14 @@ fun platformChipsWidthDp(labels: List<String>, minChipDp: Int = 0): Int =
  * einen „Steig“-Button mit vertikal scrollbarer Auswahl.
  */
 fun platformChipsFit(labels: List<String>, availableDp: Int, minChipDp: Int = 0): Boolean =
-    labels.size >= 2 && platformChipsWidthDp(labels, minChipDp) <= availableDp
+    labels.size in 2..MAX_PLATFORM_CHIPS && platformChipsWidthDp(labels, minChipDp) <= availableDp
+
+/**
+ * Glance-Row/Column erlauben max. 10 Kinder; mehr werden STILL abgeschnitten
+ * („Truncated Row container from 11 to 10 elements“). Chips daher ohne Spacer-Kinder
+ * rendern (Abstand als Padding) und nie mehr als 10 Chips.
+ */
+const val MAX_PLATFORM_CHIPS = 10
 
 /**
  * Tatsächlich anzuwendender Steig-Filter: der gespeicherte Steig, sofern er unter den

@@ -15,7 +15,6 @@
     <string name="main_topbar_preview_station">Превью виджета · %1$s</string>
     <string name="main_topbar_active_station">Активна: %1$s</string>
 
-    <string name="main_messages_locked">скрыть можно только с завтра</string>
     <string name="main_messages_to_app">В приложение</string>
     <string name="main_messages_leave">Выйти</string>
 
@@ -70,7 +69,7 @@
     <string name="main_help_debug_disabled">Режим отладки выключен</string>
 
     <string name="main_help_messages_title">Объявления &amp; фильтр</string>
-    <string name="main_help_messages_desc">Нажми на золотую «i» слева вверху виджета, чтобы прочитать актуальные объявления и сбои. Объявления, которые висят дольше суток (напр. долгие стройки или информация о транспорте), можно скрыть в настройках.</string>
+    <string name="main_help_messages_desc">Нажми на золотую «i» слева вверху виджета, чтобы прочитать актуальные объявления и сбои и скрыть отдельные. Скрытые объявления снова найдёшь в настройках в «Скрыть объявления» – или нажми на пустое место слева от названия остановки в виджете.</string>
     <string name="main_help_quick_title">Быстрый выбор избранного</string>
     <string name="main_help_quick_desc">Используй кнопки быстрого выбора внизу виджета или нажми на название остановки вверху, чтобы переключать остановки.</string>
     <string name="main_help_platforms_title">Платформы &amp; фильтр</string>

@@ -56,7 +56,6 @@ import de.dhde.hannover.departures.widget.data.PlatformOption
 import de.dhde.hannover.departures.widget.data.availablePlatforms
 import de.dhde.hannover.departures.widget.data.effectivePlatform
 import de.dhde.hannover.departures.widget.data.platformMatches
-import de.dhde.hannover.departures.widget.data.withPlatformNames
 import de.dhde.hannover.departures.widget.data.FavoritesRepository
 import de.dhde.hannover.departures.widget.data.TransportFilter
 import de.dhde.hannover.departures.widget.data.NearestStationsFinder
@@ -87,6 +86,12 @@ data class InfoDialogData(val title: String, val msgs: String? = null, val group
 class MainActivity : ComponentActivity() {
 
     private var infoDialogState by mutableStateOf<InfoDialogData?>(null)
+    private var openMessageFilter by mutableStateOf(false)
+
+    companion object {
+        /** Widget: freie Fläche vor dem Haltestellennamen → Meldungsfilter in den Optionen. */
+        const val ACTION_OPEN_MESSAGE_FILTER = "de.dhde.hannover.departures.OPEN_MESSAGE_FILTER"
+    }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -145,7 +150,12 @@ class MainActivity : ComponentActivity() {
                         .collect { DeparturesWidget().updateAll(this@MainActivity) }
                 }
                 
-                ConfigurationScreen(repo, onInfoClick = { infoDialogState = it })
+                ConfigurationScreen(
+                    repo,
+                    onInfoClick = { infoDialogState = it },
+                    openMessageFilter = openMessageFilter,
+                    onMessageFilterOpened = { openMessageFilter = false }
+                )
                 
                 infoDialogState?.let { data ->
                     Dialog(
@@ -183,8 +193,6 @@ class MainActivity : ComponentActivity() {
                                             lineHeight = 24.sp
                                         )
                                     } else if (data.groupedMsgs != null) {
-                                        val oneDayMillis = 24L * 60 * 60 * 1000
-                                        val nowMillis = System.currentTimeMillis()
                                         data.groupedMsgs.forEach { (line, lineMsgs) ->
                                             Text(
                                                 text = stringResource(R.string.common_line_colon, line),
@@ -194,8 +202,6 @@ class MainActivity : ComponentActivity() {
                                             )
                                             lineMsgs.forEach { msg ->
                                                 val isIgnored = msg.id in ignoredMessages
-                                                // Erst ab 1 Tag (nach incidentStart) ausblendbar; frische Meldungen bleiben fix.
-                                                val isFresh = msg.startMillis > 0 && (nowMillis - msg.startMillis) < oneDayMillis
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                                                     verticalAlignment = Alignment.Top
@@ -207,14 +213,7 @@ class MainActivity : ComponentActivity() {
                                                         lineHeight = 20.sp,
                                                         modifier = Modifier.weight(1f).padding(top = 10.dp)
                                                     )
-                                                    if (isFresh) {
-                                                        Icon(
-                                                            Icons.Default.Lock,
-                                                            contentDescription = stringResource(R.string.main_messages_locked),
-                                                            tint = UestraColors.TextSub,
-                                                            modifier = Modifier.padding(top = 10.dp, start = 4.dp).size(18.dp)
-                                                        )
-                                                    } else {
+                                                    run {
                                                         Checkbox(
                                                             checked = isIgnored,
                                                             onCheckedChange = { checked ->
@@ -265,6 +264,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (intent?.action == ACTION_OPEN_MESSAGE_FILTER) {
+            openMessageFilter = true
+            return
+        }
         if (intent?.action == "de.dhde.hannover.departures.SHOW_INFO") {
             val title = intent.getStringExtra("info_title") ?: getString(R.string.common_messages)
             val msgsJson = intent.getStringExtra("info_msgs_json")
@@ -301,8 +304,14 @@ enum class AppScreen(val labelRes: Int, val icon: androidx.compose.ui.graphics.v
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> Unit = {}) {
+fun ConfigurationScreen(
+    repo: FavoritesRepository,
+    onInfoClick: (InfoDialogData) -> Unit = {},
+    openMessageFilter: Boolean = false,
+    onMessageFilterOpened: () -> Unit = {}
+) {
     var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
+    if (openMessageFilter && currentScreen != AppScreen.OPTIONS) currentScreen = AppScreen.OPTIONS
     val activeStationName by repo.effectiveStationName.collectAsState(initial = stringResource(R.string.main_loading))
     val context = LocalContext.current
     val sessionStore = remember { de.dhde.hannover.departures.widget.data.WidgetSessionStore(context) }
@@ -357,7 +366,7 @@ fun ConfigurationScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData)
             when (currentScreen) {
                 AppScreen.DASHBOARD -> DashboardScreen(repo, onInfoClick = onInfoClick)
                 AppScreen.SEARCH -> SearchScreen(repo)
-                AppScreen.OPTIONS -> OptionsScreen(repo)
+                AppScreen.OPTIONS -> OptionsScreen(repo, openMessageFilter, onMessageFilterOpened)
                 AppScreen.FAVORITES -> FavoritesScreen(repo)
                 AppScreen.HELP -> HelpScreen()
                 AppScreen.DEBUG -> de.dhde.hannover.departures.widget.debug.DebugScreen()
@@ -483,9 +492,9 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         scope.launch {
             isLoading = true
             try {
-                val apiResponse = UestraApi.create().getDepartures(stationId, UestraApi.DEFAULT_DEP_SEQUENCE)
-                rawDepartures = (apiResponse.departures ?: emptyList())
-                    .withPlatformNames(StopsRepository(context).platformNames(stationId))
+                // Gewählter Steig → zusätzliche Steig-Abfrage für die volle Abfahrtsliste (wie im Widget).
+                rawDepartures = de.dhde.hannover.departures.widget.data.fetchDepartures(context, stationId, platformState)
+                    ?: emptyList()
                 departures = rawDepartures.flatMap { it.toFlatRows() }.sortedBy { it.departureTime }
                 lastUpdate = java.time.Instant.now()
             } catch (e: Exception) {
@@ -496,7 +505,8 @@ fun DashboardScreen(repo: FavoritesRepository, onInfoClick: (InfoDialogData) -> 
         }
     }
 
-    LaunchedEffect(activeStationId) {
+    // Auch beim Steigwechsel neu laden: der gewählte Steig bekommt eine eigene Abfrage (volle Liste).
+    LaunchedEffect(activeStationId, platformState) {
         activeStationId?.let { loadData(it) }
     }
 
@@ -889,12 +899,22 @@ fun WidgetHeader(stationName: String, isRefreshing: Boolean, hasMessages: Boolea
                 modifier = Modifier
                     .size(36.dp)
                     .clickable { onInfoClick() },
-                contentAlignment = Alignment.CenterStart
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
                     contentDescription = stringResource(R.string.main_preview_info),
                     tint = UestraColors.Amber,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else {
+            // Graues (i) = keine Meldungen (wie im Widget); Name springt nicht.
+            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_info),
+                    contentDescription = stringResource(R.string.common_no_messages),
+                    tint = UestraColors.IconMuted,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -963,8 +983,9 @@ fun WidgetFilterRow(
         Spacer(modifier = Modifier.width(gap))
         if (platforms.size >= 2) {
             BoxWithConstraints(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                // Wie im Widget: „▾“ hinter den Chips öffnet die Steig-Liste und zählt als Chip mit.
                 val fits = de.dhde.hannover.departures.widget.data.platformChipsFit(
-                    platforms.map { it.label }, maxWidth.value.toInt(), minChipDp = buttonWidth.value.toInt()
+                    platforms.map { it.label } + "▾", maxWidth.value.toInt(), minChipDp = buttonWidth.value.toInt()
                 )
                 if (fits) {
                     Row(horizontalArrangement = Arrangement.spacedBy(de.dhde.hannover.departures.widget.data.PLATFORM_CHIP_GAP_DP.dp)) {
@@ -973,6 +994,7 @@ fun WidgetFilterRow(
                                 onPlatformChange(if (activePlatform == p.id) null else p.id)
                             }
                         }
+                        PlatformPickerButton(platforms, activePlatform, filterHeight, onPlatformChange, compact = true)
                     }
                 } else {
                     PlatformPickerButton(platforms, activePlatform, filterHeight, onPlatformChange)
@@ -1035,23 +1057,27 @@ fun PlatformPickerButton(
     platforms: List<PlatformOption>,
     activePlatform: String?,
     mode: String,
-    onPlatformChange: (String?) -> Unit
+    onPlatformChange: (String?) -> Unit,
+    /** true: nur „▾“ in Chip-Größe (hinter den Chips), false: „Steig ▾“ bzw. „#3 ▾“. */
+    compact: Boolean = false
 ) {
     var open by remember { mutableStateOf(false) }
-    val (_, height, _) = filterSegmentSize(mode)
-    val active = platforms.firstOrNull { it.id == activePlatform }
+    val (width, height, _) = filterSegmentSize(mode)
+    val active = platforms.firstOrNull { it.id == activePlatform }.takeIf { !compact }
     val (bg, fg) = active?.let { UestraColors.lineColors(it.color) } ?: (UestraColors.ChipInactive to Color.White)
     Box {
         Box(
             modifier = Modifier
+                .then(if (compact) Modifier.width(width) else Modifier)
                 .height(height)
                 .clip(RoundedCornerShape(6.dp))
                 .background(bg)
                 .clickable { open = true }
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = if (compact) 0.dp else 12.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text((active?.label ?: stringResource(R.string.platform_button)) + " ▾", color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            val label = if (compact) "▾" else (active?.label ?: stringResource(R.string.platform_button)) + " ▾"
+            Text(label, color = fg, fontSize = if (compact) 14.sp else 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = UestraColors.CardBg) {
             DropdownMenuItem(
@@ -1385,7 +1411,7 @@ fun SearchScreen(repo: FavoritesRepository) {
             val filteredStops = if (query.isBlank()) {
                 allStops
             } else {
-                allStops.filter { it.name.contains(query, ignoreCase = true) }
+                allStops.filter { de.dhde.hannover.departures.widget.data.stopNameMatches(it.name, query) }
             }
 
             val stopsWithDistances = filteredStops.map { stop ->

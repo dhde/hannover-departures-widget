@@ -31,8 +31,9 @@
     <string name="opt_messages_manage">Manage recurring alerts</string>
     <string name="opt_messages_sheet_desc">Recurring alerts you no longer want to see.</string>
     <string name="opt_messages_unhide_all">Show all again (%1$d)</string>
-    <string name="opt_messages_none">No hideable alerts yet. Alerts can be hidden once they have lasted longer than a day. Reload the widget a few times.</string>
-    <string name="opt_messages_choose">Choose which long-running alerts to hide:</string>
+    <string name="opt_messages_none">No alerts seen yet. Reload the widget a few times.</string>
+    <string name="opt_messages_choose">Choose which alerts to hide:</string>
+    <string name="opt_messages_age_today">since today</string>
     <plurals name="opt_messages_age_days">
         <item quantity="one">for %1$d day</item>
         <item quantity="other">for %1$d days</item>
