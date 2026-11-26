@@ -7,6 +7,7 @@
     <string name="common_type_fernbus">Междугородний автобус</string>
     <string name="common_unknown">Неизвестно</string>
     <string name="common_messages">Объявления</string>
+    <string name="common_no_messages">Нет объявлений</string>
     <string name="common_messages_title">Объявления: %1$s</string>
     <string name="common_line_colon">Линия %1$s:</string>
     <string name="common_time_now">сейчас</string>

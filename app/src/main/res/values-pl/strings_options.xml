@@ -33,8 +33,9 @@
     <string name="opt_messages_manage">Zarządzaj powtarzającymi się komunikatami</string>
     <string name="opt_messages_sheet_desc">Powtarzające się komunikaty, których nie chcesz już widzieć.</string>
     <string name="opt_messages_unhide_all">Pokaż wszystkie ponownie (%1$d)</string>
-    <string name="opt_messages_none">Brak komunikatów do ukrycia. Komunikat można ukryć, gdy trwa dłużej niż dzień. Odśwież widżet kilka razy.</string>
-    <string name="opt_messages_choose">Wybierz, które dłużej trwające komunikaty ukryć:</string>
+    <string name="opt_messages_none">Nie widziano jeszcze komunikatów. Odśwież widżet kilka razy.</string>
+    <string name="opt_messages_choose">Wybierz, które komunikaty ukryć:</string>
+    <string name="opt_messages_age_today">od dzisiaj</string>
     <plurals name="opt_messages_age_days">
         <item quantity="one">od %1$d dnia</item>
         <item quantity="few">od %1$d dni</item>

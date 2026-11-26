@@ -33,8 +33,9 @@
     <string name="opt_messages_manage">Керувати повторюваними оголошеннями</string>
     <string name="opt_messages_sheet_desc">Повторювані оголошення, які ти більше не хочеш бачити.</string>
     <string name="opt_messages_unhide_all">Показати всі знову (%1$d)</string>
-    <string name="opt_messages_none">Поки немає оголошень, які можна приховати. Оголошення можна приховати, якщо вони діють довше одного дня. Онови віджет кілька разів.</string>
-    <string name="opt_messages_choose">Обери, які тривалі оголошення приховати:</string>
+    <string name="opt_messages_none">Оголошень ще не було. Онови віджет кілька разів.</string>
+    <string name="opt_messages_choose">Обери, які оголошення приховати:</string>
+    <string name="opt_messages_age_today">з сьогодні</string>
     <plurals name="opt_messages_age_days">
         <item quantity="one">вже %1$d день</item>
         <item quantity="few">вже %1$d дні</item>

@@ -33,8 +33,9 @@
     <string name="opt_messages_manage">Повторяющиеся объявления</string>
     <string name="opt_messages_sheet_desc">Повторяющиеся объявления, которые ты больше не хочешь видеть.</string>
     <string name="opt_messages_unhide_all">Показать все снова (%1$d)</string>
-    <string name="opt_messages_none">Пока нет объявлений, которые можно скрыть. Скрыть объявление можно, если оно висит дольше суток. Обнови виджет несколько раз.</string>
-    <string name="opt_messages_choose">Выбери, какие долгие объявления скрыть:</string>
+    <string name="opt_messages_none">Объявлений пока не было. Обнови виджет несколько раз.</string>
+    <string name="opt_messages_choose">Выбери, какие объявления скрыть:</string>
+    <string name="opt_messages_age_today">с сегодняшнего дня</string>
     <plurals name="opt_messages_age_days">
         <item quantity="one">уже %1$d день</item>
         <item quantity="few">уже %1$d дня</item>

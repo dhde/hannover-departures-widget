@@ -15,7 +15,6 @@
     <string name="main_topbar_preview_station">Widget önizleme · %1$s</string>
     <string name="main_topbar_active_station">Aktif: %1$s</string>
 
-    <string name="main_messages_locked">ancak yarından itibaren gizlenebilir</string>
     <string name="main_messages_to_app">Uygulamaya git</string>
     <string name="main_messages_leave">Çık</string>
 
@@ -70,7 +69,7 @@
     <string name="main_help_debug_disabled">Debug modu devre dışı</string>
 
     <string name="main_help_messages_title">Bilgi duyuruları &amp; filtre</string>
-    <string name="main_help_messages_desc">Güncel duyuruları ve aksaklıkları okumak için widget\'ın sol üstündeki altın renkli \'i\'ye dokun. Bir günden uzun süren duyurular (örn. uzun süreli inşaat çalışmaları veya araç bilgileri) Ayarlar\'dan gizlenebilir.</string>
+    <string name="main_help_messages_desc">Güncel duyuruları ve aksaklıkları okumak ve tek tek gizlemek için widget\'ın sol üstündeki altın renkli \'i\'ye dokun. Gizlenen duyuruları Ayarlar\'da „Duyuruları gizle“ altında tekrar bulursun – ya da widget\'ta durak adının solundaki boş alana dokun.</string>
     <string name="main_help_quick_title">Favori hızlı seçimi</string>
     <string name="main_help_quick_desc">Duraklar arasında geçiş yapmak için widget\'ın en altındaki hızlı seçim tuşlarını kullan ya da üstteki durak adına dokun.</string>
     <string name="main_help_platforms_title">Peronlar &amp; filtre</string>

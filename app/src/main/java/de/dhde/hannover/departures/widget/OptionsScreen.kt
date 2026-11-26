@@ -33,7 +33,11 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesRepository) {
+fun OptionsScreen(
+    repo: de.dhde.hannover.departures.widget.data.FavoritesRepository,
+    openMessageFilter: Boolean = false,
+    onMessageFilterOpened: () -> Unit = {}
+) {
     val scope = rememberCoroutineScope()
     var showAllMessages by remember { mutableStateOf(false) }
     val maxFavsFlow by repo.maxFavoritesFlow.collectAsState(initial = 3)
@@ -59,6 +63,12 @@ fun OptionsScreen(repo: de.dhde.hannover.departures.widget.data.FavoritesReposit
     var showDuplicatesWarning by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var showMessageSheet by remember { mutableStateOf(false) }
+    LaunchedEffect(openMessageFilter) {
+        if (openMessageFilter) {
+            showMessageSheet = true
+            onMessageFilterOpened()
+        }
+    }
 
     if (showDuplicatesWarning) {
         AlertDialog(
@@ -389,15 +399,13 @@ private fun MessageFilterSheetContent(
         }
         Spacer(Modifier.height(12.dp))
 
-        // Eine Meldung wird ausblendbar, sobald sie >= 1 Tag bekannt ist
-        // (Alter aus incidentStart der API, sonst aus dem ersten Sehen).
+        // Alle gesehenen Meldungen sind sofort ausblendbar (früher erst ab 1 Tag Alter).
         val oneDayMillis = 24L * 60 * 60 * 1000
         val nowMillis = System.currentTimeMillis()
         val allTypesActive = transportTypes.containsAll(setOf("Stadtbahn", "Bus", "S-Bahn", "DB", "Fernbus"))
         val filterableMessages = seenMessages
             .filter { entry ->
                 entry.value.content.isNotBlank() &&
-                (nowMillis - entry.value.effectiveStartMillis) >= oneDayMillis &&
                 if (entry.value.transportTypes.isEmpty()) {
                     // Alte Einträge ohne Typ-Info: nur zeigen wenn alle Typen aktiv
                     allTypesActive
@@ -440,9 +448,14 @@ private fun MessageFilterSheetContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(entry.content, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                        val ageDays = ((nowMillis - entry.effectiveStartMillis) / oneDayMillis).coerceAtLeast(1)
-                        Text(pluralStringResource(R.plurals.opt_messages_age_days, ageDays.toInt(), ageDays.toInt()), color = UestraColors.TextSub, fontSize = 11.sp)
+                        // Volltext, damit ausgeblendete Meldungen hier nachgelesen werden können.
+                        Text(entry.content, color = UestraColors.TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        val ageDays = ((nowMillis - entry.effectiveStartMillis) / oneDayMillis).toInt()
+                        Text(
+                            if (ageDays < 1) stringResource(R.string.opt_messages_age_today)
+                            else pluralStringResource(R.plurals.opt_messages_age_days, ageDays, ageDays),
+                            color = UestraColors.TextSub, fontSize = 11.sp
+                        )
                     }
                     IconButton(
                         onClick = {

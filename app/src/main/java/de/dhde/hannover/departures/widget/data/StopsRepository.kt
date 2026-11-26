@@ -55,5 +55,7 @@ class StopsRepository(context: Context) {
 }
 
 /** Reichert Abfahrten um den Steig-Namen an (Fallback-Label, wenn /stops den Steig nicht kennt). */
-fun List<de.dhde.hannover.departures.widget.api.DepartureItem>.withPlatformNames(names: Map<String, String>) =
-    map { it.copy(platformName = platformLabel(it.platformId, names)) }
+fun List<de.dhde.hannover.departures.widget.api.DepartureItem>.withPlatformNames(names: Map<String, String>): List<de.dhde.hannover.departures.widget.api.DepartureItem> {
+    val labels = platformLabels(map { it.platformId }, names)
+    return map { it.copy(platformName = it.platformId?.let(labels::get)) }
+}

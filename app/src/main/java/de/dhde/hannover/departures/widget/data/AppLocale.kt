@@ -61,6 +61,17 @@ object AppLocale {
         return locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
     }
 
+    /** Flaggen-Emoji vor dem Sprachnamen in den Optionen; Systemsprache = Globus. */
+    fun flag(tag: String?): String = when (tag) {
+        "de" -> "🇩🇪"
+        "en" -> "🇬🇧"
+        "tr" -> "🇹🇷"
+        "pl" -> "🇵🇱"
+        "uk" -> "🇺🇦"
+        "ru" -> "🇷🇺"
+        else -> "🌐"
+    }
+
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

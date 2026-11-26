@@ -11,6 +11,7 @@
     <string name="common_unknown">Unbekannt</string>
     <!-- Meldungs-Dialog (Widget und App) -->
     <string name="common_messages">Meldungen</string>
+    <string name="common_no_messages">Keine Meldungen</string>
     <string name="common_messages_title">Meldungen: %1$s</string>
     <string name="common_line_colon">Linie %1$s:</string>
     <!-- Abfahrtszeit in der letzten Minute bzw. vermutlich schon abgefahren (Widget + App) -->

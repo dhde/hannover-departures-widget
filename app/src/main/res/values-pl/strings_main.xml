@@ -15,7 +15,6 @@
     <string name="main_topbar_preview_station">Podgląd widżetu · %1$s</string>
     <string name="main_topbar_active_station">Aktywny: %1$s</string>
 
-    <string name="main_messages_locked">ukrycie możliwe od jutra</string>
     <string name="main_messages_to_app">Do aplikacji</string>
     <string name="main_messages_leave">Wyjdź</string>
 
@@ -70,7 +69,7 @@
     <string name="main_help_debug_disabled">Tryb debugowania wyłączony</string>
 
     <string name="main_help_messages_title">Komunikaty &amp; filtry</string>
-    <string name="main_help_messages_desc">Dotknij złotego \'i\' w lewym górnym rogu widżetu, aby przeczytać aktualne komunikaty i utrudnienia. Komunikaty trwające dłużej niż dzień (np. długie remonty lub informacje o pojazdach) możesz ukryć w ustawieniach.</string>
+    <string name="main_help_messages_desc">Dotknij złotego \'i\' w lewym górnym rogu widżetu, aby przeczytać aktualne komunikaty i utrudnienia oraz ukryć wybrane. Ukryte komunikaty znajdziesz w ustawieniach w „Ukryj komunikaty“ – albo dotknij pustego miejsca na lewo od nazwy przystanku w widżecie.</string>
     <string name="main_help_quick_title">Szybki wybór ulubionych</string>
     <string name="main_help_quick_desc">Użyj przycisków szybkiego wyboru na dole widżetu lub dotknij nazwy przystanku u góry, aby przełączać przystanki.</string>
     <string name="main_help_platforms_title">Perony &amp; filtry</string>

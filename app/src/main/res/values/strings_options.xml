@@ -40,8 +40,9 @@
     <string name="opt_messages_manage">Wiederkehrende Meldungen verwalten</string>
     <string name="opt_messages_sheet_desc">Wiederkehrende Meldungen, die du nicht mehr sehen willst.</string>
     <string name="opt_messages_unhide_all">Alle wieder einblenden (%1$d)</string>
-    <string name="opt_messages_none">Noch keine ausblendbaren Meldungen. Meldungen lassen sich ausblenden, sobald sie länger als einen Tag bestehen. Lade das Widget einige Male neu.</string>
-    <string name="opt_messages_choose">Wähle aus, welche länger bestehenden Meldungen ausgeblendet werden sollen:</string>
+    <string name="opt_messages_none">Noch keine Meldungen gesehen. Lade das Widget einige Male neu.</string>
+    <string name="opt_messages_choose">Wähle aus, welche Meldungen ausgeblendet werden sollen:</string>
+    <string name="opt_messages_age_today">seit heute</string>
     <plurals name="opt_messages_age_days">
         <item quantity="one">seit %1$d Tag</item>
         <item quantity="other">seit %1$d Tagen</item>
