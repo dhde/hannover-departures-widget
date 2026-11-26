@@ -2,23 +2,29 @@
 set -e
 
 # Konfiguration
-TAG="v1.11.1"                   # Release-Tag (z. B. v1.0.0)
+TAG="v1.11.2"                   # Release-Tag (z. B. v1.0.0)
 ASSET_FILE="./app/build/outputs/apk/release/app-release.apk"  # Pfad zur Asset-Datei
-RELEASE_TITLE="Üstra Widget 1.11.1" # Optional: Release-Titel
+RELEASE_TITLE="Üstra Widget 1.11.2" # Optional: Release-Titel
 RELEASE_NOTES=$(cat <<'NOTES'
-## Üstra Widget 1.11.1
+## Üstra Widget 1.11.2
 
-### 🚏 Größere Steig-Chips und Steig-Auswahl
+### 🚏 Steige
 
-Die Steig-Chips aus 1.11.0 waren zu klein zum Antippen.
+- Am Kröpcke fehlte im Bahn-Filter ein Steig, obwohl genug Platz war. Jetzt sind alle Steige zu sehen.
+- Hinter den Steig-Chips gibt es einen **„▾“**-Button. Er öffnet die Steig-Liste mit Linien und Zielen, auch wenn alle Chips passen.
+- Ist ein Steig gewählt, lädt das Widget die Abfahrten nur für diesen Steig. So erscheinen alle kommenden Abfahrten, nicht nur wenige.
+- Steige haben keine internen vierstelligen Nummern mehr (z.B. Noltemeyerbrücke „#2174“ → „#4“). Die Nummern sind auf jedem Gerät gleich.
 
-- Jeder Steig-Chip ist jetzt mindestens so groß wie die Bus/Bahn-Buttons. Es werden so viele angezeigt, wie in die Breite des Widgets passen.
-- Passen nicht alle (z.B. am Kröpcke), erscheint ein **„Steig ▾“**-Button. Er öffnet eine Auswahl, in der man hoch und runter scrollen kann: Jeder Steig steht dort mit Farbe, Linien und Zielen.
-- In der App-Vorschau gibt es dieselbe Auswahl als Menü.
+### ℹ️ Meldungen
+
+- Jede Meldung lässt sich sofort ausblenden, das Schloss ist weg.
+- Ohne Meldungen zeigt das Widget ein graues (i). Ein Tipp darauf öffnet den Meldungsfilter, dort kann man ausgeblendete Meldungen nachlesen und wieder einblenden.
+- Der Haltestellenname springt nicht mehr, wenn das (i) erscheint oder verschwindet.
 
 ### Kleinigkeiten
 
-- Unten im Widget öffnet jetzt auch ein Tipp auf „Inoffiziell“ die App, nicht nur der kleine Pfeil.
+- Suche: „oe“ findet „ö“ (ebenso ae/ä, ue/ü, ss/ß).
+- Sprachauswahl als Dropdown mit Flaggen.
 NOTES
 )  # Optional: Release-Notizen
 
